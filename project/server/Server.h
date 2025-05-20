@@ -2,6 +2,9 @@
 #include "../muduo/net/EventLoop.h"
 #include "../muduo/net/tcp/InetAddress.h"
 #include "../muduo/net/tcp/TcpConnection.h"
+#include "../tool/Codec.h"
+#include "Service.h"
+
 
 #include <functional>
 
@@ -25,13 +28,13 @@ public:
         server_.setThreadNum(num);
     }
 
-private:
     void ConnectionCallback(const TcpConnectionPtr& conn);
     void MessageCallback(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time);
     void MessageCompleteCallback(const TcpConnectionPtr& conn);
     void ThreadInitCallback(EventLoop* loop);
 
+private:
     EventLoop* loop_;
     TcpServer server_;
-
+    Codec codec_;
 };
