@@ -23,7 +23,7 @@ class Codec
 {
 public:
     //编码，添加包头
-    static std::string encode(const json& js, uint16_t type, uint16_t seq = 0);
+    static std::string encode(const json& js, uint16_t type, uint16_t seq);
 
     //解码，解析包头
     static std::optional<std::tuple<uint16_t, uint16_t, json>> tryDecode(Buffer* buf);

@@ -10,7 +10,7 @@
 #include <mutex>
 
 using json = nlohmann::json;
-using MessageHander = std::function<void(const TcpConnectionPtr&, const json&, Timestamp)>;
+using MessageHander = std::function<void(const TcpConnectionPtr&, const json&, const uint16_t, Timestamp)>;
 
 class Dispatcher
 {
@@ -20,7 +20,7 @@ public:
         handers_[type] = std::move(hander);
     }
 
-    void dispatch(uint16_t type, const TcpConnectionPtr conn, const json& js, Timestamp time)
+    void dispatch(uint16_t type, const TcpConnectionPtr conn, const json& js, const uint16_t seq, Timestamp time)
     {
         MessageHander cb;
 
@@ -39,7 +39,7 @@ public:
         
         if (cb)
         {
-            cb(conn, js, time);
+            cb(conn, js, seq, time);
         }
     }
 

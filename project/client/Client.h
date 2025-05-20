@@ -4,6 +4,7 @@
 #include "../muduo/net/tcp/InetAddress.h"
 #include "../tool/Codec.h"
 #include "../tool/Dispatcher.h"
+#include "../tool/Processpend.h"
 
 #include <string>
 
@@ -14,14 +15,12 @@ public:
         : loop_(loop),
           client_(loop, addr, name)
     {
-
     }
-
-
 
 private:
     EventLoop* loop_;
     TcpClient client_;
     Codec codec_;
-    
+    Processpend processpend_;
+
 };

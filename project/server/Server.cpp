@@ -31,6 +31,5 @@ void Server::MessageCallback(const TcpConnectionPtr& conn, Buffer* buf, Timestam
     }
     auto [type, seq, js] = msgopt.value();
 
-    dispatcher_.dispatch(type, conn, js, time);
-    
+    dispatcher_.dispatch(type, conn, js, seq, time);
 }
