@@ -1,3 +1,6 @@
+#ifndef CODEC_H
+#define CODEC_H
+
 #include "../muduo/net/Buffer.h"
 #include "../muduo/net/tcp/TcpConnection.h"
 
@@ -26,3 +29,5 @@ public:
     static std::optional<std::tuple<uint16_t, uint16_t, json>> tryDecode(Buffer* buf);
     
 };
+
+#endif

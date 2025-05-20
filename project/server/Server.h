@@ -1,10 +1,13 @@
+#ifndef SERVER_H
+#define SERVER_H
+
 #include "../muduo/net/tcp/TcpServer.h"
 #include "../muduo/net/EventLoop.h"
 #include "../muduo/net/tcp/InetAddress.h"
 #include "../muduo/net/tcp/TcpConnection.h"
-#include "../tool/Codec.h"
 #include "Service.h"
-
+#include "../tool/Codec.h"
+#include "../tool/Dispatcher.h"
 
 #include <functional>
 
@@ -37,4 +40,8 @@ private:
     EventLoop* loop_;
     TcpServer server_;
     Codec codec_;
+    Dispatcher dispatcher_;
+
 };
+
+#endif

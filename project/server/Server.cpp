@@ -31,8 +31,6 @@ void Server::MessageCallback(const TcpConnectionPtr& conn, Buffer* buf, Timestam
     }
     auto [type, seq, js] = msgopt.value();
 
-    switch (type) {
-        case 1:  break;
-        case 2:  break;
-    }
+    dispatcher_.dispatch(type, conn, js, time);
+    
 }
