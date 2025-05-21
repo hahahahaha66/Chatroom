@@ -20,7 +20,7 @@ using std::placeholders::_4;
 class Service
 {
 public:
-    Service();
+    Service(Dispatcher& dispatcher);
     ~Service(){};
 
     void RegisterAllHanders(Dispatcher& dispatcher);
@@ -29,10 +29,11 @@ public:
     void RegisterAccount(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
     void ListFriendlist(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
     void DeleteFrient(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    
+
 
 private:
     Codec codec_;
+    Dispatcher& dispatcher_;
     std::unordered_map<uint16_t, MessageHander> handermap_;
 };
 

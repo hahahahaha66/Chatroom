@@ -16,7 +16,8 @@ class Server
 public:
     Server(EventLoop* loop, InetAddress& addr, std::string name)
         : loop_(loop),
-          server_(loop, addr, name)
+          server_(loop, addr, name),
+          service_(dispatcher_)
     {
         server_.setConnectionCallback(std::bind(&Server::ConnectionCallback, this, std::placeholders::_1));
         server_.setMessageCallback(std::bind(&Server::MessageCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));

@@ -3,10 +3,9 @@
 #include <cstdint>
 #include <functional>
 
-Service::Service()
+Service::Service(Dispatcher& dispatcher) : dispatcher_(dispatcher)
 {
     handermap_[1] = std::bind(&Service::ProcessingLogin, this, _1, _2, _3, _4);
-
 }
 
 void Service::RegisterAllHanders(Dispatcher& dispatcher)
