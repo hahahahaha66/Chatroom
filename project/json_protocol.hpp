@@ -3,24 +3,39 @@
 
 #include <nlohmann/json.hpp>
 #include <string>
+#include <vector>
 
 using json = nlohmann::json;
 
-std::string LoginData(const std::string& username, const std::string& password);
-std::string RegisterData(const std::string username, const std::string& password);
+//用户信息
+std::string UserData(const std::string& username, const std::string& password);
 
-std::string AddFriendData(const std::string& username, const std::string& friendname);
-std::string FriendChatData(const std::string username, const std::string& to, const std::string& message);
+//好友列表
+std::string FriendList(const std::string& usrname, const std::vector<std::string>& friendlist);
+//好友
+std::string FriendData(const std::string& username, const std::string& friendname);
+//私聊
+std::string FriendChatData(const std::string& from, const std::string& to, const std::string& message);
 
-std::string GroupCreateData(const std::string& groupname, const std::string& creator);
-std::string GroupJoinData(const std::string& groupname, const std::string& username);
+//群聊列表
+std::string GroupList(const std::string& username, const std::vector<std::string>& grouplist);
+//创建群聊
+std::string GroupCreateData(const std::string& groupname, const std::string& creator, const std::vector<std::string>& othermembers);
+//群聊成员
+std::string GroupData(const std::string& groupname, const std::string& username);
+//群聊成员列表
+std::string GroupMemberList(const std::string& groupname, const std::vector<std::string> &memberlist);
+//群聊消息
 std::string GroupChatData(const std::string& groupname, const std::string& from, const std::string& message);
 
-std::string ExtractCommonField(const json& j, const std::string& key);
+//用于申请列表
+std::string UserList(const std::vector<std::string>& userlist);
 
-
-
+//回复
 std::string CommandReply(const bool& end, const std::string& result);
 
+//提取json变量
+template<typename T>
+std::string ExtractCommonField(const json& j, const std::string& key, const T& default_value = T());
 
 #endif

@@ -6,12 +6,11 @@ Service::Service()
 {
     dispatcher_.registerHander(1, [this](const TcpConnectionPtr& conn, const json& js, const uint16_t seq,Timestamp time)
     { this->ProcessingLogin(conn, js, seq, time); });
-
 }
 
 void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
 {
-    std::string name = ExtractCommonField(js, "name");
+    std::string name = ExtractCommonField(js, "username");
     std::string password = ExtractCommonField(js, "password");
 
     bool end = true;
@@ -25,6 +24,5 @@ void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, cons
     json reply_js = CommandReply(end, result);
 
     conn->send(codec_.encode(reply_js, 0, seq));
-
 }
 
