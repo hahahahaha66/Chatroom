@@ -22,6 +22,8 @@ public:
         server_.setMessageCallback(std::bind(&Server::MessageCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
         server_.setWriteCompleteCallback(std::bind(&Server::MessageCompleteCallback, this, std::placeholders::_1));
         server_.setThreadInitCallback(std::bind(&Server::ThreadInitCallback, this, std::placeholders::_1));
+
+        service_.RegisterAllHanders(dispatcher_);
     }
 
     ~Server() {}
@@ -41,7 +43,7 @@ private:
     TcpServer server_;
     Codec codec_;
     Dispatcher dispatcher_;
-
+    Service service_;
 };
 
 #endif

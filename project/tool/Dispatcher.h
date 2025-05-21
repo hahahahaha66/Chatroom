@@ -8,6 +8,7 @@
 #include <nlohmann/json.hpp>
 #include <unordered_map>
 #include <mutex>
+//服务端使用
 
 using json = nlohmann::json;
 using MessageHander = std::function<void(const TcpConnectionPtr&, const json&, const uint16_t, Timestamp)>;
@@ -15,11 +16,13 @@ using MessageHander = std::function<void(const TcpConnectionPtr&, const json&, c
 class Dispatcher
 {
 public:
+    //注册一个命令对应的回调函数
     void registerHander(uint16_t type, MessageHander hander) {
         std::lock_guard<std::mutex> lock(mutex_);
         handers_[type] = std::move(hander);
     }
 
+    //触发不同命令的回调函数
     void dispatch(uint16_t type, const TcpConnectionPtr conn, const json& js, const uint16_t seq, Timestamp time)
     {
         MessageHander cb;

@@ -6,21 +6,34 @@
 #include "../tool/Codec.h"
 
 #include <cstdint>
+#include <functional>
 #include <nlohmann/json.hpp>
+#include <unordered_map>
 
 using json = nlohmann::json;
+using MessageHander = std::function<void(const TcpConnectionPtr&, const json&, const uint16_t, Timestamp)>;
+using std::placeholders::_1;
+using std::placeholders::_2;
+using std::placeholders::_3;
+using std::placeholders::_4;
 
 class Service
 {
 public:
     Service();
-    ~Service();
+    ~Service(){};
+
+    void RegisterAllHanders(Dispatcher& dispatcher);
 
     void ProcessingLogin(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void RegisterAccount(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void ListFriendlist(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void DeleteFrient(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    
 
 private:
-    Dispatcher dispatcher_;
     Codec codec_;
+    std::unordered_map<uint16_t, MessageHander> handermap_;
 };
 
 #endif

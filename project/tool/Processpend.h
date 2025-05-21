@@ -8,6 +8,7 @@
 #include <nlohmann/json.hpp>
 #include <unordered_map>
 #include <mutex>
+//客户端使用
 
 using json = nlohmann::json;
 using Requestcomeback = std::function<void(const json&, Timestamp)>;
@@ -15,12 +16,14 @@ using Requestcomeback = std::function<void(const json&, Timestamp)>;
 class Processpend  
 {
 public:
+    //添加受到请求对应的回调函数
     void addRequest(uint16_t seq, Requestcomeback hander)
     {
         std::lock_guard<std::mutex> lock(mutex_);
         pendingRequests[seq] = std::move(hander);
     }
 
+    //通过seq找到对应的回调函数
     void executeRequest(uint16_t seq, const json& js, Timestamp time)
     {
         Requestcomeback cb;

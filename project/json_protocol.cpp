@@ -1,11 +1,20 @@
 #include "json_protocol.hpp"
 #include "muduo/logging/Logging.h"
+#include <optional>
 
 std::string UserData(const std::string &username, const std::string &password)
 {
     json j = {
         {"username", username},
         {"password", password}
+    };
+    return j.dump();
+}
+
+std::string User(const std::string& username)
+{
+    json j = {
+        {"username", username}
     };
     return j.dump();
 }
@@ -94,7 +103,7 @@ std::string CommandReply(const bool &end, const std::string &result)
 }
 
 template<typename  T>
-std::string ExtractCommonField(const json& j, const std::string& key, const T& default_value)
+std::optional<T> ExtractCommonField(const json& j, const std::string& key)
 {
     try 
     {
@@ -107,5 +116,16 @@ std::string ExtractCommonField(const json& j, const std::string& key, const T& d
     {
         LOG_ERROR << e.what();
     }
-    return default_value;
+    return std::nullopt;
+}
+
+template<typename T>
+bool AssignIfPresent(const json& j, const std::string& key, T& out)
+{
+    auto opt = ExtractCommonField<T>(j, key);
+    if (opt.has_value()) {
+        out = std::move(opt.value());
+        return true;
+    }
+    return false;
 }

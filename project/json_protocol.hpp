@@ -2,6 +2,7 @@
 #define JSON_HPP
 
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -9,10 +10,12 @@ using json = nlohmann::json;
 
 //用户信息
 std::string UserData(const std::string& username, const std::string& password);
+//用户
+std::string User(const std::string& username);
 
 //好友列表
 std::string FriendList(const std::string& usrname, const std::vector<std::string>& friendlist);
-//好友
+//用户与好友
 std::string FriendData(const std::string& username, const std::string& friendname);
 //私聊
 std::string FriendChatData(const std::string& from, const std::string& to, const std::string& message);
@@ -36,6 +39,10 @@ std::string CommandReply(const bool& end, const std::string& result);
 
 //提取json变量
 template<typename T>
-std::string ExtractCommonField(const json& j, const std::string& key, const T& default_value = T());
+std::optional<T> ExtractCommonField(const json& j, const std::string& key);
+
+//更完备的提取json变量
+template<typename T>
+bool AssignIfPresent(const json& j, const std::string& key, T& out);
 
 #endif
