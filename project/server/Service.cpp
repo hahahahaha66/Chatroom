@@ -6,6 +6,10 @@
 Service::Service(Dispatcher& dispatcher) : dispatcher_(dispatcher)
 {
     handermap_[1] = std::bind(&Service::ProcessingLogin, this, _1, _2, _3, _4);
+    handermap_[2] = std::bind(&Service::RegisterAccount, this, _1, _2, _3, _4);
+    handermap_[5] = std::bind(&Service::ListFriendlist, this, _1, _2, _3, _4);
+    handermap_[7] = std::bind(&Service::DeleteFrient, this, _1, _2, _3, _4);
+    handermap_[1] = std::bind(&Service::ProcessingLogin, this, _1, _2, _3, _4);
 }
 
 void Service::RegisterAllHanders(Dispatcher& dispatcher)
