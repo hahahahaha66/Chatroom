@@ -4,6 +4,9 @@
 #include "../muduo/net/tcp/TcpConnection.h"
 #include "../tool/Dispatcher.h"
 #include "../tool/Codec.h"
+#include "../entity/User.h"
+#include "../entity/Group.h"
+#include "../entity/Friend.h"
 
 #include <cstdint>
 #include <functional>
@@ -34,6 +37,9 @@ public:
 private:
     Codec codec_;
     Dispatcher& dispatcher_;
+
+    std::unordered_map<int, User> userlist_;
+    std::unordered_map<int, Group> grouplist_;
     std::unordered_map<uint16_t, MessageHander> handermap_;
 };
 

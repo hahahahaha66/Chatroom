@@ -14,6 +14,7 @@ public:
     const std::string& GetUserName() const;
     const std::string& GetRole() const;
     bool IsMuted() const;
+    
     time_t GetJoinTime() const;
     time_t GetLastReadTimre() const;
 
@@ -26,6 +27,7 @@ private:
     std::string username_;
     std::string role_;
     bool muted_ = false;
+
     time_t jointime_;
     time_t lastreadtime_;
 };

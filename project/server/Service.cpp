@@ -2,6 +2,7 @@
 #include "../json_protocol.hpp"
 #include <cstdint>
 #include <functional>
+#include <unordered_set>
 
 Service::Service(Dispatcher& dispatcher) : dispatcher_(dispatcher)
 {
@@ -25,9 +26,9 @@ void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, cons
     bool end = true;
     std::string result;
 
-    std::string username;
+    int userid;
     std::string password;
-    end &= AssignIfPresent(js, "username", username);
+    end &= AssignIfPresent(js, "userid", userid);
     end &= AssignIfPresent(js, "password", password);
 
     if (end == true)
@@ -40,7 +41,10 @@ void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, cons
     else  
         result = "Login failed!";
 
-    json reply_js = CommandReply(end, result);
+    json reply_js = js_CommandReply(end, result);
+    uint16_t type = (end == true ? 1 : 0);
+    if (end) 
+        userlist_[userid].SetOnline(conn);
 
     conn->send(codec_.encode(reply_js, 0, seq));
 }
@@ -50,8 +54,10 @@ void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, cons
     bool end = true;
     std::string result;
 
+    int userid;
     std::string username;
     std::string password;
+    end &= AssignIfPresent(js, "userid", userid);
     end &= AssignIfPresent(js, "username", username);
     end &= AssignIfPresent(js, "password", password);
 
@@ -65,9 +71,13 @@ void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, cons
     else  
         result = "Register failed!";
 
-    json reply_js = CommandReply(end, result);
+    json reply_js = js_CommandReply(end, result);
     uint16_t type = (end == true ? 1 : 0);
-
+    if (end)
+    {
+        userlist_[userid] = {userid, username, password};
+    }
+       
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
@@ -75,16 +85,17 @@ void Service::ListFriendlist(const TcpConnectionPtr& conn, const json& js, const
 {
     bool end = true;
 
-    std::string username;
-    end &= AssignIfPresent(js, "username", username);
+    int userid;
+    end &= AssignIfPresent(js, "userid", userid);
 
-    std::vector<std::string> friendlist;
-    if (end)
+    std::unordered_set<int> friendset = userlist_[userid].GetFriendList();
+    std::vector<int> friendlist;
+    for (auto& it : friendset)
     {
-        //读取数据库用户中朋友列表，写入friendlist中,并设置end表示是否成功
+        friendlist.push_back(it);
     }
 
-    json reply_js = FriendList(username, friendlist);
+    json reply_js = js_FriendList(userid, friendlist);
     uint16_t type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
@@ -95,23 +106,20 @@ void Service::DeleteFrient(const TcpConnectionPtr& conn, const json& js, const u
     bool end = true;
     std::string result;
 
-    std::string username;
-    std::string friendname;
+    int userid;
+    int friendid;
 
-    end &= AssignIfPresent(js, "username", username);
-    end &= AssignIfPresent(js, "friendname", friendname);
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "friendid", friendid);
 
-    if (end)
-    {
-        //将朋友名字从用户的数据库中删除
-    }
+    userlist_[userid].DeleteFriend(friendid);
 
     if (end)
         result = "Delete successful!";
     else  
         result = "Delete failed!";
 
-    json reply_js = CommandReply(end, result);
+    json reply_js = js_CommandReply(end, result);
     uint16_t type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));

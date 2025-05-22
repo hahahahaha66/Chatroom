@@ -2,90 +2,143 @@
 #include "muduo/logging/Logging.h"
 #include <optional>
 
-std::string UserData(const std::string &username, const std::string &password)
+std::string js_UserData(const int& userid, const std::string& password)
 {
     json j = {
+        {"userid", userid},
+        {"password", password}
+    };
+    return j.dump();
+}
+
+// 注册
+std::string js_RegisterData(const int& userid, const std::string& username, const std::string& password)
+{
+    json j = {
+        {"userid", userid},
         {"username", username},
         {"password", password}
     };
     return j.dump();
 }
 
-std::string User(const std::string& username)
+// 用户
+std::string js_User(const int& userid, const std::string& username)
 {
     json j = {
+        {"userid", userid},
         {"username", username}
     };
     return j.dump();
 }
 
-std::string FriendList(const std::string &usrname, const std::vector<std::string> &friendlist)
+// 好友
+std::string js_Friend(const int& friendid, const std::string& friendname, const bool online)
 {
     json j = {
-        {"username", usrname},
+        {"friendid", friendid},
+        {"friendname", friendname},
+        {"online", online}
+    };
+    return j.dump();
+}
+
+// 好友列表
+std::string js_FriendList(const int& userid, const std::vector<int>& friendlist)
+{
+    json j = {
+        {"userid", userid},
         {"friendlist", friendlist}
     };
     return j.dump();
 }
 
-std::string FriendData(const std::string& username, const std::string& friendname) 
+// 用户与好友
+std::string js_FriendData(const int& userid, const int& friendid)
 {
     json j = {
-        {"username", username},
-        {"friendname", friendname}
+        {"userid", userid},
+        {"friendid", friendid}
     };
     return j.dump();
 }
 
-std::string FriendChatData(const std::string& from, const std::string& to, const std::string& message) 
+// 私聊
+std::string js_FriendChatData(const int& fromuserid, const int& touserid, const std::string& message)
 {
     json j = {
-        {"from", from},
-        {"to", to},
+        {"fromuserid", fromuserid},
+        {"touserid", touserid},
         {"message", message}
     };
     return j.dump();
 }
 
-std::string GroupCreateData(const std::string& groupName, const std::string& creator, const std::vector<std::string>& othermembers) 
+// 群聊
+std::string js_Group(const int& groupid, const std::string& groupname)
 {
     json j = {
-        {"groupname", groupName},
+        {"groupid", groupid},
+        {"groupname", groupname}
+    };
+    return j.dump();
+}
+
+// 群聊列表
+std::string js_GroupList(const int& userid, const std::vector<int>& grouplist)
+{
+    json j = {
+        {"userid", userid},
+        {"grouplist", grouplist}
+    };
+    return j.dump();
+}
+
+// 创建群聊
+std::string js_GroupCreateData(const int& groupid, const std::string groupname, const int& creator, const std::vector<int>& othermembers)
+{
+    json j = {
+        {"groupid", groupid},
+        {"groupname", groupname},
         {"creator", creator},
         {"othermembers", othermembers}
     };
     return j.dump();
 }
 
-std::string GroupData(const std::string& groupName, const std::string& username) 
+// 群聊成员
+std::string js_GroupData(const int& groupid, const int& userid)
 {
     json j = {
-        {"groupname", groupName},
-        {"username", username}
+        {"groupid", groupid},
+        {"userid", userid}
     };
     return j.dump();
 }
 
-std::string GroupMemberList(const std::string &groupname, const std::vector<std::string>& memberlist)
+// 群聊成员列表
+std::string js_GroupMemberList(const int& groupid, const std::vector<int>& memberlist)
 {
     json j = {
-        {"groupname", groupname},
+        {"groupid", groupid},
         {"memberlist", memberlist}
     };
     return j.dump();
 }
 
-std::string GroupChatData(const std::string& groupname, const std::string& from, const std::string& message)
+// 群聊消息
+std::string js_GroupChatData(const int& groupid, const int& from, const std::string& message)
 {
     json j = {
-        {"groupname", groupname},
+        {"groupid", groupid},
         {"from", from},
         {"message", message}
     };
     return j.dump();
 }
 
-std::string UserList(const std::vector<std::string>& userlist)
+// 用于申请列表
+std::string js_UserList(const std::vector<int>& userlist)
 {
     json j = {
         {"userlist", userlist}
@@ -93,7 +146,8 @@ std::string UserList(const std::vector<std::string>& userlist)
     return j.dump();
 }
 
-std::string CommandReply(const bool &end, const std::string &result)
+// 回复
+std::string js_CommandReply(const bool& end, const std::string& result)
 {
     json j = {
         {"end", end},
@@ -101,6 +155,7 @@ std::string CommandReply(const bool &end, const std::string &result)
     };
     return j.dump();
 }
+
 
 template<typename  T>
 std::optional<T> ExtractCommonField(const json& j, const std::string& key)

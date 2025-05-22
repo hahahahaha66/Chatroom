@@ -9,33 +9,39 @@
 using json = nlohmann::json;
 
 //用户信息
-std::string UserData(const std::string& username, const std::string& password);
+std::string js_UserData(const int& userid, const std::string& password);
+//注册
+std::string js_RegisterData(const int& userid, const std::string& username, const std::string& password);
 //用户
-std::string User(const std::string& username);
+std::string js_User(const int& userid, const std::string& username);
 
+//好友
+std::string js_Friend(const int& friendid, const std::string& friendname, const bool online);
 //好友列表
-std::string FriendList(const std::string& usrname, const std::vector<std::string>& friendlist);
+std::string js_FriendList(const int& userid, const std::vector<int>& friendlist);
 //用户与好友
-std::string FriendData(const std::string& username, const std::string& friendname);
+std::string js_FriendData(const int& userid, const int& friendid);
 //私聊
-std::string FriendChatData(const std::string& from, const std::string& to, const std::string& message);
+std::string js_FriendChatData(const int& fromuserid, const int& touserid, const std::string& message);
 
+//群聊
+std::string js_Group(const int& groupid, const std::string& groupname);
 //群聊列表
-std::string GroupList(const std::string& username, const std::vector<std::string>& grouplist);
+std::string js_GroupList(const int& userid, const std::vector<int>& grouplist);
 //创建群聊
-std::string GroupCreateData(const std::string& groupname, const std::string& creator, const std::vector<std::string>& othermembers);
+std::string js_GroupCreateData(const int& groupid, const std::string groupname, const int& creator, const std::vector<int>& othermembers);
 //群聊成员
-std::string GroupData(const std::string& groupname, const std::string& username);
+std::string js_GroupData(const int& groupid, const int& userid);
 //群聊成员列表
-std::string GroupMemberList(const std::string& groupname, const std::vector<std::string> &memberlist);
+std::string js_GroupMemberList(const int& groupid, const std::vector<int>& memberlist);
 //群聊消息
-std::string GroupChatData(const std::string& groupname, const std::string& from, const std::string& message);
+std::string js_GroupChatData(const int& groupid, const int& from, const std::string& message);
 
 //用于申请列表
-std::string UserList(const std::vector<std::string>& userlist);
+std::string js_UserList(const std::vector<int>& userlist);
 
 //回复
-std::string CommandReply(const bool& end, const std::string& result);
+std::string js_CommandReply(const bool& end, const std::string& result);
 
 //提取json变量
 template<typename T>
