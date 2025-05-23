@@ -5,7 +5,9 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 #include <unordered_map>
+#include <unordered_set>
 
 class Group  
 {
@@ -14,6 +16,11 @@ public:
 
     int GetGroupId() const;
     const std::string& GetGroupName() const;
+
+    void AddApply(int applicantid);
+    void ApprovalApply(int applicantid);
+    void RefuseApply(int applicantid);
+    const std::unordered_set<int>& GetApplyList() const;
     
     void AddMember(const GroupUser& user);
     void RemoveMember(int userid);
@@ -25,6 +32,7 @@ private:
     int groupid_;
     std::string groupname_;
 
+    std::unordered_set<int> applylist_;
     std::unordered_map<int, GroupUser> members_;
 };
 

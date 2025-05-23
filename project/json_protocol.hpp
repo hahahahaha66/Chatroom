@@ -29,6 +29,8 @@ std::string js_FriendChatData(const int& fromuserid, const int& touserid, const 
 
 //群聊
 std::string js_Group(const int& groupid, const std::string& groupname);
+//群聊id
+std::string js_GroupId(const int& groupid);
 //群聊列表
 std::string js_GroupList(const int& userid, const std::vector<int>& grouplist);
 //创建群聊
@@ -42,6 +44,8 @@ std::string js_GroupChatData(const int& groupid, const int& from, const std::str
 
 //用于申请列表
 std::string js_UserList(const std::vector<int>& userlist);
+//申请结果
+std::string js_ApplyResult(const int& userid, const int& applicantid, bool result);
 
 //回复
 std::string js_CommandReply(const bool& end, const std::string& result);

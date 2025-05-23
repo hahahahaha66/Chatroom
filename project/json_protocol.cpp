@@ -96,6 +96,15 @@ std::string js_Group(const int& groupid, const std::string& groupname)
     return j.dump();
 }
 
+// 群聊id
+std::string js_GroupId(const int &groupid)
+{
+    json j = {
+        {"groupid", groupid}
+    };
+    return j.dump();
+}
+
 // 群聊列表
 std::string js_GroupList(const int& userid, const std::vector<int>& grouplist)
 {
@@ -154,6 +163,16 @@ std::string js_UserList(const std::vector<int>& userlist)
 {
     json j = {
         {"userlist", userlist}
+    };
+    return j.dump();
+}
+
+std::string js_ApplyResult(const int& userid, const int& applicantid, bool result)
+{
+    json j = {
+        {"userid", userid},
+        {"applicantid", applicantid},
+        {"result", result}
     };
     return j.dump();
 }

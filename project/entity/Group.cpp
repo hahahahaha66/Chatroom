@@ -18,6 +18,27 @@ const std::string& Group::GetGroupName() const
     return groupname_;
 }
 
+void Group::AddApply(int applicantid)
+{
+    applylist_.insert(applicantid);
+}
+
+void Group::ApprovalApply(int applicantid)
+{
+    applylist_.erase(applicantid);
+    members_[applicantid] = std::move(GroupUser(applicantid, "Member"));
+}
+
+void Group::RefuseApply(int applicantid)
+{
+    applylist_.erase(applicantid);
+}
+
+const std::unordered_set<int>& Group::GetApplyList() const
+{
+    return applylist_;
+}
+
 void Group::AddMember(const GroupUser& user)
 {
     members_[user.GetUserId()] = user;

@@ -160,7 +160,30 @@ void Service::BlockFriend(const TcpConnectionPtr& conn, const json& js, const ui
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::ListApplyList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::AddFriend(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+{
+    bool end = true;
+    std::string result;
+
+    int applicantid;  //发送好友申请
+    int userid;  //接收好友申请
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "friendid", applicantid);
+
+    userlist_[userid].AddApply(applicantid);
+
+    if (end)
+        result = "Add apply successful!";
+    else  
+        result = "Add apply failed!";
+
+    json reply_js = js_CommandReply(end, result);
+    uint16_t type = (end == true ? 1 : 0);
+
+    conn->send(codec_.encode(reply_js, type, seq));
+}
+
+void Service::ListFriendApplyList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
 {
     bool end = true;
 
@@ -180,6 +203,24 @@ void Service::ListApplyList(const TcpConnectionPtr& conn, const json& js, const 
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
+void ProcessFriendApply(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+{
+    bool end = true;
+    std::string result;
+
+    int userid;
+    int applicantid;
+    bool real_result;
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "applicantid", applicantid);
+    end &= AssignIfPresent(js, "result", real_result);
+
+    if (real_result)
+    {
+        
+    }
+}
+
 void Service::ListGroupList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
 {
     bool end = true;
@@ -195,7 +236,7 @@ void Service::ListGroupList(const TcpConnectionPtr& conn, const json& js, const 
         grouplist.push_back(it);
     }
 
-    json reply_js = js_GroupList(userid, grouplist);
+    json reply_js = js_UserList(grouplist);
     uint16_t type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
@@ -237,5 +278,50 @@ void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js, const ui
     uint16_t type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
-
 }
+
+void Service::ListGroupMemberList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+{
+    bool end = true;
+
+    int groupid;
+    end &= AssignIfPresent(js, "groupid", groupid);
+    
+    std::vector<int> memberlist;
+    if (end) 
+    {
+        std::unordered_map<int, GroupUser> temp = grouplist_[groupid].GetAllMembers();
+        for (auto& it : temp) 
+        {
+            memberlist.push_back(it.second.GetUserId());
+        }
+    }
+
+    json reply_js = js_UserList(memberlist);
+    uint16_t type = (end == true ? 1 : 0);
+
+    conn->send(codec_.encode(reply_js, type, seq));
+}
+
+void Service::ListGroupApplyList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+{
+    bool end = true;
+
+    int groupid;
+    end &= AssignIfPresent(js, "groupid", groupid);
+
+    std::vector<int> applylist_;
+    if (end)
+    {
+        for (auto& it : grouplist_[groupid].GetApplyList())
+        {
+            applylist_.push_back(it);
+        }
+    }
+    
+    json reply_js = js_UserList(applylist_);
+    uint16_t type = (end == true ? 1 : 0);
+
+    conn->send(codec_.encode(reply_js, type, seq));
+}
+ 
