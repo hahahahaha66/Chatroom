@@ -3,11 +3,13 @@
 #include <optional>
 #include <unordered_map>
 
-std::string js_UserData(const int& userid, const std::string& password)
+std::string js_UserData(const int& userid, const std::string& username, const int& friendnum, const int& groupnum)
 {
     json j = {
         {"userid", userid},
-        {"password", password}
+        {"username", username},
+        {"friendnum", friendnum},
+        {"groupnum", groupnum},
     };
     return j.dump();
 }
@@ -19,6 +21,15 @@ std::string js_RegisterData(const int& userid, const std::string& username, cons
         {"userid", userid},
         {"username", username},
         {"password", password}
+    };
+    return j.dump();
+}
+
+// 用户id
+std::string js_UserId(const int &userid)
+{
+    json j = {
+        {"userid", userid}
     };
     return j.dump();
 }

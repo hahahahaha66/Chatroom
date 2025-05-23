@@ -9,10 +9,12 @@
 
 using json = nlohmann::json;
 
-//用户信息
-std::string js_UserData(const int& userid, const std::string& password);
+//打印用户信息
+std::string js_UserData(const int& userid, const std::string& username, const int& friendnum, const int& groupnum);
 //注册
 std::string js_RegisterData(const int& userid, const std::string& username, const std::string& password);
+//用户id
+std::string js_UserId(const int& userid);
 //用户
 std::string js_User(const int& userid, const std::string& username);
 

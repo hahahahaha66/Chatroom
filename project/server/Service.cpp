@@ -203,7 +203,7 @@ void Service::ListFriendApplyList(const TcpConnectionPtr& conn, const json& js, 
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void ProcessFriendApply(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::ProcessFriendApply(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -215,10 +215,21 @@ void ProcessFriendApply(const TcpConnectionPtr& conn, const json& js, const uint
     end &= AssignIfPresent(js, "applicantid", applicantid);
     end &= AssignIfPresent(js, "result", real_result);
 
+    userlist_[userid].DeleteApply(applicantid);
     if (real_result)
     {
-        
+        userlist_[userid].AddFriend(applicantid);
     }
+
+    if (end)
+        result = "Process apply successful!";
+    else  
+        result = "Process apply failed!";
+
+    json reply_js = js_CommandReply(end, result);
+    uint16_t type = (end == true ? 1 : 0);
+
+    conn->send(codec_.encode(reply_js, type, seq));
 }
 
 void Service::ListGroupList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
@@ -324,4 +335,73 @@ void Service::ListGroupApplyList(const TcpConnectionPtr& conn, const json& js, c
 
     conn->send(codec_.encode(reply_js, type, seq));
 }
- 
+
+void Service::ProcessGroupApply(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+{
+    bool end = true;
+    std::string result;
+
+    int groupid;
+    int applicantid;
+    bool real_result;
+    end &= AssignIfPresent(js, "userid", groupid);
+    end &= AssignIfPresent(js, "applicantid", applicantid);
+    end &= AssignIfPresent(js, "result", real_result);
+
+    grouplist_[groupid].DeleteApply(applicantid);
+    if (real_result)
+    {
+        grouplist_[groupid].AddMember(std::move(GroupUser(applicantid, "Member")));
+    }
+
+    if (end)
+        result = "Process apply successful!";
+    else  
+        result = "Process apply failed!";
+
+    json reply_js = js_CommandReply(end, result);
+    uint16_t type = (end == true ? 1 : 0);
+
+    conn->send(codec_.encode(reply_js, type, seq));
+}
+
+void Service::QuitGroup(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+{
+    bool end = true;
+    std::string result;
+
+    int userid;
+    int groupid;
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "groupid", groupid);
+
+    userlist_[userid].LeaveGroup(groupid);
+    grouplist_[groupid].RemoveMember(userid);
+
+    if (end)
+        result = "Quit group successful!";
+    else  
+        result = "Quit group failed!";
+
+    json reply_js = js_CommandReply(end, result);
+    uint16_t type = (end == true ? 1 : 0);
+
+    conn->send(codec_.encode(reply_js, type, seq));
+}
+
+void Service::PrintUserData(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+{
+    bool end = true;
+    
+    int userid;
+    end &= AssignIfPresent(js, "userid", userid);
+    
+    std::string username = userlist_[userid].GetUserName();
+    int friendnum = userlist_[userid].GetFriendList().size();
+    int groupnum = userlist_[userid].GetGroupList().size();
+
+    json reply_js = js_UserData(userid, username, friendnum, groupnum);
+    uint16_t type = (end == true ? 1 : 0);
+
+    conn->send(codec_.encode(reply_js, type, seq));
+}

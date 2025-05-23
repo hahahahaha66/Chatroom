@@ -29,7 +29,7 @@ void Group::ApprovalApply(int applicantid)
     members_[applicantid] = std::move(GroupUser(applicantid, "Member"));
 }
 
-void Group::RefuseApply(int applicantid)
+void Group::DeleteApply(int applicantid)
 {
     applylist_.erase(applicantid);
 }

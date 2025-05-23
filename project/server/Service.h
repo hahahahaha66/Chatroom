@@ -39,6 +39,9 @@ public:
     void ListGroupMemberList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
     void ListGroupApplyList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
     void ProcessFriendApply(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void ProcessGroupApply(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void QuitGroup(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void PrintUserData(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
 
 private:
     Codec codec_;

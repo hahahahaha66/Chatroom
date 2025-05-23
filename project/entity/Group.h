@@ -19,7 +19,7 @@ public:
 
     void AddApply(int applicantid);
     void ApprovalApply(int applicantid);
-    void RefuseApply(int applicantid);
+    void DeleteApply(int applicantid);
     const std::unordered_set<int>& GetApplyList() const;
     
     void AddMember(const GroupUser& user);

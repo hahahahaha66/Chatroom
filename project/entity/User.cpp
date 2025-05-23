@@ -111,7 +111,7 @@ void User::ApprovalApply(int applicantid)
     friendlist_.insert(applicantid);
 }
 
-void User::RefuseApply(int applicantid)
+void User::DeleteApply(int applicantid)
 {
     applylist_.erase(applicantid);
 }
