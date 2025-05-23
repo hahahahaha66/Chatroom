@@ -1,10 +1,9 @@
 #include "GroupUser.h"
 
-GroupUser::GroupUser(int userid, const std::string& username, const std::string& role)
-    : userid_(userid),
-      username_(username),
-      role_(role)
+GroupUser::GroupUser(int userid, const std::string& role)
+    : userid_(userid)
 {
+    SetRole(role);
 }
 
 int GroupUser::GetUserId() const
@@ -12,14 +11,14 @@ int GroupUser::GetUserId() const
     return userid_;
 }
 
-const std::string& GroupUser::GetUserName() const 
+const std::string GroupUser::GetRole() const
 {
-    return username_;
-}
-
-const std::string& GroupUser::GetRole() const
-{
-    return role_;
+    switch (role_) {
+        case Level::Group_owner:    return "Group_owner";
+        case Level::Administrator:  return "Administrator";
+        case Level::Member:         return "Member";
+        default:                    throw std::invalid_argument("Invalid level");
+    }
 }
 
 bool GroupUser::IsMuted() const
@@ -39,7 +38,10 @@ time_t GroupUser::GetLastReadTimre() const
 
 void GroupUser::SetRole(const std::string& role)
 {
-    role_ = role;
+    if (role == "Group_owner") role_ = Level::Group_owner;
+    else if (role == "Administrator") role_ = Level::Administrator;
+    else if (role == "Member") role_ = Level::Member;
+    else throw std::invalid_argument("Invalid level string");
 }
 
 void GroupUser::SetMuted(bool muted)

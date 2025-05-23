@@ -4,6 +4,7 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 using json = nlohmann::json;
@@ -18,9 +19,11 @@ std::string js_User(const int& userid, const std::string& username);
 //好友
 std::string js_Friend(const int& friendid, const std::string& friendname, const bool online);
 //好友列表
-std::string js_FriendList(const int& userid, const std::vector<int>& friendlist);
+std::string js_FriendList(const int& userid, const std::unordered_map<int, bool>& friendlist);
 //用户与好友
 std::string js_FriendData(const int& userid, const int& friendid);
+//所有好友id与名字
+std::string js_AllFriendIdName(const int& userid, const std::unordered_map<int, std::string>& firendidname, const std::unordered_map<int, std::string>& groupidname);
 //私聊
 std::string js_FriendChatData(const int& fromuserid, const int& touserid, const std::string& message);
 

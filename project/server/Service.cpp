@@ -2,6 +2,7 @@
 #include "../json_protocol.hpp"
 #include <cstdint>
 #include <functional>
+#include <unordered_map>
 #include <unordered_set>
 
 Service::Service(Dispatcher& dispatcher) : dispatcher_(dispatcher)
@@ -9,7 +10,7 @@ Service::Service(Dispatcher& dispatcher) : dispatcher_(dispatcher)
     handermap_[1] = std::bind(&Service::ProcessingLogin, this, _1, _2, _3, _4);
     handermap_[2] = std::bind(&Service::RegisterAccount, this, _1, _2, _3, _4);
     handermap_[5] = std::bind(&Service::ListFriendlist, this, _1, _2, _3, _4);
-    handermap_[7] = std::bind(&Service::DeleteFrient, this, _1, _2, _3, _4);
+    handermap_[7] = std::bind(&Service::DeleteFriend, this, _1, _2, _3, _4);
     handermap_[1] = std::bind(&Service::ProcessingLogin, this, _1, _2, _3, _4);
 }
 
@@ -24,7 +25,8 @@ void Service::RegisterAllHanders(Dispatcher& dispatcher)
 void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
 {
     bool end = true;
-    std::string result;
+    std::unordered_map<int, std::string> friendlist;
+    std::unordered_map<int, std::string> grouplist;
 
     int userid;
     std::string password;
@@ -36,18 +38,27 @@ void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, cons
         //这里执行从数据库中查询名字及密码是否正确
     }
     
-    if (end)
-        result = "Login successful!";
-    else  
-        result = "Login failed!";
-
-    json reply_js = js_CommandReply(end, result);
     uint16_t type = (end == true ? 1 : 0);
     if (end) 
         userlist_[userid].SetOnline(conn);
 
-    conn->send(codec_.encode(reply_js, 0, seq));
+    if (end)
+    {
+        for (auto& it : userlist_[userid].GetFriendList())
+        {
+            friendlist[it] = userlist_[it].GetUserName();
+        }
+
+        for (auto& it : userlist_[userid].GetGroupList())
+        {
+            grouplist[it] = grouplist_[it].GetGroupName();
+        }
+    }
+    
+    json all_friend = js_AllFriendIdName(userid, friendlist, grouplist);
+    conn->send(codec_.encode(all_friend, type, seq));
 }
+
 
 void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
 {
@@ -89,10 +100,10 @@ void Service::ListFriendlist(const TcpConnectionPtr& conn, const json& js, const
     end &= AssignIfPresent(js, "userid", userid);
 
     std::unordered_set<int> friendset = userlist_[userid].GetFriendList();
-    std::vector<int> friendlist;
+    std::unordered_map<int, bool> friendlist;
     for (auto& it : friendset)
     {
-        friendlist.push_back(it);
+        friendlist[it] = userlist_[it].IsOnLine();
     }
 
     json reply_js = js_FriendList(userid, friendlist);
@@ -101,7 +112,7 @@ void Service::ListFriendlist(const TcpConnectionPtr& conn, const json& js, const
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::DeleteFrient(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::DeleteFriend(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -123,4 +134,108 @@ void Service::DeleteFrient(const TcpConnectionPtr& conn, const json& js, const u
     uint16_t type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
+}
+
+void Service::BlockFriend(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+{
+    bool end = true;
+    std::string result;
+
+    int userid;
+    int friendid;
+
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "friendid", friendid);
+
+    userlist_[userid].AddBlockFriend(friendid);
+
+    if (end)
+        result = "Block successful!";
+    else  
+        result = "Block failed!";
+
+    json reply_js = js_CommandReply(end, result);
+    uint16_t type = (end == true ? 1 : 0);
+
+    conn->send(codec_.encode(reply_js, type, seq));
+}
+
+void Service::ListApplyList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+{
+    bool end = true;
+
+    int userid;
+    end &= AssignIfPresent(js, "userid", userid);
+
+    std::unordered_set<int> applyset = userlist_[userid].GetApplyList();
+    std::unordered_map<int, bool> applylist;
+    for (auto& it : applyset)
+    {
+        applylist[it] = userlist_[it].IsOnLine();
+    }
+
+    json reply_js = js_FriendList(userid, applylist);
+    uint16_t type = (end == true ? 1 : 0);
+
+    conn->send(codec_.encode(reply_js, type, seq));
+}
+
+void Service::ListGroupList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+{
+    bool end = true;
+
+    int userid;
+    end &= AssignIfPresent(js, "userid", userid);
+
+    std::unordered_set<int> groupset = userlist_[userid].GetGroupList();
+    std::vector<int> grouplist;
+
+    for (auto&it : groupset)
+    {
+        grouplist.push_back(it);
+    }
+
+    json reply_js = js_GroupList(userid, grouplist);
+    uint16_t type = (end == true ? 1 : 0);
+
+    conn->send(codec_.encode(reply_js, type, seq));
+}
+
+void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+{
+    bool end = true;
+    std::string result;
+
+    int groupid;
+    std::string groupname;
+    int creatorid;
+    std::vector<int> othermembers;
+    end &= AssignIfPresent(js, "userid", groupid);
+    end &= AssignIfPresent(js, "groupname", groupname);
+    end &= AssignIfPresent(js, "creatorid", creatorid);
+    end &= AssignIfPresent(js, "othermember", othermembers);
+
+    grouplist_[groupid] = {groupid, groupname};
+    grouplist_[groupid].AddMember(std::move(GroupUser(creatorid, "Group_owner")));
+    for (auto& it : othermembers)
+    {
+        grouplist_[groupid].AddMember(std::move(GroupUser(it, "Member")));
+    }
+
+    userlist_[creatorid].JoinGroup(groupid);
+    for (auto& it : othermembers)
+    {
+        userlist_[it].JoinGroup(groupid);
+    }
+    
+    if (end)
+        result = "Create group successful!";
+    else  
+        result = "Create group failed!";
+
+    json reply_js = js_CommandReply(end, result);
+    uint16_t type = (end == true ? 1 : 0);
+
+    conn->send(codec_.encode(reply_js, type, seq));
+
 }

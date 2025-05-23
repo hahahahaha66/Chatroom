@@ -3,16 +3,17 @@
 
 #include <ctime>
 #include <string>
+#include <stdexcept>
 
 class GroupUser  
 {
 public:
     GroupUser();
-    GroupUser(int userid, const std::string& username, const std::string& role);
+    GroupUser(int userid, const std::string& role);
 
     int GetUserId() const;
     const std::string& GetUserName() const;
-    const std::string& GetRole() const;
+    const std::string GetRole() const;
     bool IsMuted() const;
     
     time_t GetJoinTime() const;
@@ -23,9 +24,15 @@ public:
     void SetLastReadTime(time_t lastreadtime);
 
 private: 
+    enum class Level
+    {
+        Group_owner,
+        Administrator,
+        Member
+    };
+
     int userid_;
-    std::string username_;
-    std::string role_;
+    Level role_;
     bool muted_ = false;
 
     time_t jointime_;

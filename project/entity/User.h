@@ -38,6 +38,11 @@ public:
     bool IsBlockFriend(int blockuser) const;
     const std::unordered_set<int>& GetBlockList() const;
 
+    void AddApply(int applicantid);
+    void ApprovalApply(int applicantid);
+    void RefuseApply(int applicantid);
+    const std::unordered_set<int>& GetApplyList() const;
+
     void JoinGroup(int groupid);
     void LeaveGroup(int groupid);
     bool IsInGroup(int groupid) const;
@@ -50,6 +55,7 @@ private:
     bool online_ = false;
     std::shared_ptr<TcpConnection> conn_;
 
+    std::unordered_set<int> applylist_;
     std::unordered_set<int> blocklist_;
     std::unordered_set<int> friendlist_;
     std::unordered_set<int> grouplist_;

@@ -100,6 +100,27 @@ const std::unordered_set<int>& User::GetBlockList() const
     return blocklist_;
 }
 
+void User::AddApply(int applicantid)
+{
+    applylist_.insert(applicantid);
+}
+
+void User::ApprovalApply(int applicantid)
+{
+    applylist_.erase(applicantid);
+    friendlist_.insert(applicantid);
+}
+
+void User::RefuseApply(int applicantid)
+{
+    applylist_.erase(applicantid);
+}
+
+const std::unordered_set<int>& User::GetApplyList() const
+{
+    return applylist_;
+}
+
 void User::JoinGroup(int groupid)
 {
     grouplist_.insert(groupid);

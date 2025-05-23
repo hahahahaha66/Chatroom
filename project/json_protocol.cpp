@@ -1,6 +1,7 @@
 #include "json_protocol.hpp"
 #include "muduo/logging/Logging.h"
 #include <optional>
+#include <unordered_map>
 
 std::string js_UserData(const int& userid, const std::string& password)
 {
@@ -44,7 +45,7 @@ std::string js_Friend(const int& friendid, const std::string& friendname, const 
 }
 
 // 好友列表
-std::string js_FriendList(const int& userid, const std::vector<int>& friendlist)
+std::string js_FriendList(const int& userid, const std::unordered_map<int, bool>& friendlist)
 {
     json j = {
         {"userid", userid},
@@ -59,6 +60,17 @@ std::string js_FriendData(const int& userid, const int& friendid)
     json j = {
         {"userid", userid},
         {"friendid", friendid}
+    };
+    return j.dump();
+}
+
+// 所有好友id与名字
+std::string js_AllFriendIdName(const int& userid, const std::unordered_map<int, std::string>& friendidname, const std::unordered_map<int, std::string>& groupidname)
+{
+    json j = {
+        {"userid", userid},
+        {"friendidname", friendidname},
+        {"groupidname", groupidname}
     };
     return j.dump();
 }

@@ -31,8 +31,11 @@ public:
     void ProcessingLogin(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
     void RegisterAccount(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
     void ListFriendlist(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void DeleteFrient(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-
+    void DeleteFriend(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void BlockFriend(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void ListApplyList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void ListGroupList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void CreateGroup(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
 
 private:
     Codec codec_;
