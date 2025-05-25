@@ -42,6 +42,9 @@ public:
     void ProcessGroupApply(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
     void QuitGroup(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
     void PrintUserData(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void ChangeUserPassword(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void DeleteUserAccount(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void DeleteGroup(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
 
 private:
     Codec codec_;

@@ -389,6 +389,41 @@ void Service::QuitGroup(const TcpConnectionPtr& conn, const json& js, const uint
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
+void Service::DeleteGroup(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+{
+    bool end = true;
+    std::string result;
+
+    int userid;
+    int groupid;
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "groupid", groupid);
+
+    if (grouplist_[groupid].GetMember(userid)->GetRole() == "Group_owner")
+    {
+        for (auto& it : grouplist_[groupid].GetAllMembers())
+        {
+            userlist_[it.first].LeaveGroup(groupid);
+        }
+
+        grouplist_.erase(groupid);
+    }
+    else 
+    {
+        end = false;
+    }
+
+    if (end)
+        result = "Delete group successful!";
+    else  
+        result = "Delete group failed!";
+
+    json reply_js = js_CommandReply(end, result);
+    uint16_t type = (end == true ? 1 : 0);
+
+    conn->send(codec_.encode(reply_js, type, seq));
+}
+
 void Service::PrintUserData(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
 {
     bool end = true;
@@ -401,6 +436,67 @@ void Service::PrintUserData(const TcpConnectionPtr& conn, const json& js, const 
     int groupnum = userlist_[userid].GetGroupList().size();
 
     json reply_js = js_UserData(userid, username, friendnum, groupnum);
+    uint16_t type = (end == true ? 1 : 0);
+
+    conn->send(codec_.encode(reply_js, type, seq));
+}
+
+void Service::ChangeUserPassword(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+{
+    bool end = true;
+    std::string result;
+
+    int userid;
+    std::string password;
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "password", password);
+
+    userlist_[userid].SetPassWord(password);
+
+    if (end)
+        result = "Chance password successful!";
+    else  
+        result = "Chance password failed!";
+
+    json reply_js = js_CommandReply(end, result);
+    uint16_t type = (end == true ? 1 : 0);
+
+    conn->send(codec_.encode(reply_js, type, seq));
+}
+
+void Service::DeleteUserAccount(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+{
+    bool end = true;
+    std::string result;
+
+    int userid;
+    std::string password;
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "password", password);
+
+    if (userlist_[userid].GetPassWord() == password)
+    {
+        for (auto& it : userlist_[userid].GetFriendList())
+        {
+            userlist_[it].DeleteFriend(userid);
+        }
+        
+        for (auto& it : userlist_[userid].GetGroupList())
+        {
+            grouplist_[it].RemoveMember(userid);
+        }
+        userlist_.erase(userid);
+    }
+    else {
+        end = false;
+    }
+
+    if (end)
+        result = "Delete account successful!";
+    else  
+        result = "Delete account failed!";
+
+    json reply_js = js_CommandReply(end, result);
     uint16_t type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
