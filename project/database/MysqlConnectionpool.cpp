@@ -2,7 +2,6 @@
 #include "MysqlConnection.h"
 
 #include <cstddef>
-#include <iostream>
 #include <chrono>
 #include <memory>
 #include <mutex>

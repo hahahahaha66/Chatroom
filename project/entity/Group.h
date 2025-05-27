@@ -34,6 +34,7 @@ private:
 
     std::unordered_set<int> applylist_;
     std::unordered_map<int, GroupUser> members_;
+    
 };
 
 #endif
