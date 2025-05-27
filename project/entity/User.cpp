@@ -54,14 +54,20 @@ std::shared_ptr<TcpConnection> User::GetConnection() const
     return conn_;
 }
 
-void User::AddFriend(int friendid)
+bool User::AddFriend(int friendid)
 {
-    friendlist_.insert(friendid);
+    if (friendlist_.insert(friendid).second == true)
+        return false;
+    else  
+        return true;
 }
 
-void User::DeleteFriend(int friendid)
+bool User::DeleteFriend(int friendid)
 {
-    friendlist_.erase(friendid);
+    if (friendlist_.erase(friendid) == 1)
+        return true;
+    else  
+        return false;
 }
 
 bool User::IsFriend(int friendid) const
@@ -77,14 +83,20 @@ const std::unordered_set<int>& User::GetFriendList() const
     return friendlist_;
 }
 
-void User::AddBlockFriend(int blockuser)
+bool User::AddBlockFriend(int blockuser)
 {
-    blocklist_.insert(blockuser);
+    if (blocklist_.insert(blockuser).second == true)
+        return true;
+    else
+        return false;
 }
 
-void User::DeleteBlockFriend(int blockuser)
+bool User::DeleteBlockFriend(int blockuser)
 {
-    blocklist_.erase(blockuser);
+    if (blocklist_.erase(blockuser) == 1)
+        return true;
+    else  
+        return false;
 }
 
 bool User::IsBlockFriend(int blockuser) const
@@ -100,9 +112,12 @@ const std::unordered_set<int>& User::GetBlockList() const
     return blocklist_;
 }
 
-void User::AddApply(int applicantid)
+bool User::AddApply(int applicantid)
 {
-    applylist_.insert(applicantid);
+    if (applylist_.insert(applicantid).second == true)
+        return true;
+    else  
+        return false;
 }
 
 void User::ApprovalApply(int applicantid)
@@ -116,19 +131,33 @@ void User::DeleteApply(int applicantid)
     applylist_.erase(applicantid);
 }
 
+bool User::IsApply(int applicantid)
+{
+    if (applylist_.find(applicantid) == applylist_.end())
+        return false;
+    else  
+        return true;
+}
+
 const std::unordered_set<int>& User::GetApplyList() const
 {
     return applylist_;
 }
 
-void User::JoinGroup(int groupid)
+bool User::JoinGroup(int groupid)
 {
-    grouplist_.insert(groupid);
+    if (grouplist_.insert(groupid).second == true)
+        return true;
+    else  
+        return false;
 }
 
-void User::LeaveGroup(int groupid)
+bool User::LeaveGroup(int groupid)
 {
-    grouplist_.erase(groupid);
+    if (grouplist_.erase(groupid) == 1)
+        return true;
+    else  
+        return false;
 }
 
 bool User::IsInGroup(int groupid) const

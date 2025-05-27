@@ -1,6 +1,7 @@
 #include "Group.h"
 #include "GroupUser.h"
 #include <unordered_map>
+#include <utility>
 
 Group::Group(int groupid, const std::string& groupname)
     : groupid_(groupid),
@@ -18,20 +19,33 @@ const std::string& Group::GetGroupName() const
     return groupname_;
 }
 
-void Group::AddApply(int applicantid)
+bool Group::AddApply(int applicantid)
 {
-    applylist_.insert(applicantid);
+    if (applylist_.insert(applicantid).second == true)
+        return true;
+    else  
+        return false;
 }
 
-void Group::ApprovalApply(int applicantid)
+bool Group::ApprovalApply(int applicantid)
 {
-    applylist_.erase(applicantid);
-    members_[applicantid] = std::move(GroupUser(applicantid, "Member"));
+    if (applylist_.erase(applicantid) == 1)
+    {
+        members_[applicantid] = std::move(GroupUser(applicantid, "Member"));
+        return true;
+    }
+    else  
+    {
+        return false;
+    }
 }
 
-void Group::DeleteApply(int applicantid)
+bool Group::DeleteApply(int applicantid)
 {
-    applylist_.erase(applicantid);
+    if (applylist_.erase(applicantid) == 1)
+        return true;
+    else  
+        return false;
 }
 
 const std::unordered_set<int>& Group::GetApplyList() const
@@ -39,14 +53,20 @@ const std::unordered_set<int>& Group::GetApplyList() const
     return applylist_;
 }
 
-void Group::AddMember(const GroupUser& user)
+bool Group::AddMember(const GroupUser& user)
 {
-    members_[user.GetUserId()] = user;
+    if (members_.insert(std::make_pair(user.GetUserId(), user)).second == true)
+        return true;
+    else  
+        return false;
 }
 
-void Group::RemoveMember(int userid)
+bool Group::RemoveMember(int userid)
 {
-    members_.erase(userid);
+    if (members_.erase(userid) == 1)
+        return true;
+    else  
+        return false;
 }
 
 bool Group::HasMember(int userid) const

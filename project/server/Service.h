@@ -6,6 +6,8 @@
 #include "../tool/Codec.h"
 #include "../entity/User.h"
 #include "../entity/Group.h"
+#include "../entity/Friend.h"
+#include "../database/MysqlConnectionpool.h"
 
 #include <cstdint>
 #include <functional>
@@ -18,6 +20,13 @@ using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
 using std::placeholders::_4;
+
+struct ChatConnect 
+{
+    enum class Type {None, Private, Group};
+    Type type;
+    int peerid;
+};
 
 class Service
 {
@@ -50,6 +59,8 @@ private:
     Codec codec_;
     Dispatcher& dispatcher_;
 
+    std::unordered_map<int, ChatConnect> chatconnect_;
+    std::unordered_map<int, Friend> friendlist;
     std::unordered_map<int, User> userlist_;
     std::unordered_map<int, Group> grouplist_;
     std::unordered_map<uint16_t, MessageHander> handermap_;

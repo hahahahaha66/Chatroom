@@ -33,7 +33,7 @@ private:
 
     int userid_;
     Level role_;
-    bool muted_ = false;
+    bool muted_ = false;  //禁言
 
     time_t jointime_;
     time_t lastreadtime_;

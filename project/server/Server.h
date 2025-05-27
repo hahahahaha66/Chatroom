@@ -8,8 +8,10 @@
 #include "Service.h"
 #include "../tool/Codec.h"
 #include "../tool/Dispatcher.h"
+#include "../database/MysqlConnectionpool.h"
 
 #include <functional>
+#include <mysql/mysql.h>
 
 class Server 
 {
@@ -19,6 +21,7 @@ public:
           server_(loop, addr, name),
           service_(dispatcher_)
     {
+        MysqlConnectionPool::Instance().Init("localhost", 3306, "root", "123456", "Chatroombase", 10);
         server_.setConnectionCallback(std::bind(&Server::ConnectionCallback, this, std::placeholders::_1));
         server_.setMessageCallback(std::bind(&Server::MessageCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
         server_.setWriteCompleteCallback(std::bind(&Server::MessageCompleteCallback, this, std::placeholders::_1));

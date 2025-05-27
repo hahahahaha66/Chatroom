@@ -17,7 +17,7 @@ const std::string GroupUser::GetRole() const
         case Level::Group_owner:    return "Group_owner";
         case Level::Administrator:  return "Administrator";
         case Level::Member:         return "Member";
-        default:                    throw std::invalid_argument("Invalid level");
+        default:                    return "Member";
     }
 }
 
@@ -40,8 +40,7 @@ void GroupUser::SetRole(const std::string& role)
 {
     if (role == "Group_owner") role_ = Level::Group_owner;
     else if (role == "Administrator") role_ = Level::Administrator;
-    else if (role == "Member") role_ = Level::Member;
-    else throw std::invalid_argument("Invalid level string");
+    else role_ = Level::Member;
 }
 
 void GroupUser::SetMuted(bool muted)

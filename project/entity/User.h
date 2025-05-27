@@ -28,23 +28,24 @@ public:
     bool IsOnLine() const;
     std::shared_ptr<TcpConnection> GetConnection() const;
 
-    void AddFriend(int friendid);
-    void DeleteFriend(int friendid);
+    bool AddFriend(int friendid);
+    bool DeleteFriend(int friendid);
     bool IsFriend(int friendid) const;
     const std::unordered_set<int>& GetFriendList() const;
 
-    void AddBlockFriend(int blockuser);
-    void DeleteBlockFriend(int blockuser);
+    bool AddBlockFriend(int blockuser);
+    bool DeleteBlockFriend(int blockuser);
     bool IsBlockFriend(int blockuser) const;
     const std::unordered_set<int>& GetBlockList() const;
 
-    void AddApply(int applicantid);
+    bool AddApply(int applicantid);
     void ApprovalApply(int applicantid);
     void DeleteApply(int applicantid);
+    bool IsApply(int applicantid);
     const std::unordered_set<int>& GetApplyList() const;
 
-    void JoinGroup(int groupid);
-    void LeaveGroup(int groupid);
+    bool JoinGroup(int groupid);
+    bool LeaveGroup(int groupid);
     bool IsInGroup(int groupid) const;
     const std::unordered_set<int>& GetGroupList() const;
 

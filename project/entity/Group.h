@@ -17,13 +17,13 @@ public:
     int GetGroupId() const;
     const std::string& GetGroupName() const;
 
-    void AddApply(int applicantid);
-    void ApprovalApply(int applicantid);
-    void DeleteApply(int applicantid);
+    bool AddApply(int applicantid);
+    bool ApprovalApply(int applicantid);
+    bool DeleteApply(int applicantid);
     const std::unordered_set<int>& GetApplyList() const;
     
-    void AddMember(const GroupUser& user);
-    void RemoveMember(int userid);
+    bool AddMember(const GroupUser& user);
+    bool RemoveMember(int userid);
     bool HasMember(int uerid) const;
     const GroupUser* GetMember(int userid) const;
     const std::unordered_map<int, GroupUser>& GetAllMembers() const;
