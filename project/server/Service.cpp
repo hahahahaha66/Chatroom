@@ -22,6 +22,15 @@ void Service::RegisterAllHanders(Dispatcher& dispatcher)
     }
 }
 
+void Service::RefreshDatabase()
+{
+    auto conn =MysqlConnectionPool::Instance().GetConnection();
+    if (conn)
+    {
+     
+    }
+}
+
 void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
 {
     bool end = true;
@@ -54,7 +63,7 @@ void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, cons
             grouplist[it] = grouplist_[it].GetGroupName();
         }
     }
-    
+
     json all_friend = js_AllFriendIdName(userid, friendlist, grouplist);
     conn->send(codec_.encode(all_friend, type, seq));
 }

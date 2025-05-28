@@ -36,6 +36,8 @@ public:
 
     void RegisterAllHanders(Dispatcher& dispatcher);
 
+    void RefreshDatabase();
+
     void ProcessingLogin(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
     void RegisterAccount(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
     void ListFriendlist(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
