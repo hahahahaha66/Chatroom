@@ -3,6 +3,94 @@
 #include <optional>
 #include <unordered_map>
 
+//database
+
+// chatconnect 实现
+std::string js_data_chatconnect(const int& id, const std::string& type, const int& peerid) {
+    json j = {
+        {"id", id},
+        {"type", type},
+        {"peerid", peerid}
+    };
+    return j.dump();
+}
+
+// friend 实现
+std::string js_data_friend(const int& id, const int& userid, const int& friendid, const std::string& status) {
+    json j = {
+        {"id", id},
+        {"userid", userid},
+        {"friendid", friendid},
+        {"status", status}
+    };
+    return j.dump();
+}
+
+// groupapply 实现
+std::string js_data_groupapply(const int& id, const int& groupid, const int& applyid) {
+    json j = {
+        {"id", id},
+        {"groupid", groupid},
+        {"applyid", applyid}
+    };
+    return j.dump();
+}
+
+// groups 实现
+std::string js_data_groups(const int& id, const std::string& groupname) {
+    json j = {
+        {"id", id},
+        {"groupname", groupname}
+    };
+    return j.dump();
+}
+
+// groupuser 实现
+std::string js_data_groupuser(const int& id, const int& groupid, std::string& level) {
+    json j = {
+        {"id", id},
+        {"groupid", groupid},
+        {"level", level}
+    };
+    return j.dump();
+}
+
+// message 实现
+std::string js_data_message(const int& id, const std::string& type, const int& senderid, 
+                          const int& receiverid, const std::string& text, const std::string& status) {
+    json j = {
+        {"id", id},
+        {"type", type},
+        {"senderid", senderid},
+        {"receiverid", receiverid},
+        {"text", text},
+        {"status", status}
+    };
+    return j.dump();
+}
+
+// user 实现
+std::string js_data_user(const int& id, const std::string& username, 
+                        const std::string password, bool online) {
+    json j = {
+        {"id", id},
+        {"username", username},
+        {"password", password},
+        {"online", online}
+    };
+    return j.dump();
+}
+
+// userapply 实现
+std::string js_data_userapply(const int& id, const int& userid, const int& applyid) {
+    json j = {
+        {"id", id},
+        {"userid", userid},
+        {"applyid", applyid}
+    };
+    return j.dump();
+}
+
 std::string js_UserData(const int& userid, const std::string& username, const int& friendnum, const int& groupnum)
 {
     json j = {

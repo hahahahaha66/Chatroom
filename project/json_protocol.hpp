@@ -9,6 +9,26 @@
 
 using json = nlohmann::json;
 
+//database
+
+//chatconect
+std::string js_data_chatconnect(const int& id, const std::string& type, const int&peerid);
+//friend
+std::string js_data_friend(const int& id, const int& userid, const int& friendid, const std::string& status);
+//groupapply
+std::string js_data_groupapply(const int& id, const int& groupid, const int& applyid);
+//groups
+std::string js_data_groups(const int& id, const std::string& groupname);
+//groupuser
+std::string js_data_groupuser(const int& id, const int& groupid, std::string& level);
+//message
+std::string js_data_message(const int& id, const std::string& type, const int& senderid, const int& reveiverid, const std::string& text, const std::string& status);
+//user
+std::string js_data_user(const int& id, const std::string& username, const std::string password, bool online);
+//userapply
+std::string js_data_userapply(const int& id, const int& userid, const int& applyid);
+
+
 //打印用户信息
 std::string js_UserData(const int& userid, const std::string& username, const int& friendnum, const int& groupnum);
 //注册
