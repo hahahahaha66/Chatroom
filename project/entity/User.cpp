@@ -1,5 +1,8 @@
 #include "User.h"
+#include "Friend.h"
+#include <type_traits>
 #include <unordered_set>
+#include <utility>
 
 User::User(int userid, const std::string& username, const std::string& passsword) 
     : userid_(userid),
@@ -54,9 +57,10 @@ std::shared_ptr<TcpConnection> User::GetConnection() const
     return conn_;
 }
 
-bool User::AddFriend(int friendid)
+bool User::AddFriend(int id, int friendid)
 {
-    if (friendlist_.insert(friendid).second == true)
+    friendlist_[id] = std::move(Friend(userid_, friendid));
+    if (friendlist_.insert(std::make_pair(id, std::move(Friend(userid_, friendid)))).second == true)
         return false;
     else  
         return true;
@@ -70,46 +74,51 @@ bool User::DeleteFriend(int friendid)
         return false;
 }
 
-bool User::IsFriend(int friendid) const
+bool User::IsFriend(int id) const
 {
-    if (friendlist_.find(friendid) == friendlist_.end())
+    if (friendlist_.find(id) == friendlist_.end())
         return false;
     else  
         return true;
 }
 
-const std::unordered_set<int>& User::GetFriendList() const
+const std::unordered_map<int, Friend>& User::GetFriendList() const
 {
     return friendlist_;
 }
 
-bool User::AddBlockFriend(int blockuser)
+void User::AddBlockFriend(int id, int blockuser)
 {
-    if (blocklist_.insert(blockuser).second == true)
-        return true;
-    else
-        return false;
+    friendlist_[id].SetStatus("Block");
 }
 
-bool User::DeleteBlockFriend(int blockuser)
+bool User::DeleteBlockFriend(int id)
 {
-    if (blocklist_.erase(blockuser) == 1)
+    if (friendlist_.erase(id) == 1)
         return true;
     else  
         return false;
 }
 
-bool User::IsBlockFriend(int blockuser) const
+bool User::IsBlockFriend(int id) const
 {
-    if (blocklist_.find(blockuser) == blocklist_.end())
-        return false;
-    else  
+    if (friendlist_.at(id).GetStatus() == "Block")
         return true;
+    else  
+        return false;
 }
 
-const std::unordered_set<int>& User::GetBlockList() const
+const std::vector<int> User::GetBlockList() const
 {
-    return blocklist_;
+    std::vector<int> result;
+    for (auto& it : friendlist_)
+    {
+        if (it.second.GetStatus() == "Block")
+        {
+            result.push_back(it.second.GetFriendId());
+        }
+    }
+    return result;
 }
 
 bool User::AddApply(int applicantid)
@@ -120,10 +129,10 @@ bool User::AddApply(int applicantid)
         return false;
 }
 
-void User::ApprovalApply(int applicantid)
+void User::ApprovalApply(int id, int applicantid)
 {
     applylist_.erase(applicantid);
-    friendlist_.insert(applicantid);
+    friendlist_.insert(std::make_pair(id, std::move(Friend(userid_, applicantid))));
 }
 
 void User::DeleteApply(int applicantid)

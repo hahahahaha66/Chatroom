@@ -2,6 +2,7 @@
 #include "../json_protocol.hpp"
 #include <cstdint>
 #include <functional>
+#include <mysql/mysql.h>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -22,13 +23,65 @@ void Service::RegisterAllHanders(Dispatcher& dispatcher)
     }
 }
 
-void Service::RefreshDatabase()
+void Service::ReadUserFromDataBase()
 {
-    auto conn =MysqlConnectionPool::Instance().GetConnection();
-    if (conn)
-    {
-     
-    }
+    databasethreadpool_.EnqueueTask([this](MysqlConnection& conn) {
+        MYSQL_RES* res = conn.ExcuteQuery("select * from user");
+
+        if (!res) return;
+
+        MysqlResult result(res);
+
+        while (result.Next())
+        {
+            MysqlRow row = result.GetRow();
+
+            int id = row.GetInt("id");
+            std::string username = row.GetString("username");
+            std::string password = row.GetString("password");
+            bool online = row.GetBool("online");
+            userlist_[id] = std::move(User(id, username, password));
+        }
+    });
+}
+
+void Service::ReadGroupFromDataBase()
+{
+    databasethreadpool_.EnqueueTask([this](MysqlConnection& conn) {
+        MYSQL_RES* res = conn.ExcuteQuery("select * from groups");
+
+        if (!res) return;
+
+        MysqlResult result(res);
+
+        while (result.Next())
+        {
+            MysqlRow row = result.GetRow();
+
+            int id = row.GetInt("id");
+            std::string groupname = row.GetString("groupname");
+            grouplist_[id] = std::move(Group(id, groupname));
+        }
+    });
+}
+
+void Service::ReadFriendFromDataBase()
+{
+    databasethreadpool_.EnqueueTask([this](MysqlConnection& conn) {
+        MYSQL_RES* res = conn.ExcuteQuery("select * from friend");
+
+        if (!res) return;
+
+        MysqlResult result(res);
+
+        while (result.Next())
+        {
+            MysqlRow row = result.GetRow();
+
+            int id = row.GetInt("id");
+            int userid = row.
+        }
+    });
 }
 
 void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)

@@ -3,6 +3,7 @@
 
 #include "../muduo/net/tcp/TcpConnection.h"
 #include "GroupUser.h"
+#include "Friend.h"
 
 #include <memory>
 #include <sys/types.h>
@@ -28,18 +29,18 @@ public:
     bool IsOnLine() const;
     std::shared_ptr<TcpConnection> GetConnection() const;
 
-    bool AddFriend(int friendid);
+    bool AddFriend(int id,int friendid);
     bool DeleteFriend(int friendid);
     bool IsFriend(int friendid) const;
-    const std::unordered_set<int>& GetFriendList() const;
+    const std::unordered_map<int, Friend>& GetFriendList() const;
 
-    bool AddBlockFriend(int blockuser);
+    void AddBlockFriend(int id, int blockuser);
     bool DeleteBlockFriend(int blockuser);
     bool IsBlockFriend(int blockuser) const;
-    const std::unordered_set<int>& GetBlockList() const;
+    const std::vector<int> GetBlockList() const;
 
     bool AddApply(int applicantid);
-    void ApprovalApply(int applicantid);
+    void ApprovalApply(int id, int applicantid);
     void DeleteApply(int applicantid);
     bool IsApply(int applicantid);
     const std::unordered_set<int>& GetApplyList() const;
@@ -56,9 +57,8 @@ private:
     bool online_ = false;
     std::shared_ptr<TcpConnection> conn_;
 
+    std::unordered_map<int, Friend> friendlist_;
     std::unordered_set<int> applylist_;
-    std::unordered_set<int> blocklist_;
-    std::unordered_set<int> friendlist_;
     std::unordered_set<int> grouplist_;
 };
 

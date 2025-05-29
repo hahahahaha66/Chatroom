@@ -26,7 +26,7 @@ void Friend::SetFriendId(int friendid)
     friendid_ = friendid;
 }
 
-int Friend::GetFriendId()
+int Friend::GetFriendId() const
 {
     return friendid_;
 }
@@ -43,7 +43,7 @@ void Friend::SetStatus(std::string status)
     }
 }
 
-std::string Friend::GetStatus()
+std::string Friend::GetStatus() const
 {
     if (status_ == Status::Block)
     {

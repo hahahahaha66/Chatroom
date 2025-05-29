@@ -13,10 +13,10 @@ public:
     int GetUserId();
 
     void SetFriendId(int friendid);
-    int GetFriendId();
+    int GetFriendId() const;
 
     void SetStatus(std::string status);
-    std::string GetStatus();
+    std::string GetStatus() const;
 
 private:
     enum class Status  

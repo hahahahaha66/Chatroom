@@ -8,6 +8,9 @@
 #include "../entity/Group.h"
 #include "../entity/Friend.h"
 #include "../database/MysqlConnectionpool.h"
+#include "../database/DatabaseThreadPool.h"
+#include "../database/MysqlResult.h"
+#include "../database/MysqlRow.h"
 
 #include <cstdint>
 #include <functional>
@@ -24,8 +27,9 @@ using std::placeholders::_4;
 struct ChatConnect 
 {
     enum class Type {None, Private, Group};
-    Type type;
-    int peerid;
+    Type type_;
+    int peerid_;
+    ChatConnect(int peerid, Type type = Type::None) : type_(type), peerid_(peerid) {}
 };
 
 class Service
@@ -36,30 +40,37 @@ public:
 
     void RegisterAllHanders(Dispatcher& dispatcher);
 
-    void RefreshDatabase();
+    void ReadUserFromDataBase();
+    void ReadGroupFromDataBase();
+    void ReadFriendFromDataBase();
+    void ReadChatConnectFromDataBase();
+    void ReadGroupApplyFromDataBase();
+    void ReadUserApplyFromDataBase();
+    void ReadGroupUserFromDataBase();
 
-    void ProcessingLogin(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void RegisterAccount(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void ListFriendlist(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void DeleteFriend(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void BlockFriend(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void AddFriend(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void ProcessingLogin    (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void RegisterAccount    (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void ListFriendlist     (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void DeleteFriend       (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void BlockFriend        (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void AddFriend          (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
     void ListFriendApplyList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void ListGroupList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void CreateGroup(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void ListGroupList      (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void CreateGroup        (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
     void ListGroupMemberList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void ListGroupApplyList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void ProcessFriendApply(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void ProcessGroupApply(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void QuitGroup(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void PrintUserData(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void ChangeUserPassword(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void DeleteUserAccount(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void DeleteGroup(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void ListGroupApplyList (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void ProcessFriendApply (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void ProcessGroupApply  (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void QuitGroup          (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void PrintUserData      (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void ChangeUserPassword (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void DeleteUserAccount  (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void DeleteGroup        (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
 
 private:
     Codec codec_;
     Dispatcher& dispatcher_;
+    DatabaseThreadPool databasethreadpool_;
 
     std::unordered_map<int, ChatConnect> chatconnect_;
     std::unordered_map<int, Friend> friendlist;
