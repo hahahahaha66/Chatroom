@@ -5,6 +5,7 @@
 #include <mysql/mysql.h>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 Service::Service(Dispatcher& dispatcher) : dispatcher_(dispatcher)
 {
@@ -78,8 +79,103 @@ void Service::ReadFriendFromDataBase()
         {
             MysqlRow row = result.GetRow();
 
-            int id = row.GetInt("id");
-            int userid = row.
+            int userid = row.GetInt("userid");
+            int friendid = row.GetInt("friendid");
+            std::string status = row.GetString("Status");
+
+            userlist_[userid].AddFriend(friendid);
+            userlist_[userid].SetStatusFriend(friendid, status);
+            userfriendlist[userid][friendid] = std::move(Friend(userid, friendid, status));
+        }
+    });
+}
+
+void Service::ReadChatConnectFromDataBase()
+{
+    databasethreadpool_.EnqueueTask([this](MysqlConnection& conn) {
+        MYSQL_RES* res = conn.ExcuteQuery("select * from chatconnect");
+
+        if (!res) return;
+
+        MysqlResult result(res);
+
+        while (result.Next())
+        {
+            MysqlRow row = result.GetRow();
+
+            int userid = row.GetInt("userid");
+            ChatConnect::Type type;
+            std::string str = row.GetString("type");
+            if (str == "Private")
+                type = ChatConnect::Type::Private;
+            else if (str == "Group")
+                type = ChatConnect::Type::Group;
+            else    
+                type = ChatConnect::Type::None;
+
+            int peerid = row.GetInt("peerid");
+            chatconnect_[userid] = std::move(ChatConnect(peerid, type));
+        }
+    });
+}
+
+void Service::ReadGroupApplyFromDataBase()
+{
+    databasethreadpool_.EnqueueTask([this](MysqlConnection& conn) {
+        MYSQL_RES* res = conn.ExcuteQuery("select * from groupapply");
+         
+        if (!res) return;
+
+        MysqlResult result(res);
+
+        while (result.Next())
+        {
+            MysqlRow row = result.GetRow();
+
+            int groupid = row.GetInt("groupid");
+            int applyid = row.GetInt("applyid");
+            grouplist_[groupid].AddApply(applyid);
+        }
+    });
+}
+
+void Service::ReadUserApplyFromDataBase()
+{
+    databasethreadpool_.EnqueueTask([this](MysqlConnection& conn) {
+        MYSQL_RES* res = conn.ExcuteQuery("select * from groupapply");
+         
+        if (!res) return;
+
+        MysqlResult result(res);
+
+        while (result.Next())
+        {
+            MysqlRow row = result.GetRow();
+
+            int userid = row.GetInt("userid");
+            int applyid = row.GetInt("applyid");
+            userlist_[userid].AddApply(applyid);
+        }
+    });
+}
+
+void Service::ReadGroupUserFromDataBase()
+{
+    databasethreadpool_.EnqueueTask([this](MysqlConnection& conn) {
+        MYSQL_RES* res = conn.ExcuteQuery("select * from groupapply");
+         
+        if (!res) return;
+
+        MysqlResult result(res);
+
+        while (result.Next())
+        {
+            MysqlRow row = result.GetRow();
+
+            int userid = row.GetInt("id");
+            int groupid = row.GetInt("groupid");
+            std::string str = row.GetString("level");
+            grouplist_[groupid].AddMember(std::move(GroupUser(userid, str)));
         }
     });
 }

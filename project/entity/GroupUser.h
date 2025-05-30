@@ -8,6 +8,13 @@
 class GroupUser  
 {
 public:
+    enum class Level
+    {
+        Group_owner,
+        Administrator,
+        Member
+    };
+    
     GroupUser();
     GroupUser(int userid, const std::string& role);
 
@@ -24,13 +31,6 @@ public:
     void SetLastReadTime(time_t lastreadtime);
 
 private: 
-    enum class Level
-    {
-        Group_owner,
-        Administrator,
-        Member
-    };
-
     int userid_;
     Level role_;
     bool muted_ = false;  //禁言

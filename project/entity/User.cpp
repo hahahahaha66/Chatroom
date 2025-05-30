@@ -57,10 +57,10 @@ std::shared_ptr<TcpConnection> User::GetConnection() const
     return conn_;
 }
 
-bool User::AddFriend(int id, int friendid)
+bool User::AddFriend(int friendid)
 {
-    friendlist_[id] = std::move(Friend(userid_, friendid));
-    if (friendlist_.insert(std::make_pair(id, std::move(Friend(userid_, friendid)))).second == true)
+    friendlist_[friendid] = std::move(Friend(userid_, friendid));
+    if (friendlist_.insert(std::make_pair(friendid, std::move(Friend(userid_, friendid)))).second == true)
         return false;
     else  
         return true;
@@ -74,9 +74,9 @@ bool User::DeleteFriend(int friendid)
         return false;
 }
 
-bool User::IsFriend(int id) const
+bool User::IsFriend(int friendid) const
 {
-    if (friendlist_.find(id) == friendlist_.end())
+    if (friendlist_.find(friendid) == friendlist_.end())
         return false;
     else  
         return true;
@@ -87,22 +87,14 @@ const std::unordered_map<int, Friend>& User::GetFriendList() const
     return friendlist_;
 }
 
-void User::AddBlockFriend(int id, int blockuser)
+void User::SetStatusFriend(int friendid, std::string& status)
 {
-    friendlist_[id].SetStatus("Block");
+    friendlist_[friendid].SetStatus(status);
 }
 
-bool User::DeleteBlockFriend(int id)
+bool User::IsBlockFriend(int blockuserid) const
 {
-    if (friendlist_.erase(id) == 1)
-        return true;
-    else  
-        return false;
-}
-
-bool User::IsBlockFriend(int id) const
-{
-    if (friendlist_.at(id).GetStatus() == "Block")
+    if (friendlist_.at(blockuserid).GetStatus() == "Block")
         return true;
     else  
         return false;

@@ -29,13 +29,12 @@ public:
     bool IsOnLine() const;
     std::shared_ptr<TcpConnection> GetConnection() const;
 
-    bool AddFriend(int id,int friendid);
+    bool AddFriend(int friendid);
     bool DeleteFriend(int friendid);
     bool IsFriend(int friendid) const;
     const std::unordered_map<int, Friend>& GetFriendList() const;
 
-    void AddBlockFriend(int id, int blockuser);
-    bool DeleteBlockFriend(int blockuser);
+    void SetStatusFriend(int friendid, std::string& status);
     bool IsBlockFriend(int blockuser) const;
     const std::vector<int> GetBlockList() const;
 

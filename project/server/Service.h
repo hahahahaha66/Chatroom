@@ -73,7 +73,7 @@ private:
     DatabaseThreadPool databasethreadpool_;
 
     std::unordered_map<int, ChatConnect> chatconnect_;
-    std::unordered_map<int, Friend> friendlist;
+    std::unordered_map<int, std::unordered_map<int, Friend>> userfriendlist;
     std::unordered_map<int, User> userlist_;
     std::unordered_map<int, Group> grouplist_;
     std::unordered_map<uint16_t, MessageHander> handermap_;
