@@ -32,7 +32,7 @@ std::string js_data_userapply(const int& id, const int& userid, const int& apply
 //打印用户信息
 std::string js_UserData(const int& userid, const std::string& username, const int& friendnum, const int& groupnum);
 //注册
-std::string js_RegisterData(const int& userid, const std::string& username, const std::string& password);
+std::string js_RegisterData(const std::string& username, const std::string& password);
 //用户id
 std::string js_UserId(const int& userid);
 //用户
@@ -44,7 +44,7 @@ std::string js_Friend(const int& friendid, const std::string& friendname, const 
 std::string js_FriendList(const int& userid, const std::unordered_map<int, bool>& friendlist);
 //用户与好友
 std::string js_FriendData(const int& userid, const int& friendid);
-//所有好友id与名字
+//所有好友群组id与名字
 std::string js_AllFriendIdName(const int& userid, const std::unordered_map<int, std::string>& firendidname, const std::unordered_map<int, std::string>& groupidname);
 //私聊
 std::string js_FriendChatData(const int& fromuserid, const int& touserid, const std::string& message);

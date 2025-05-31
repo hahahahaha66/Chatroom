@@ -49,6 +49,11 @@ public:
         return t;
     }
 
+    MYSQL_ROW Get()
+    {
+        return row_;
+    }
+
 private:
     MYSQL_ROW row_;
     const std::map<std::string, int>& colmap_;

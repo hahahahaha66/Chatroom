@@ -103,10 +103,9 @@ std::string js_UserData(const int& userid, const std::string& username, const in
 }
 
 // 注册
-std::string js_RegisterData(const int& userid, const std::string& username, const std::string& password)
+std::string js_RegisterData(const std::string& username, const std::string& password)
 {
     json j = {
-        {"userid", userid},
         {"username", username},
         {"password", password}
     };

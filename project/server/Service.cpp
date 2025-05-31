@@ -2,6 +2,8 @@
 #include "../json_protocol.hpp"
 #include <cstdint>
 #include <functional>
+#include <future>
+#include <mysql/mariadb_com.h>
 #include <mysql/mysql.h>
 #include <unordered_map>
 #include <unordered_set>
@@ -193,7 +195,10 @@ void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, cons
 
     if (end == true)
     {
-        //这里执行从数据库中查询名字及密码是否正确
+        if (userlist_[userid].GetPassWord() == password)
+            end = true;
+        else  
+            end = false;
     }
     
     uint16_t type = (end == true ? 1 : 0);
@@ -204,7 +209,7 @@ void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, cons
     {
         for (auto& it : userlist_[userid].GetFriendList())
         {
-            friendlist[it] = userlist_[it].GetUserName();
+            friendlist[it.first] = userlist_[it.first].GetUserName();
         }
 
         for (auto& it : userlist_[userid].GetGroupList())
@@ -223,17 +228,71 @@ void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, cons
     bool end = true;
     std::string result;
 
-    int userid;
     std::string username;
     std::string password;
-    end &= AssignIfPresent(js, "userid", userid);
     end &= AssignIfPresent(js, "username", username);
     end &= AssignIfPresent(js, "password", password);
+
+    std::promise<int> promise;
+    std::future<int> result_future = promise.get_future();
 
     if (end)
     {
         //检查数据库中有无已创建的账号，有返回false，没有则写入返回true
+        databasethreadpool_.EnqueueTask([username, password, p = std::move(promise)](MysqlConnection& conn)mutable {
+            std::string check_sql = 
+                "select exists (select 1 from user where username = '" + username + "' ) as user_exists;";
+            MYSQL_RES* res = conn.ExcuteQuery(check_sql);
+            if (!res) {
+                p.set_value(-2);
+                return ;
+            }
+
+            MysqlResult result(res);
+            if (result.Next())
+            {
+                MysqlRow row = result.GetRow();
+                bool exists = row.GetBool("user_exixts");
+                if (exists)
+                {
+                    p.set_value(-1);
+                    return;
+                }
+            }
+            
+            std::string insert_sql = 
+                "insert into user (username, password) value ('" + username + "' , '" + password + "');";
+            if (!conn.ExcuteQuery(insert_sql)) 
+            {
+                p.set_value(-3);
+                return;
+            }
+
+            MYSQL_RES* idres = conn.ExcuteQuery("select last_insert_id() as is");
+            if (!idres)
+            {
+                p.set_value(-4);
+                return;
+            }
+
+            MysqlResult id_result(idres);
+            if (id_result.Next())
+            {
+                MysqlRow row = id_result.GetRow();
+                int id = row.GetInt("id");
+                p.set_value(id);
+            }
+            else  
+            {
+                p.set_value(-5);
+            }
+        });
     }
+
+    int userid = result_future.get();
+    
+    if (userid < 0)
+        end = false;
 
     if (end)
         result = "Register successful!";
