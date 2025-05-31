@@ -39,7 +39,7 @@ public:
     ~Service(){};
 
     void RegisterAllHanders(Dispatcher& dispatcher);
-
+    
     void ReadUserFromDataBase();
     void ReadGroupFromDataBase();
     void ReadFriendFromDataBase();
@@ -68,6 +68,9 @@ public:
     void DeleteGroup        (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
 
 private:
+    void ReadFromDataBase(const std::string& query, std::function<void(MysqlRow&)> rowprocessor);
+
+
     Codec codec_;
     Dispatcher& dispatcher_;
     DatabaseThreadPool databasethreadpool_;

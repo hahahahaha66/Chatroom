@@ -26,159 +26,107 @@ void Service::RegisterAllHanders(Dispatcher& dispatcher)
     }
 }
 
-void Service::ReadUserFromDataBase()
+void Service::ReadFromDataBase(const std::string& query, std::function<void(MysqlRow&)> rowhander)
 {
-    databasethreadpool_.EnqueueTask([this](MysqlConnection& conn) {
-        MYSQL_RES* res = conn.ExcuteQuery("select * from user");
-
-        if (!res) return;
+    databasethreadpool_.EnqueueTask([this, query, rowhander](MysqlConnection& conn) {
+        MYSQL_RES* res = conn.ExcuteQuery(query);
+        if (!res) 
+        {
+            return;
+        }
 
         MysqlResult result(res);
-
         while (result.Next())
         {
             MysqlRow row = result.GetRow();
-
-            int id = row.GetInt("id");
-            std::string username = row.GetString("username");
-            std::string password = row.GetString("password");
-            bool online = row.GetBool("online");
-            userlist_[id] = std::move(User(id, username, password));
+            rowhander(row);
         }
+    });
+}
+
+void Service::ReadUserFromDataBase()
+{
+    std::string query = "select * from user;";
+    ReadFromDataBase(query, [this](MysqlRow& row) {
+        int id = row.GetInt("id");
+        std::string username = row.GetString("username");
+        std::string password = row.GetString("password");
+        bool online = row.GetBool("online");
+        userlist_[id] = std::move(User(id, username, password));
     });
 }
 
 void Service::ReadGroupFromDataBase()
 {
-    databasethreadpool_.EnqueueTask([this](MysqlConnection& conn) {
-        MYSQL_RES* res = conn.ExcuteQuery("select * from groups");
-
-        if (!res) return;
-
-        MysqlResult result(res);
-
-        while (result.Next())
-        {
-            MysqlRow row = result.GetRow();
-
-            int id = row.GetInt("id");
-            std::string groupname = row.GetString("groupname");
-            grouplist_[id] = std::move(Group(id, groupname));
-        }
+    std::string query = "select * from groups;";
+    ReadFromDataBase(query, [this](MysqlRow& row) {
+        int id = row.GetInt("id");
+        std::string groupname = row.GetString("groupname");
+        grouplist_[id] = std::move(Group(id, groupname));
     });
 }
 
 void Service::ReadFriendFromDataBase()
 {
-    databasethreadpool_.EnqueueTask([this](MysqlConnection& conn) {
-        MYSQL_RES* res = conn.ExcuteQuery("select * from friend");
+    std::string query = "select * from friend;";
+    ReadFromDataBase(query, [this](MysqlRow& row) {
+        int userid = row.GetInt("userid");
+        int friendid = row.GetInt("friendid");
+        std::string status = row.GetString("Status");
 
-        if (!res) return;
-
-        MysqlResult result(res);
-
-        while (result.Next())
-        {
-            MysqlRow row = result.GetRow();
-
-            int userid = row.GetInt("userid");
-            int friendid = row.GetInt("friendid");
-            std::string status = row.GetString("Status");
-
-            userlist_[userid].AddFriend(friendid);
-            userlist_[userid].SetStatusFriend(friendid, status);
-            userfriendlist[userid][friendid] = std::move(Friend(userid, friendid, status));
-        }
+        userlist_[userid].AddFriend(friendid);
+        userlist_[userid].SetStatusFriend(friendid, status);
+        userfriendlist[userid][friendid] = std::move(Friend(userid, friendid, status));
     });
 }
 
 void Service::ReadChatConnectFromDataBase()
 {
-    databasethreadpool_.EnqueueTask([this](MysqlConnection& conn) {
-        MYSQL_RES* res = conn.ExcuteQuery("select * from chatconnect");
+    std::string query = "select * from chatconnect;";
+    ReadFromDataBase(query, [this](MysqlRow& row) {
+        int userid = row.GetInt("userid");
+        ChatConnect::Type type;
+        std::string str = row.GetString("type");
+        if (str == "Private")
+            type = ChatConnect::Type::Private;
+        else if (str == "Group")
+            type = ChatConnect::Type::Group;
+        else    
+            type = ChatConnect::Type::None;
 
-        if (!res) return;
-
-        MysqlResult result(res);
-
-        while (result.Next())
-        {
-            MysqlRow row = result.GetRow();
-
-            int userid = row.GetInt("userid");
-            ChatConnect::Type type;
-            std::string str = row.GetString("type");
-            if (str == "Private")
-                type = ChatConnect::Type::Private;
-            else if (str == "Group")
-                type = ChatConnect::Type::Group;
-            else    
-                type = ChatConnect::Type::None;
-
-            int peerid = row.GetInt("peerid");
-            chatconnect_[userid] = std::move(ChatConnect(peerid, type));
-        }
+        int peerid = row.GetInt("peerid");
+        chatconnect_[userid] = std::move(ChatConnect(peerid, type));
     });
 }
 
 void Service::ReadGroupApplyFromDataBase()
 {
-    databasethreadpool_.EnqueueTask([this](MysqlConnection& conn) {
-        MYSQL_RES* res = conn.ExcuteQuery("select * from groupapply");
-         
-        if (!res) return;
-
-        MysqlResult result(res);
-
-        while (result.Next())
-        {
-            MysqlRow row = result.GetRow();
-
-            int groupid = row.GetInt("groupid");
-            int applyid = row.GetInt("applyid");
-            grouplist_[groupid].AddApply(applyid);
-        }
+    std::string query = "select * from groupapply;";
+    ReadFromDataBase(query, [this](MysqlRow& row) {
+        int groupid = row.GetInt("groupid");
+        int applyid = row.GetInt("applyid");
+        grouplist_[groupid].AddApply(applyid);
     });
 }
 
 void Service::ReadUserApplyFromDataBase()
 {
-    databasethreadpool_.EnqueueTask([this](MysqlConnection& conn) {
-        MYSQL_RES* res = conn.ExcuteQuery("select * from groupapply");
-         
-        if (!res) return;
-
-        MysqlResult result(res);
-
-        while (result.Next())
-        {
-            MysqlRow row = result.GetRow();
-
-            int userid = row.GetInt("userid");
-            int applyid = row.GetInt("applyid");
-            userlist_[userid].AddApply(applyid);
-        }
+    std::string query = "select * from userapply;";
+    ReadFromDataBase(query, [this](MysqlRow& row) {
+        int userid = row.GetInt("userid");
+        int applyid = row.GetInt("applyid");
+        userlist_[userid].AddApply(applyid);
     });
 }
 
 void Service::ReadGroupUserFromDataBase()
 {
-    databasethreadpool_.EnqueueTask([this](MysqlConnection& conn) {
-        MYSQL_RES* res = conn.ExcuteQuery("select * from groupapply");
-         
-        if (!res) return;
-
-        MysqlResult result(res);
-
-        while (result.Next())
-        {
-            MysqlRow row = result.GetRow();
-
-            int userid = row.GetInt("id");
-            int groupid = row.GetInt("groupid");
-            std::string str = row.GetString("level");
-            grouplist_[groupid].AddMember(std::move(GroupUser(userid, str)));
-        }
+    std::string query = "select * from groupuser;";
+    ReadFromDataBase(query, [this](MysqlRow& row) {
+        int userid = row.GetInt("id");
+        int groupid = row.GetInt("groupid");
+        std::string str = row.GetString("level");
+        grouplist_[groupid].AddMember(std::move(GroupUser(userid, str)));
     });
 }
 
@@ -316,11 +264,11 @@ void Service::ListFriendlist(const TcpConnectionPtr& conn, const json& js, const
     int userid;
     end &= AssignIfPresent(js, "userid", userid);
 
-    std::unordered_set<int> friendset = userlist_[userid].GetFriendList();
+    
     std::unordered_map<int, bool> friendlist;
-    for (auto& it : friendset)
+    for (auto& it : userfriendlist[userid])
     {
-        friendlist[it] = userlist_[it].IsOnLine();
+        friendlist[it.first] = userlist_[it.first].IsOnLine();
     }
 
     json reply_js = js_FriendList(userid, friendlist);
@@ -340,7 +288,8 @@ void Service::DeleteFriend(const TcpConnectionPtr& conn, const json& js, const u
     end &= AssignIfPresent(js, "userid", userid);
     end &= AssignIfPresent(js, "friendid", friendid);
 
-    userlist_[userid].DeleteFriend(friendid);
+    end &= userlist_[userid].DeleteFriend(friendid);
+    userfriendlist[userid].erase(friendid);
 
     if (end)
         result = "Delete successful!";
@@ -364,7 +313,7 @@ void Service::BlockFriend(const TcpConnectionPtr& conn, const json& js, const ui
     end &= AssignIfPresent(js, "userid", userid);
     end &= AssignIfPresent(js, "friendid", friendid);
 
-    userlist_[userid].AddBlockFriend(friendid);
+    userfriendlist[userid][friendid].SetStatus("Block");
 
     if (end)
         result = "Block successful!";
@@ -436,6 +385,9 @@ void Service::ProcessFriendApply(const TcpConnectionPtr& conn, const json& js, c
     if (real_result)
     {
         userlist_[userid].AddFriend(applicantid);
+        userfriendlist[userid][applicantid] = std::move(Friend(userid, applicantid));
+        userlist_[applicantid].AddFriend(userid);
+        userfriendlist[applicantid][userid] = std::move(Friend(applicantid,userid));
     }
 
     if (end)
@@ -695,13 +647,21 @@ void Service::DeleteUserAccount(const TcpConnectionPtr& conn, const json& js, co
     {
         for (auto& it : userlist_[userid].GetFriendList())
         {
-            userlist_[it].DeleteFriend(userid);
+            userlist_[it.first].DeleteFriend(userid);
         }
         
         for (auto& it : userlist_[userid].GetGroupList())
         {
             grouplist_[it].RemoveMember(userid);
         }
+
+        for (auto& it : userfriendlist[userid])
+        {
+            userlist_[it.second.GetFriendId()].DeleteFriend(userid);
+            userfriendlist[it.second.GetFriendId()].erase(userid);
+        }
+        
+        userfriendlist.erase(userid);
         userlist_.erase(userid);
     }
     else {
