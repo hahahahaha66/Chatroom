@@ -1,10 +1,14 @@
 #include "Service.h"
 #include "../json_protocol.hpp"
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <future>
 #include <mysql/mariadb_com.h>
 #include <mysql/mysql.h>
+#include <sstream>
+#include <string>
+#include <thread>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -128,6 +132,126 @@ void Service::ReadGroupUserFromDataBase()
         std::string str = row.GetString("level");
         grouplist_[groupid].AddMember(std::move(GroupUser(userid, str)));
     });
+}
+
+void Service::StartAutoFlushToDataBase(int seconds)
+{
+    running_ = true;
+    flush_thread_ = std::thread([this, seconds]() {
+        while (running_)
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(seconds));
+            FlushToDataBase();
+        }
+    });
+}
+
+void Service::StopAutoFlush()
+{
+    if (flush_thread_.joinable())
+        flush_thread_.join();
+}
+
+void Service::FlushToDataBase()
+{
+    databasethreadpool_.EnqueueTask([this](MysqlConnection& conn) {
+        for (auto& [userid, user] : userlist_)
+        {
+            std::string sql = FormatUpdateUser(user);
+            conn.ExcuteUpdata(sql);
+
+            for (auto& applyid : user.GetApplyList())
+            {
+                std::string sql = FormatUpdateUserApply(userid, applyid);
+                conn.ExcuteUpdata(sql);
+            }
+
+            for (auto& [firendid, userfriend] : userfriendlist[userid])
+            {
+                std::string sql = FormatUpdateFriend(userfriend);
+                conn.ExcuteUpdata(sql);
+            }
+        }
+
+        for (auto& [groupid, group] : grouplist_)
+        {
+            std::string sql_group = FormatUpdateGroup(group);
+            conn.ExcuteUpdata(sql_group);
+
+            for (auto& applyid : group.GetApplyList())
+            {
+                std::string sql = FormatUqdateGroupApply(groupid, applyid);
+                conn.ExcuteUpdata(sql);
+            }
+
+            for (auto& [userid, groupuser] : group.GetAllMembers())
+            {
+                std::string sql_groupuser = FormatUpdateGroupUser(groupid, groupuser);
+                conn.ExcuteUpdata(sql_groupuser);
+            }
+        }
+    });
+}
+
+std::string Service::Escape(const std::string& input) {
+    std::string output;
+    for (char c : input) {
+        if (c == '\'' || c == '\"' || c == '\\') output += '\\';
+        output += c;
+    }
+    return output;
+}
+
+std::string Service::FormatUpdateUser(const User& user)
+{
+    std::ostringstream oss;
+    oss << "replace into user (id, name, password, online) values (" 
+        << user.GetId() << ", "<< Escape(user.GetUserName()) << ", "
+        << Escape(user.GetPassWord()) << ", " << (user.IsOnLine() ? 1 : 0) << ") ;";
+    return oss.str();
+}
+
+std::string Service::FormatUpdateFriend(const Friend& userfriend)
+{
+    std::ostringstream oss;
+    oss << "replace into friend (userid, friendid, status) values ("
+        << userfriend.GetUserId() << ", " << userfriend.GetFriendId() << ", "
+        << userfriend.GetStatus() << ") ;";
+    return oss.str();
+}
+
+std::string Service::FormatUpdateGroup(const Group& group)
+{
+    std::ostringstream oss;
+    oss << "replace into groups (id, groupname) values ("
+        << group.GetGroupId() << ", " << Escape(group.GetGroupName())
+        << ") ;";
+    return oss.str();
+}
+
+std::string Service::FormatUpdateGroupUser(const int& groupid, const GroupUser& groupuser)
+{
+    std::ostringstream oss;
+    oss << "replace into groupuser (id, groupid, level) values ("
+        << groupuser.GetUserId() << "," << groupid << ", "
+        << Escape(groupuser.GetRole()) << ") ;";
+    return oss.str();
+}
+
+std::string Service::FormatUpdateUserApply(const int& userid, const int& applyid)
+{
+    std::ostringstream oss;
+    oss << "replace into userapply (userid, applyid) values ("
+        << userid << applyid << ") ;";
+    return oss.str();
+}
+
+std::string Service::FormatUqdateGroupApply(const int& groupid, const int& applyid)
+{
+    std::ostringstream oss;
+    oss << "replace into groupapply (groupid, applyid) values ("
+        << groupid << applyid << ") ;";
+    return oss.str();
 }
 
 void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)

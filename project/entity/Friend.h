@@ -10,7 +10,7 @@ public:
     Friend(int userid, int friendid, std::string Status = "Normal");
 
     void SetUserId(int userid);
-    int GetUserId();
+    int GetUserId() const;
 
     void SetFriendId(int friendid);
     int GetFriendId() const;

@@ -12,6 +12,7 @@
 #include "../database/MysqlResult.h"
 #include "../database/MysqlRow.h"
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <nlohmann/json.hpp>
@@ -48,6 +49,18 @@ public:
     void ReadUserApplyFromDataBase();
     void ReadGroupUserFromDataBase();
 
+    void StartAutoFlushToDataBase(int seconds = 5);
+    void StopAutoFlush();
+    void FlushToDataBase();
+
+    std::string Escape(const std::string& input);
+    std::string FormatUpdateUser(const User& user);
+    std::string FormatUpdateGroup(const Group& group);
+    std::string FormatUpdateGroupUser(const int& groupid, const GroupUser& groupuser);
+    std::string FormatUpdateFriend(const Friend& userfriend);
+    std::string FormatUpdateUserApply(const int& userid, const int& applyid);
+    std::string FormatUqdateGroupApply(const int& groupid, const int& applyid);
+
     void ProcessingLogin    (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
     void RegisterAccount    (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
     void ListFriendlist     (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
@@ -70,7 +83,8 @@ public:
 private:
     void ReadFromDataBase(const std::string& query, std::function<void(MysqlRow&)> rowprocessor);
 
-
+    std::atomic<bool> running_ = false;
+    std::thread flush_thread_;
     Codec codec_;
     Dispatcher& dispatcher_;
     DatabaseThreadPool databasethreadpool_;
