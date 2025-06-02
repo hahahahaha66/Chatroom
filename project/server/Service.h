@@ -61,6 +61,8 @@ public:
     std::string FormatUpdateUserApply(const int& userid, const int& applyid);
     std::string FormatUqdateGroupApply(const int& groupid, const int& applyid);
 
+    void Message(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+
     void ProcessingLogin    (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
     void RegisterAccount    (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
     void ListFriendlist     (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);

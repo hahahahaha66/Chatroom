@@ -91,6 +91,19 @@ std::string js_data_userapply(const int& id, const int& userid, const int& apply
     return j.dump();
 }
 
+std::string js_Message(const std::string& type, const int& senderid, const int& receiverid, const std::string& text, const std::string& status)
+{
+    json j = {
+        {"type", type},
+        {"senderid", senderid},
+        {"receiverid", receiverid},
+        {"text", text},
+        {"status", status}
+    };
+    return j.dump();
+}
+
+// 用户数据
 std::string js_UserData(const int& userid, const std::string& username, const int& friendnum, const int& groupnum)
 {
     json j = {
@@ -173,17 +186,6 @@ std::string js_AllFriendIdName(const int& userid, const std::unordered_map<int, 
     return j.dump();
 }
 
-// 私聊
-std::string js_FriendChatData(const int& fromuserid, const int& touserid, const std::string& message)
-{
-    json j = {
-        {"fromuserid", fromuserid},
-        {"touserid", touserid},
-        {"message", message}
-    };
-    return j.dump();
-}
-
 // 群聊
 std::string js_Group(const int& groupid, const std::string& groupname)
 {
@@ -241,17 +243,6 @@ std::string js_GroupMemberList(const int& groupid, const std::vector<int>& membe
     json j = {
         {"groupid", groupid},
         {"memberlist", memberlist}
-    };
-    return j.dump();
-}
-
-// 群聊消息
-std::string js_GroupChatData(const int& groupid, const int& from, const std::string& message)
-{
-    json j = {
-        {"groupid", groupid},
-        {"from", from},
-        {"message", message}
     };
     return j.dump();
 }

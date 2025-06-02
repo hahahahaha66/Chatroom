@@ -28,6 +28,8 @@ std::string js_data_user(const int& id, const std::string& username, const std::
 //userapply
 std::string js_data_userapply(const int& id, const int& userid, const int& applyid);
 
+//消息
+std::string js_Message(const std::string& type, const int& senderid, const int& receiverid, const std::string& text, const std::string& status);
 
 //打印用户信息
 std::string js_UserData(const int& userid, const std::string& username, const int& friendnum, const int& groupnum);
@@ -46,8 +48,6 @@ std::string js_FriendList(const int& userid, const std::unordered_map<int, bool>
 std::string js_FriendData(const int& userid, const int& friendid);
 //所有好友群组id与名字
 std::string js_AllFriendIdName(const int& userid, const std::unordered_map<int, std::string>& firendidname, const std::unordered_map<int, std::string>& groupidname);
-//私聊
-std::string js_FriendChatData(const int& fromuserid, const int& touserid, const std::string& message);
 
 //群聊
 std::string js_Group(const int& groupid, const std::string& groupname);
@@ -61,8 +61,6 @@ std::string js_GroupCreateData(const int& groupid, const std::string groupname, 
 std::string js_GroupData(const int& groupid, const int& userid);
 //群聊成员列表
 std::string js_GroupMemberList(const int& groupid, const std::vector<int>& memberlist);
-//群聊消息
-std::string js_GroupChatData(const int& groupid, const int& from, const std::string& message);
 
 //用于申请列表
 std::string js_UserList(const std::vector<int>& userlist);

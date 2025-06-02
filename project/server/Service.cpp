@@ -1,11 +1,14 @@
 #include "Service.h"
 #include "../json_protocol.hpp"
+#include <cerrno>
 #include <chrono>
 #include <cstdint>
 #include <functional>
 #include <future>
+#include <memory>
 #include <mysql/mariadb_com.h>
 #include <mysql/mysql.h>
+#include <ostream>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -252,6 +255,66 @@ std::string Service::FormatUqdateGroupApply(const int& groupid, const int& apply
     oss << "replace into groupapply (groupid, applyid) values ("
         << groupid << applyid << ") ;";
     return oss.str();
+}
+
+void Service::Message(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+{
+    bool end = true;
+
+    std::string type;
+    int senderid;
+    int receiverid;
+    std::string text;
+    std::string status;
+    end &= AssignIfPresent(js, "type", type);
+    end &= AssignIfPresent(js, "senderid", senderid);
+    end &= AssignIfPresent(js, "receiverid", receiverid);
+    end &= AssignIfPresent(js, "text", text);
+    end &= AssignIfPresent(js, "status", status);
+
+    if (end)  
+    {
+        if (type == "private")
+        {
+            if (chatconnect_[receiverid].type_ == ChatConnect::Type::Private && chatconnect_[receiverid].peerid_ == senderid)
+            {
+                std::shared_ptr<TcpConnection> receiver_conn = userlist_[receiverid].GetConnection();
+                status = "read";
+                json reply_js = js_Message(type, senderid, receiverid, text, status);
+                uint16_t type = (end == true ? 1 : 0);
+                receiver_conn->send(codec_.encode(reply_js, type, seq));
+            }
+        }        
+        else if (type == "group")
+        {
+            json reply_js = js_Message(type, senderid, receiverid, text, status);
+            for (auto& it : grouplist_[receiverid].GetAllMembers())
+            {
+                if (chatconnect_[it.first].type_ == ChatConnect::Type::Group && chatconnect_[it.first].peerid_ == receiverid)
+                {
+                    std::shared_ptr<TcpConnection> receiver_conn = userlist_[it.first].GetConnection();
+                    uint16_t type = (end == true ? 1 : 0);
+                    receiver_conn->send(codec_.encode(reply_js, type, seq));
+                }
+            }
+        }        
+        else  
+        {
+            end = false;
+        }    
+    }
+
+    if (end)
+    {
+        databasethreadpool_.EnqueueTask([type, senderid, receiverid, text, status, this](MysqlConnection& conn) {
+            std::ostringstream sql;
+            sql << "insert into message (type, senderid, receiverid, connect, status) values ("
+                << Escape(type) << ", " << senderid << ", " << receiverid << ", " << Escape(text) << ", "
+                << Escape(status) << ") ;";
+            conn.ExcuteUpdata(sql.str());
+        });
+    }
+
 }
 
 void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
