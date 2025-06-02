@@ -196,6 +196,16 @@ std::string js_Group(const int& groupid, const std::string& groupname)
     return j.dump();
 }
 
+// 用户与群聊id
+std::string js_UserWithGroup(const int &userid, const int &groupid)
+{
+    json j = {
+        {"userid", userid},
+        {"groupid", groupid}
+    };
+    return j.dump();
+}
+
 // 群聊id
 std::string js_GroupId(const int &groupid)
 {

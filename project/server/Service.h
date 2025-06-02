@@ -11,6 +11,7 @@
 #include "../database/DatabaseThreadPool.h"
 #include "../database/MysqlResult.h"
 #include "../database/MysqlRow.h"
+#include "../entity/other.h"
 
 #include <atomic>
 #include <cstdint>
@@ -24,14 +25,6 @@ using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
 using std::placeholders::_4;
-
-struct ChatConnect 
-{
-    enum class Type {None, Private, Group};
-    Type type_;
-    int peerid_;
-    ChatConnect(int peerid, Type type = Type::None) : type_(type), peerid_(peerid) {}
-};
 
 class Service
 {
@@ -61,7 +54,9 @@ public:
     std::string FormatUpdateUserApply(const int& userid, const int& applyid);
     std::string FormatUqdateGroupApply(const int& groupid, const int& applyid);
 
-    void Message(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void ProcessMessage(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void GetUserChatInterface(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void GetGroupChatInterface(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
 
     void ProcessingLogin    (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
     void RegisterAccount    (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);

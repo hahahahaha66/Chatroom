@@ -51,6 +51,8 @@ std::string js_AllFriendIdName(const int& userid, const std::unordered_map<int, 
 
 //群聊
 std::string js_Group(const int& groupid, const std::string& groupname);
+//用户与群聊 
+std::string js_UserWithGroup(const int& userid, const int& groupid);
 //群聊id
 std::string js_GroupId(const int& groupid);
 //群聊列表
