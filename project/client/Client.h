@@ -29,6 +29,13 @@ public:
 
     void InitialInterface();
     void MainInterface();
+    void PrivateChatInterface(int friendid);
+    void GroupChatInterface(int groupid);
+
+    void ClearScreen() 
+    {
+        std::cout << "\033[2J\033[H";
+    }
 
 private:
     EventLoop* loop_;
