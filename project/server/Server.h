@@ -22,10 +22,11 @@ public:
           service_(dispatcher_)
     {
         MysqlConnectionPool::Instance().Init("localhost", 3306, "root", "123456", "Chatroombase", 10);
-        server_.setConnectionCallback(std::bind(&Server::ConnectionCallback, this, std::placeholders::_1));
-        server_.setMessageCallback(std::bind(&Server::MessageCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-        server_.setWriteCompleteCallback(std::bind(&Server::MessageCompleteCallback, this, std::placeholders::_1));
-        server_.setThreadInitCallback(std::bind(&Server::ThreadInitCallback, this, std::placeholders::_1));
+        
+        server_.setConnectionCallback(std::bind(&Server::ConnectionCallback, this, _1));
+        server_.setMessageCallback(std::bind(&Server::MessageCallback, this, _1, _2, _3));
+        server_.setWriteCompleteCallback(std::bind(&Server::MessageCompleteCallback, this, _1));
+        server_.setThreadInitCallback(std::bind(&Server::ThreadInitCallback, this, _1));
 
         service_.RegisterAllHanders(dispatcher_);
     }
