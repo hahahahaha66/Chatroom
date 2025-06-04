@@ -29,6 +29,8 @@ public:
 
     void InitialInterface();
     void MainInterface();
+    void FriendInterface();
+    void GroupInterface();
     void PrivateChatInterface(int friendid);
     void GroupChatInterface(int groupid);
 
