@@ -1,4 +1,7 @@
+#include <complex>
 #include <iostream>
+#include <sstream>
+#include <string>
 #include <vector>
 
 void InitialInterface();
@@ -13,6 +16,21 @@ void ClearScreen()
     std::cout << "\033[2J\033[H";
 }
 
+void ReadingIntegers( std::string input, int &result)
+{
+    int value;
+    std::stringstream ss(input);
+     
+    if (ss >> value && ss.eof())
+    {
+        result = value;
+    }
+    else  
+    {
+        std::cout << std::endl << "格式输入无效,请重试" << std::endl;
+    }
+}
+
 void InitialInterface()
 {
     while (true)
@@ -21,10 +39,10 @@ void InitialInterface()
         std::cout << "1. 登陆" << std::endl;
         std::cout << "2. 注册" << std::endl;
 
-        char order_ = 0;
+        std::string order_;
         std::cin >> order_;
 
-        if (order_ == '1')
+        if (order_ == "1")
         {
 
             while (true)
@@ -51,7 +69,7 @@ void InitialInterface()
                 
             }
         }
-        else if (order_ == '2')
+        else if (order_ == "2")
         {
             while (true) 
             {
@@ -82,7 +100,7 @@ void InitialInterface()
                 //注册成功后自动返回上级界面
             }
         }
-        else if (order_ == 'q')
+        else if (order_ == "q")
         {
             break;
         }
@@ -101,22 +119,22 @@ void MainInterface()
         std::cout << "1. 私聊" << std::endl;
         std::cout << "2. 群聊" << std::endl;
         std::cout << "3. 个人信息" << std::endl;
-        char order_;
+        std::string order_;
         std::cin >> order_;
-        if (order_ == '1')
+        if (order_ == "1")
         {
             FriendInterface();
         }
-        else if (order_ == '2')
+        else if (order_ == "2")
         {
             GroupInterface();
         }
-        else if (order_ == '3')
+        else if (order_ == "3")
         {
             //~
             //打印个人数据
         }
-        else if (order_ == 'q')
+        else if (order_ == "q")
         {
             break;
         }
@@ -131,45 +149,51 @@ void FriendInterface()
 {
     while (true)
     {
-        char order_;
+        std::string order_;
         std::cout << "-----------输入q退出或返回上一界面----------------" << std::endl;
         std::cout << "1. 选择好友聊天" << std::endl;
         std::cout << "2. 添加好友" << std::endl;
         std::cout << "3. 删除好友" << std::endl;
 
         std::cin >> order_;
-        if (order_ == '1')
+        if (order_ == "1")
         {
             //~
             //打印朋友列表
             int friendid;
             std::cout << "输入要聊天的朋友id : ";
-            std::cin >> friendid;
+            std::string input;
+            std::getline(std::cin, input);
+            ReadingIntegers(input, friendid);
             //确认是否是朋友id
             ClearScreen();
             //~
             //获取历史记录
             PrivateChatInterface(friendid);
         }
-        else if (order_ == '2')
+        else if (order_ == "2")
         {
             int new_friendid;
             std::cout << "输入新的朋友的id : ";
-            std::cin >> new_friendid;
+            std::string input;
+            std::getline(std::cin, input);
+            ReadingIntegers(input, new_friendid);
             //~
             //发送好友申请
         }
-        else if (order_ == '3')
+        else if (order_ == "3")
         {
             int old_friendid;
             //打印朋友列表
             std::cout << "输入要删除的朋友 : ";
-            std::cin >> old_friendid;
+            std::string input;
+            std::getline(std::cin, input);
+            ReadingIntegers(input, old_friendid);
             //检查该id是否在好友列表中
             //~
             //删除好友
         }
-        else if (order_ == 'q')  
+        else if (order_ == "q")  
         {
             break;
         }
@@ -184,7 +208,7 @@ void GroupInterface()
 {
     while (true)
     {
-        char order_;
+        std::string order_;
         std::cout << "-----------输入q退出或返回上一界面----------------" << std::endl;
         std::cout << "1. 选择群聊聊天" << std::endl;
         std::cout << "2. 加入新群聊" << std::endl;
@@ -192,38 +216,45 @@ void GroupInterface()
         std::cout << "4. 创建群聊" << std::endl;
 
         std::cin >> order_;
-        if (order_ == '1')
+        if (order_ == "1")
         {
             //~
             //打印群聊列表
             int groupid;
             std::cout << "输入要进入的群聊id : ";
-            std::cin >> groupid;
+            std::string input;
+            std::getline(std::cin, input);
+            ReadingIntegers(input, groupid);
             //确认是否是群聊id
             ClearScreen();
             //~
             //获取历史记录
             GroupChatInterface(groupid);
         }
-        else if (order_ == '2')
+        else if (order_ == "2")
         {
             int new_groupid;
             std::cout << "输入要加入的群聊的id : ";
-            std::cin >> new_groupid;
+            std::string input;
+            std::getline(std::cin, input);
+            std::cout << input;
+            ReadingIntegers(input, new_groupid);
             //~
             //发送群聊申请
         }
-        else if (order_ == '3')
+        else if (order_ == "3")
         {
             int old_groupid;
             //打印群聊列表
             std::cout << "输入要退出的群聊id : ";
-            std::cin >> old_groupid;
+            std::string input;
+            std::getline(std::cin, input);
+            ReadingIntegers(input, old_groupid);
             //检查是否是已加入的群聊
             //~
             //执行退出群聊操作
         }
-        else if (order_ == '4')
+        else if (order_ == "4")
         {
             std::string new_groupname;
             std::vector<int> new_groupuserid;
@@ -234,7 +265,7 @@ void GroupInterface()
             std::cout << "现在初始化群聊成员" << std::endl;
             //打印好友列表
             std::cout << "输入好友id,完成输入-1";
-            int tempid;
+            int tempid = 0;
 
             while (true)
             {
@@ -249,9 +280,14 @@ void GroupInterface()
                     break;
                 }
 
-                std::cin >> tempid;
+                std::string input;
+                std::getline(std::cin, input);
+                ReadingIntegers(input, tempid);
                 //检查输入的id是否是朋友，若果不是报错
-                new_groupuserid.push_back(tempid);
+                if (tempid != 0)
+                {
+                    new_groupuserid.push_back(tempid);
+                }
 
                 std::cout << "当前初始化成员列表 : ";
                 for (int& i : new_groupuserid)
@@ -264,7 +300,7 @@ void GroupInterface()
             //~
             //创建群聊
         }
-        else if (order_ == 'q')  
+        else if (order_ == "q")  
         {
             break;
         }
@@ -279,14 +315,15 @@ void PrivateChatInterface(int friendid)
 {
     while (true)
     {
-        char order_;
+        std::string order_;
         std::cout << "-----------输入q退出或返回上一界面----------------" << std::endl;
         std::cout << "1. 发送消息" << std::endl;
         std::cout << "2. 屏蔽好友" << std::endl;
         std::cout << "3. 删除好友" << std::endl;
+
         std::cin >> order_;
         
-        if (order_ == '1')
+        if (order_ == "1")
         {
             //检查是否屏蔽，如果屏蔽则打印并显示已屏蔽，无法发送消息
             std::string message;
@@ -295,7 +332,7 @@ void PrivateChatInterface(int friendid)
             //~
             //将消息发送给朋友
         }
-        else if (order_ == '2')
+        else if (order_ == "2")
         {
             //~
             //这里有两种情况
@@ -303,26 +340,27 @@ void PrivateChatInterface(int friendid)
             //若已屏蔽，则设为未屏蔽
             //将最终结果打印出来
         }
-        else if (order_ == '3')
+        else if (order_ == "3")
         {
-            int temp_order;
+            std::string temp_order;
             std::cout << "1. 确认删除好友" << std::endl;
             std::cout << "2. 取消删除好友" << std::endl;
             std::cin >> temp_order;
-            if (temp_order == 1)
+            if (temp_order == "1")
             {
                 //~
                 //删除好友，并返回上一界面
                 break;
             }
         }
-        else if (order_ == 'q')
+        else if (order_ == "q")
         {
             break;
         }
         else  
         {
             std::cout << "命令输入错误,请重新输入" << std::endl;
+            return;
         }
     }
 }
@@ -331,7 +369,7 @@ void GroupChatInterface(int groupid)
 {
     while (true)
     {
-        char order_;
+        std::string order_;
 
         if (1)  //普通用户
         {
@@ -365,20 +403,20 @@ void GroupChatInterface(int groupid)
 
         std::cin >> order_;
 
-        if (order_ == '1')
+        if (order_ == "1")
         {
             std::string message;
-            std::cout << "输入消息 : " << std::endl;
+            std::cout << "输入消息 : ";
             std::cin >> message;
             //~
             //发送消息群聊
         }
-        else if (order_ == '2')
+        else if (order_ == "2")
         {
             //~
             //打印群聊成员
         }
-        else if (order_ == '3')
+        else if (order_ == "3")
         {
             char sure;
             std::cout << "1. 确定退出群聊" << std::endl;
@@ -400,7 +438,7 @@ void GroupChatInterface(int groupid)
                 std::cout << "输入错误,自动返回上一界面" << std::endl;
             }
         }
-        else if (order_ == '4')
+        else if (order_ == "4")
         {
             //~
             //打印申请列表
@@ -422,39 +460,46 @@ void GroupChatInterface(int groupid)
                 std::cout << "输入错误,自动返回上一界面" << std::endl;
             }
         }
-        else if (order_ == '5')
+        else if (order_ == "5")
         {
             //~
             //打印成员列表
             int removeid = 0;
             std::cout << "输入移除的成员id : " << std::endl;
+            std::string input;
+            std::getline(std::cin, input);
+            ReadingIntegers(input, removeid);
             //检查是否是成员id
             //是则移除
             //不是则报错
         }
-        else if (order_ == '6')
+        else if (order_ == "6")
         {
             int new_administratorid = 0;
             //~
             //打印群聊成员列表
             std::cout << "输入新的管理员id : ";
-            std::cin >> new_administratorid;
+            std::string input;
+            std::getline(std::cin, input);
+            ReadingIntegers(input, new_administratorid);
             //判断是否是群聊成员
             //~
             //执行设置管理员
         }
-        else if (order_ == '7')
+        else if (order_ == "7")
         {
             int old_administratorid = 0;
             //~
             //打印管理员员列表
             std::cout << "输入取消的管理员id : ";
-            std::cin >> old_administratorid;
+            std::string input;
+            std::getline(std::cin, input);
+            ReadingIntegers(input, old_administratorid);
             //判断是否是管理员员
             //~
             //执行取消管理员
         }                        
-        else if (order_ == '8')
+        else if (order_ == "8")
         {
             char sure;
             std::cout << "1. 确定删除群聊" << std::endl;
@@ -476,7 +521,7 @@ void GroupChatInterface(int groupid)
                 std::cout << "输入错误,自动返回上一界面" << std::endl;
             }
         }        
-        else if (order_ == 'q')
+        else if (order_ == "q")
         {
             break;
         }
