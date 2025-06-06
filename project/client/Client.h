@@ -39,6 +39,8 @@ public:
         std::cout << "\033[2J\033[H";
     }
 
+    bool ReadingIntegers(std::string input, int &result);
+
 private:
     EventLoop* loop_;
     TcpClient client_;
