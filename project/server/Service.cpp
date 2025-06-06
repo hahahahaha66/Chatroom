@@ -261,7 +261,7 @@ std::string Service::FormatUqdateGroupApply(const int& groupid, const int& apply
     return oss.str();
 }
 
-void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
 
@@ -286,6 +286,7 @@ void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, const
                 status = "read";
                 json reply_js = js_Message(type, senderid, receiverid, connect, status);
                 uint16_t type = (end == true ? 1 : 0);
+                seq = 0;
                 receiver_conn->send(codec_.encode(reply_js, type, seq));
             }
         }        
@@ -298,6 +299,7 @@ void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, const
                 {
                     std::shared_ptr<TcpConnection> receiver_conn = userlist_[it.first].GetConnection();
                     uint16_t type = (end == true ? 1 : 0);
+                    seq = 0;
                     receiver_conn->send(codec_.encode(reply_js, type, seq));
                 }
             }
@@ -321,18 +323,30 @@ void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, const
 
 }
 
-void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
     std::unordered_map<int, std::string> friendlist;
     std::unordered_map<int, std::string> grouplist;
 
-    int userid;
+    std::string username;
     std::string password;
-    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "username", username);
     end &= AssignIfPresent(js, "password", password);
 
-    if (end == true)
+    int userid = -1;
+    for (auto& it : userlist_)
+    {
+        if (it.second.GetUserName() == username)
+        {
+            userid = it.first;
+            break;
+        }
+    }
+
+    if (userid == -1) end = false;
+
+    if (end)
     {
         if (userlist_[userid].GetPassWord() == password)
             end = true;
@@ -362,7 +376,7 @@ void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, cons
 }
 
 
-void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -449,7 +463,7 @@ void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, cons
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::ListFriendlist(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::ListFriendlist(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
 
@@ -469,7 +483,7 @@ void Service::ListFriendlist(const TcpConnectionPtr& conn, const json& js, const
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::GetUserChatInterface(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::GetUserChatInterface(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
     
@@ -554,7 +568,7 @@ void Service::GetUserChatInterface(const TcpConnectionPtr& conn, const json& js,
     conn->send(codec_.encode(result, type_, seq));
 }
 
-void Service::GetGroupChatInterface(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::GetGroupChatInterface(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
 
@@ -639,7 +653,7 @@ void Service::GetGroupChatInterface(const TcpConnectionPtr& conn, const json& js
     conn->send(codec_.encode(result, type_, seq));
 }  
 
-void Service::DeleteFriend(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::DeleteFriend(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -664,7 +678,7 @@ void Service::DeleteFriend(const TcpConnectionPtr& conn, const json& js, const u
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::BlockFriend(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::BlockFriend(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -688,7 +702,7 @@ void Service::BlockFriend(const TcpConnectionPtr& conn, const json& js, const ui
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::AddFriend(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::AddFriend(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -711,7 +725,7 @@ void Service::AddFriend(const TcpConnectionPtr& conn, const json& js, const uint
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::ListFriendApplyList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::ListFriendApplyList(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
 
@@ -763,7 +777,7 @@ void Service::ProcessFriendApply(const TcpConnectionPtr& conn, const json& js, c
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::ListGroupList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::ListGroupList(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
 
@@ -784,7 +798,7 @@ void Service::ListGroupList(const TcpConnectionPtr& conn, const json& js, const 
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -822,7 +836,7 @@ void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js, const ui
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::ListGroupMemberList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::ListGroupMemberList(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
 
@@ -845,7 +859,7 @@ void Service::ListGroupMemberList(const TcpConnectionPtr& conn, const json& js, 
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::ListGroupApplyList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::ListGroupApplyList(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
 
@@ -867,7 +881,7 @@ void Service::ListGroupApplyList(const TcpConnectionPtr& conn, const json& js, c
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::ProcessGroupApply(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::ProcessGroupApply(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -896,7 +910,7 @@ void Service::ProcessGroupApply(const TcpConnectionPtr& conn, const json& js, co
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::QuitGroup(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::QuitGroup(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -920,7 +934,7 @@ void Service::QuitGroup(const TcpConnectionPtr& conn, const json& js, const uint
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::DeleteGroup(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::DeleteGroup(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -955,7 +969,7 @@ void Service::DeleteGroup(const TcpConnectionPtr& conn, const json& js, const ui
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::PrintUserData(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::PrintUserData(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
     
@@ -972,7 +986,7 @@ void Service::PrintUserData(const TcpConnectionPtr& conn, const json& js, const 
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::ChangeUserPassword(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::ChangeUserPassword(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -995,7 +1009,7 @@ void Service::ChangeUserPassword(const TcpConnectionPtr& conn, const json& js, c
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::DeleteUserAccount(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::DeleteUserAccount(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
     std::string result;

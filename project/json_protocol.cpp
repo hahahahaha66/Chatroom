@@ -144,6 +144,16 @@ std::string js_User(const int& userid, const std::string& username)
     return j.dump();
 }
 
+// 登陆
+std::string js_Login(const std::string username, const std::string password)
+{
+    json j = {
+        {"username", username},
+        {"password", password},
+    };
+    return j.dump();
+}
+
 // 好友
 std::string js_Friend(const int& friendid, const std::string& friendname, const bool online)
 {

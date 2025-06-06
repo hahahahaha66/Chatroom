@@ -54,28 +54,28 @@ public:
     std::string FormatUpdateUserApply(const int& userid, const int& applyid);
     std::string FormatUqdateGroupApply(const int& groupid, const int& applyid);
 
-    void ProcessMessage(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void GetUserChatInterface(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void GetGroupChatInterface(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void ProcessMessage(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void GetUserChatInterface(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void GetGroupChatInterface(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
 
-    void ProcessingLogin    (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void RegisterAccount    (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void ListFriendlist     (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void DeleteFriend       (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void BlockFriend        (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void AddFriend          (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void ListFriendApplyList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void ListGroupList      (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void CreateGroup        (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void ListGroupMemberList(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void ListGroupApplyList (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void ProcessFriendApply (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void ProcessGroupApply  (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void QuitGroup          (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void PrintUserData      (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void ChangeUserPassword (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void DeleteUserAccount  (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
-    void DeleteGroup        (const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time);
+    void ProcessingLogin    (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void RegisterAccount    (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void ListFriendlist     (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void DeleteFriend       (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void BlockFriend        (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void AddFriend          (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void ListFriendApplyList(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void ListGroupList      (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void CreateGroup        (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void ListGroupMemberList(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void ListGroupApplyList (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void ProcessFriendApply (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void ProcessGroupApply  (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void QuitGroup          (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void PrintUserData      (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void ChangeUserPassword (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void DeleteUserAccount  (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void DeleteGroup        (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
 
 private:
     void ReadFromDataBase(const std::string& query, std::function<void(MysqlRow&)> rowprocessor);

@@ -37,6 +37,8 @@ std::string js_UserData(const int& userid, const std::string& username, const in
 std::string js_RegisterData(const std::string& username, const std::string& password);
 //用户id
 std::string js_UserId(const int& userid);
+//登陆
+std::string js_Login(const std::string username, const std::string password);
 //用户
 std::string js_User(const int& userid, const std::string& username);
 

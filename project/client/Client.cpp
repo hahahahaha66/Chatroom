@@ -41,13 +41,23 @@ void Client::MessageCallback(const TcpConnectionPtr& conn, Buffer* buf, Timestam
     {
         std::cout << "消息发送失败" << std::endl;
         return ;
+    
     }
     auto [type, seq, js] = msgopt.value();
+
     if (type == 0)
     {
         std::cout << "命令执行失败" << std::endl;
     }
-    processpend_.executeRequest(seq, js, time);
+
+    if (seq == 0)
+    {
+
+    }
+    else  
+    {
+        processpend_.executeRequest(seq, js, time);
+    }
 }
 
 bool Client::ReadingIntegers(std::string input, int &result)
@@ -109,6 +119,8 @@ void Client::InitialInterface()
                 //登陆成功成功调用一下函数，否则循环
                 if (1)
                 {
+                    //~
+                    //初始化个人信息
                     MainInterface();
                     break;
                 }
@@ -191,6 +203,7 @@ void Client::MainInterface()
         {
             //~
             //打印个人数据
+            //可以本地打印
         }
         else if (order_ == "q")
         {
@@ -219,6 +232,7 @@ void Client::FriendInterface()
         {
             //~
             //打印朋友列表
+            //本地打印
             int friendid = 0;
             std::cout << "输入要聊天的朋友id : ";
             std::string input;
@@ -499,13 +513,14 @@ void Client::GroupChatInterface(int groupid)
                     break;
                 }
                 //~
-                //将消息发送给朋友
+                //将消息发送到群聊
             }
         }
         else if (order_ == "2")
         {
             //~
             //打印群聊成员
+            //本地打印
         }
         else if (order_ == "3")
         {
@@ -518,7 +533,7 @@ void Client::GroupChatInterface(int groupid)
             if (sure == "1")
             {
                 //~
-                //推出群聊
+                //退出群聊
                 break;
             }
             else if (sure == "1" || sure == "q")
@@ -534,6 +549,7 @@ void Client::GroupChatInterface(int groupid)
         {
             //~
             //打印申请列表
+            //本地打印
             while (true)
             {
                 std::string temp_order;
