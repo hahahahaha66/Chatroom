@@ -91,6 +91,19 @@ std::string js_data_userapply(const int& id, const int& userid, const int& apply
     return j.dump();
 }
 
+// 发送消息
+std::string js_SendMessage(const std::string type, const int& senderid, const int& receiverid, const std::string text)
+{
+    json j = {
+        {"type", type},
+        {"userid", senderid},
+        {"receiverid", receiverid},
+        {"text", text}
+    };
+    return j.dump();
+}
+
+// 消息
 std::string js_Message(const std::string& type, const int& senderid, const int& receiverid, const std::string& text, const std::string& status)
 {
     json j = {
@@ -176,7 +189,7 @@ std::string js_FriendList(const int& userid, const std::unordered_map<int, bool>
 }
 
 // 用户与好友
-std::string js_FriendData(const int& userid, const int& friendid)
+std::string js_UserWithFriend(const int& userid, const int& friendid)
 {
     json j = {
         {"userid", userid},

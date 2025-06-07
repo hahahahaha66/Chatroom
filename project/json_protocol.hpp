@@ -28,7 +28,9 @@ std::string js_data_user(const int& id, const std::string& username, const std::
 //userapply
 std::string js_data_userapply(const int& id, const int& userid, const int& applyid);
 
-//消息
+//发送消息
+std::string js_SendMessage(const std::string type, const int& userid, const int& friendid, const std::string text);
+//存储消息
 std::string js_Message(const std::string& type, const int& senderid, const int& receiverid, const std::string& text, const std::string& status);
 
 //打印用户信息
@@ -47,7 +49,7 @@ std::string js_Friend(const int& friendid, const std::string& friendname, const 
 //好友列表
 std::string js_FriendList(const int& userid, const std::unordered_map<int, bool>& friendlist);
 //用户与好友
-std::string js_FriendData(const int& userid, const int& friendid);
+std::string js_UserWithFriend(const int& userid, const int& friendid);
 //所有好友群组id与名字
 std::string js_AllFriendIdName(const int& userid, const std::unordered_map<int, std::string>& firendidname, const std::unordered_map<int, std::string>& groupidname);
 
