@@ -239,7 +239,6 @@ std::string js_GroupList(const int& userid, const std::vector<int>& grouplist)
 std::string js_GroupCreateData(const int& groupid, const std::string groupname, const int& creator, const std::vector<int>& othermembers)
 {
     json j = {
-        {"groupid", groupid},
         {"groupname", groupname},
         {"creator", creator},
         {"othermembers", othermembers}

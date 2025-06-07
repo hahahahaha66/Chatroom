@@ -24,9 +24,25 @@ Service::Service(Dispatcher& dispatcher) : dispatcher_(dispatcher)
 {
     handermap_[1] = std::bind(&Service::ProcessingLogin, this, _1, _2, _3, _4);
     handermap_[2] = std::bind(&Service::RegisterAccount, this, _1, _2, _3, _4);
-    handermap_[5] = std::bind(&Service::ListFriendlist, this, _1, _2, _3, _4);
-    handermap_[7] = std::bind(&Service::DeleteFriend, this, _1, _2, _3, _4);
-    handermap_[1] = std::bind(&Service::ProcessingLogin, this, _1, _2, _3, _4);
+    handermap_[3] = std::bind(&Service::ListFriendlist, this, _1, _2, _3, _4);
+    handermap_[4] = std::bind(&Service::DeleteFriend, this, _1, _2, _3, _4);
+    handermap_[5] = std::bind(&Service::BlockFriend, this, _1, _2, _3, _4);
+    handermap_[6] = std::bind(&Service::AddFriend, this, _1, _2, _3, _4);
+    handermap_[7] = std::bind(&Service::ListFriendApplyList, this, _1, _2, _3, _4);
+    handermap_[8] = std::bind(&Service::ListGroupList, this, _1, _2, _3, _4);
+    handermap_[9] = std::bind(&Service::CreateGroup, this, _1, _2, _3, _4);
+    handermap_[10] = std::bind(&Service::ListGroupMemberList, this, _1, _2, _3, _4);
+    handermap_[11] = std::bind(&Service::ListGroupApplyList, this, _1, _2, _3, _4);
+    handermap_[12] = std::bind(&Service::ProcessFriendApply, this, _1, _2, _3, _4);
+    handermap_[13] = std::bind(&Service::ProcessGroupApply, this, _1, _2, _3, _4);
+    handermap_[14] = std::bind(&Service::QuitGroup, this, _1, _2, _3, _4);
+    handermap_[15] = std::bind(&Service::PrintUserData, this, _1, _2, _3, _4);
+    handermap_[16] = std::bind(&Service::ChangeUserPassword, this, _1, _2, _3, _4);
+    handermap_[17] = std::bind(&Service::DeleteUserAccount, this, _1, _2, _3, _4);
+    handermap_[18] = std::bind(&Service::DeleteGroup, this, _1, _2, _3, _4);
+    handermap_[19] = std::bind(&Service::ProcessMessage, this, _1, _2, _3, _4);
+    handermap_[20] = std::bind(&Service::GetUserChatInterface, this, _1, _2, _3, _4);
+    handermap_[21] = std::bind(&Service::GetGroupChatInterface, this, _1, _2, _3, _4);
 }
 
 void Service::RegisterAllHanders(Dispatcher& dispatcher)

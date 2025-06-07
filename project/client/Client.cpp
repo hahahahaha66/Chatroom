@@ -299,6 +299,7 @@ void Client::GroupInterface()
         {
             //~
             //打印群聊列表
+            //本地打印
             int groupid = 0;
             std::cout << "输入要进入的群聊id : ";
             std::string input;
@@ -329,6 +330,7 @@ void Client::GroupInterface()
         {
             int old_groupid = 0;
             //打印群聊列表
+            //本地打印
             std::cout << "输入要退出的群聊id : ";
             std::string input;
             std::getline(std::cin, input);
@@ -349,6 +351,7 @@ void Client::GroupInterface()
             
             std::cout << "现在初始化群聊成员" << std::endl;
             //打印好友列表
+            //本地打印
             std::cout << "输入好友id,完成输入-1";
             int tempid = 0;
 
@@ -370,6 +373,7 @@ void Client::GroupInterface()
                 if (ReadingIntegers(input, tempid) && tempid != 0)
                 {
                     //检查输入的id是否是朋友，若果不是报错
+                    //如果已经输入过报错，可以改用set
                     new_groupuserid.push_back(tempid);
                 }
 

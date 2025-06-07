@@ -60,7 +60,7 @@ std::string js_GroupId(const int& groupid);
 //群聊列表
 std::string js_GroupList(const int& userid, const std::vector<int>& grouplist);
 //创建群聊
-std::string js_GroupCreateData(const int& groupid, const std::string groupname, const int& creator, const std::vector<int>& othermembers);
+std::string js_GroupCreateData(const std::string groupname, const int& creator, const std::vector<int>& othermembers);
 //群聊成员
 std::string js_GroupData(const int& groupid, const int& userid);
 //群聊成员列表
