@@ -1,5 +1,4 @@
 #include "Clientservice.h"
-#include "Client.h"
 
 //消息
 void Clientservice::SendToFriend(const TcpConnectionPtr& conn, const int& userid, const int& friendid, const std::string& message, const uint16_t seq)

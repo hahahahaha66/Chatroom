@@ -167,6 +167,51 @@ std::string js_Login(const std::string username, const std::string password)
     return j.dump();
 }
 
+// 登陆后数据包
+std::string js_UserAllData(const int& userid, const std::unordered_map<int, Friend>& friends, const std::unordered_map<int, Group>& groups)
+{
+    json j;
+    j["userid"] = userid;
+
+    for (const auto& [id, f] : friends)
+    {
+        json jf;
+        jf["friendid"] = f.GetFriendId();
+        jf["friendname"] = f.GetFriendName();
+        jf["status"] = f.GetStatus();
+        jf["friends"].push_back(jf);
+    }
+
+    for (const auto& [id, g] : groups)
+    {
+        json jg;
+        jg["groupid"] = g.GetGroupId();
+        jg["groupname"] = g.GetGroupName();
+        
+        for (const auto& [uid, user] : g.GetAllMembers())
+        {
+            json jm;
+            jm["userid"] = user.GetUserId();
+            jm["username"] = user.GetUserName();
+            jm["role"] = user.GetRole();
+            jm["muted"] = user.IsMuted();
+            jm["members"].push_back(jm);
+        }
+
+        for (const auto& [uid, apply] : g.GetApplyList())
+        {
+            json ja;
+            ja["applyid"] = apply.GetId();
+            ja["applyname"] = apply.GetUserName();
+            ja["apply"].push_back(ja);
+        }
+        
+        j["group"].push_back(jg);
+    }
+    
+    return j.dump();
+}
+
 // 好友
 std::string js_Friend(const int& friendid, const std::string& friendname, const bool online)
 {

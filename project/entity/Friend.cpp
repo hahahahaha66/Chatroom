@@ -26,7 +26,7 @@ void Friend::SetFriendName(const std::string friendname)
     friendname_ = friendname;
 }
 
-std::string Friend::GetFriendName()
+std::string Friend::GetFriendName() const
 {
     return friendname_;
 }

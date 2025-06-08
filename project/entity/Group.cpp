@@ -19,9 +19,9 @@ const std::string& Group::GetGroupName() const
     return groupname_;
 }
 
-bool Group::AddApply(int applicantid)
+bool Group::AddApply(User& applicant)
 {
-    if (applylist_.insert(applicantid).second == true)
+    if (applylist_.insert(std::make_pair(applicant.GetId(), applicant)).second == true)
         return true;
     else  
         return false;
@@ -48,7 +48,7 @@ bool Group::DeleteApply(int applicantid)
         return false;
 }
 
-std::unordered_set<int>& Group::GetApplyList()
+const std::unordered_map<int, User>& Group::GetApplyList() const
 {
     return applylist_;
 }
@@ -82,7 +82,7 @@ GroupUser* Group::GetMember(int userid)
     return &(members_.at(userid));
 }
 
-std::unordered_map<int, GroupUser>& Group::GetAllMembers()
+const std::unordered_map<int, GroupUser>& Group::GetAllMembers() const
 {
     return members_;
 }

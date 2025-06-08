@@ -26,12 +26,14 @@ public:
     time_t GetJoinTime() const;
     time_t GetLastReadTimre() const;
 
+    void SetUserName(std::string username);
     void SetRole(const std::string& role); 
     void SetMuted(bool muted);
     void SetLastReadTime(time_t lastreadtime);
 
 private: 
     int userid_;
+    std::string username_;
     Level role_;
     bool muted_ = false;  //禁言
 

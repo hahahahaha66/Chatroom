@@ -13,7 +13,7 @@ public:
     int GetUserId() const;
 
     void SetFriendName(const std::string friendname);
-    std::string GetFriendName();
+    std::string GetFriendName() const;
 
     void SetFriendId(int friendid);
     int GetFriendId() const;
