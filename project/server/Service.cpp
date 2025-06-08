@@ -328,6 +328,21 @@ void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, uint1
 
     if (end)
     {
+        json other_reply_js = js_CommandReply(true, "Message sent failed");
+        uint16_t type = (end == true ? 1 : 0);
+        seq = 14;
+        conn->send(codec_.encode(other_reply_js, type, seq));
+    }
+    else  
+    {
+        json other_reply_js = js_CommandReply(true, "Message sent failed");
+        uint16_t type = (end == true ? 1 : 0);
+        seq = 14;
+        conn->send(codec_.encode(other_reply_js, type, seq));
+    }
+
+    if (end)
+    {
         databasethreadpool_.EnqueueTask([type, senderid, receiverid, connect, status, this](MysqlConnection& conn) {
             std::ostringstream sql;
             sql << "insert into message (type, senderid, receiverid, connect, status) values ("

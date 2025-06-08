@@ -108,11 +108,39 @@ void Clientservice::RemoveAdministrator(const TcpConnectionPtr& conn, const int&
 //消息回调
 void Clientservice::Back_SendToFriend(const json& js, Timestamp)
 {
+    bool state = true;
 
+    bool end;
+    std::string result;
+    state &= AssignIfPresent(js, "end", end);
+    state &= AssignIfPresent(js, "result", result);
+
+    if (end)
+    {
+
+    }
+    else  
+    {
+        std::cout << result << std::endl;
+    }
 }
 void Clientservice::Back_SendToGroup(const json& js, Timestamp)
 {
+    bool state = true;
 
+    bool end;
+    std::string result;
+    state &= AssignIfPresent(js, "end", end);
+    state &= AssignIfPresent(js, "result", result);
+
+    if (end)
+    {
+
+    }
+    else  
+    {
+        std::cout << result << std::endl;
+    }   
 }
 
 //登陆注册回调
@@ -122,7 +150,21 @@ void Clientservice::Back_LoginRequest(const json& js, Timestamp)
 }
 void Clientservice::Back_RegistrationRequest(const json& js, Timestamp)
 {
+    bool state = true;
 
+    bool end;
+    std::string result;
+    state &= AssignIfPresent(js, "end", end);
+    state &= AssignIfPresent(js, "result", result);
+
+    if (end)
+    {
+
+    }
+    else  
+    {
+        std::cout << result << std::endl;
+    }   
 }
 
 //获取聊天历史回调
