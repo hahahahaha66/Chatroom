@@ -16,9 +16,19 @@ void Friend::SetUserId(int userid)
     userid_ = userid;
 }
 
-int Friend::GetUserId()
+int Friend::GetUserId() const
 {
     return userid_;
+}
+
+void Friend::SetFriendName(const std::string friendname)
+{
+    friendname_ = friendname;
+}
+
+std::string Friend::GetFriendName()
+{
+    return friendname_;
 }
 
 void Friend::SetFriendId(int friendid)

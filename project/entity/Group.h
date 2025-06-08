@@ -20,13 +20,13 @@ public:
     bool AddApply(int applicantid);
     bool ApprovalApply(int applicantid);
     bool DeleteApply(int applicantid);
-    const std::unordered_set<int>& GetApplyList() const;
+    std::unordered_set<int>& GetApplyList();
     
     bool AddMember(const GroupUser& user);
     bool RemoveMember(int userid);
     bool HasMember(int uerid) const;
-    const GroupUser* GetMember(int userid) const;
-    const std::unordered_map<int, GroupUser>& GetAllMembers() const;
+    GroupUser* GetMember(int userid);
+    std::unordered_map<int, GroupUser>& GetAllMembers();
 
 private:
     int groupid_;

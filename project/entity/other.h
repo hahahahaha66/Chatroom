@@ -19,8 +19,21 @@ struct Message
     Type type_;
     int senderid_;
     int receiverid_;
-    std::string connnect_;
+    std::string connect_;
     Status status_;
+    Message(int senderid, int receiverid, std::string connect)
+        : senderid_(senderid),
+          receiverid_(receiverid),
+          connect_(connect)
+    {
+    }
+    
+    Message(int senderid, int receiverid, std::string connect, Status, Type)
+        : senderid_(senderid),
+          receiverid_(receiverid),
+          connect_(connect)
+    {
+    }
 };
 
 #endif

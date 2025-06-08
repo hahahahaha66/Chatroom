@@ -9,9 +9,6 @@
 #include "../tool/Dispatcher.h"
 #include "../tool/Processpend.h"
 #include "Clientservice.h"
-#include "../entity/Friend.h"
-#include "../entity/GroupUser.h"
-#include "../entity/Group.h"
 
 #include <string>
 #include <atomic>
@@ -52,9 +49,6 @@ private:
     Processpend processpend_;
     Clientservice clientservice_;
 
-    std::unordered_map<int, Friend> friendlist_;
-    std::unordered_map<int, Group> grouplist_;
-    std::atomic<long> total_seq;
 };
 
 #endif

@@ -4,6 +4,9 @@
 #include "../json_protocol.hpp"
 #include "../muduo/net/tcp/TcpClient.h"
 #include "../tool/Codec.h"
+#include "../entity/Friend.h"
+#include "../entity/GroupUser.h"
+#include "../entity/Group.h"
 
 #include <cstdint>
 #include <string>
@@ -37,34 +40,40 @@ public:
     void RemoveAdministrator(const TcpConnectionPtr& conn, const int& groupid, const int& userid, const uint16_t seq);
     void DeleteGroup(const TcpConnectionPtr& conn, const int& groupid, const uint16_t seq);
 
-    void Back_SendToFriend(const json& js, Timestamp);
-    void Back_SendToGroup(const json& js, Timestamp);
+    void Back_SendToFriend(const json& js, Timestamp time);
+    void Back_SendToGroup(const json& js, Timestamp time);
 
-    void Back_LoginRequest(const json& js, Timestamp);
-    void Back_RegistrationRequest(const json& js, Timestamp);
+    void Back_LoginRequest(const json& js, Timestamp time);
+    void Back_RegistrationRequest(const json& js, Timestamp time);
 
-    void Back_GetPersonalChatHistory(const json& js, Timestamp);
-    void Back_GetGroupChatHistory(const json& js, Timestamp);
+    void Back_GetPersonalChatHistory(const json& js, Timestamp time);
+    void Back_GetGroupChatHistory(const json& js, Timestamp time);
 
-    void Back_SendFriendRequest(const json& js, Timestamp);
-    void Back_SendGroupRequest(const json& js, Timestamp);
+    void Back_SendFriendRequest(const json& js, Timestamp time);
+    void Back_SendGroupRequest(const json& js, Timestamp time);
 
-    void ProcessingFriendRequest(const json& js, Timestamp);
-    void ProcessingGroupRequest(const json& js, Timestamp);
+    void ProcessingFriendRequest(const json& js, Timestamp time);
+    void ProcessingGroupRequest(const json& js, Timestamp time);
 
 
-    void Back_BlockFriend(const json& js, Timestamp);
-    void Back_DeleteFriend(const json& js, Timestamp);
+    void Back_BlockFriend(const json& js, Timestamp time);
+    void Back_DeleteFriend(const json& js, Timestamp time);
     
-    void Back_QuitGroup(const json& js, Timestamp);
-    void Back_CreateGroup(const json& js, Timestamp);
-    void Back_RemoveGroupUser(const json& js, Timestamp);
-    void Back_SetAdministrator(const json& js, Timestamp);
-    void Back_RemoveAdministrator(const json& js, Timestamp);
-    void Back_DeleteGroup(const json& js, Timestamp);
+    void Back_QuitGroup(const json& js, Timestamp time);
+    void Back_CreateGroup(const json& js, Timestamp time);
+    void Back_RemoveGroupUser(const json& js, Timestamp time);
+    void Back_SetAdministrator(const json& js, Timestamp time);
+    void Back_RemoveAdministrator(const json& js, Timestamp time);
+    void Back_DeleteGroup(const json& js, Timestamp time);
+
+    void CommandReply(const json& js, Timestamp time);
 
 private:
     Codec codec_;
+
+    std::unordered_map<int, Friend> friendlist_;
+    std::unordered_map<int, Group> grouplist_;
+    std::atomic<long> total_seq;
 };
 
 #endif

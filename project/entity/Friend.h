@@ -12,6 +12,9 @@ public:
     void SetUserId(int userid);
     int GetUserId() const;
 
+    void SetFriendName(const std::string friendname);
+    std::string GetFriendName();
+
     void SetFriendId(int friendid);
     int GetFriendId() const;
 
@@ -25,6 +28,7 @@ private:
         Block
     };
 
+    std::string friendname_;
     int userid_;
     int friendid_;
     Status status_;

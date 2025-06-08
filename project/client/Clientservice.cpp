@@ -105,8 +105,10 @@ void Clientservice::RemoveAdministrator(const TcpConnectionPtr& conn, const int&
 //     conn->send(codec_.encode(j, 14, seq));
 // }
 
+
+
 //消息回调
-void Clientservice::Back_SendToFriend(const json& js, Timestamp)
+void Clientservice::Back_SendToFriend(const json& js, Timestamp time)
 {
     bool state = true;
 
@@ -115,7 +117,7 @@ void Clientservice::Back_SendToFriend(const json& js, Timestamp)
     state &= AssignIfPresent(js, "end", end);
     state &= AssignIfPresent(js, "result", result);
 
-    if (end)
+    if (state)
     {
 
     }
@@ -124,7 +126,7 @@ void Clientservice::Back_SendToFriend(const json& js, Timestamp)
         std::cout << result << std::endl;
     }
 }
-void Clientservice::Back_SendToGroup(const json& js, Timestamp)
+void Clientservice::Back_SendToGroup(const json& js, Timestamp time)
 {
     bool state = true;
 
@@ -133,22 +135,111 @@ void Clientservice::Back_SendToGroup(const json& js, Timestamp)
     state &= AssignIfPresent(js, "end", end);
     state &= AssignIfPresent(js, "result", result);
 
-    if (end)
+    if (state)
     {
 
     }
     else  
     {
         std::cout << result << std::endl;
-    }   
+    }
 }
 
 //登陆注册回调
-void Clientservice::Back_LoginRequest(const json& js, Timestamp)
+void Clientservice::Back_LoginRequest(const json& js, Timestamp time)
 {
 
 }
-void Clientservice::Back_RegistrationRequest(const json& js, Timestamp)
+void Clientservice::Back_RegistrationRequest(const json& js, Timestamp time)
+{
+    CommandReply(js, time);
+}
+
+//获取聊天历史回调
+void Clientservice::Back_GetPersonalChatHistory(const json& js, Timestamp time)
+{
+    int senderid;  
+    std::string connect;
+
+    for (const auto& it : js["message"])
+    {
+        AssignIfPresent(it, "senderid", senderid);
+        AssignIfPresent(it, "connect", connect);
+
+        std::cout << friendlist_[senderid].GetFriendName() << " : " << connect << std::endl;
+    }
+}
+void Clientservice::Back_GetGroupChatHistory(const json& js, Timestamp time)
+{
+    int senderid;  
+    std::string connect;
+
+    for (const auto& it : js["message"])
+    {
+        AssignIfPresent(it, "senderid", senderid);
+        AssignIfPresent(it, "connect", connect);
+
+        std::cout << friendlist_[senderid].GetFriendName() << " : " << connect << std::endl;
+    }
+}
+
+//好友与群聊请求回调
+void Clientservice::Back_SendFriendRequest(const json& js, Timestamp time)
+{
+    CommandReply(js, time);
+}
+void Clientservice::Back_SendGroupRequest(const json& js, Timestamp time)
+{
+    CommandReply(js, time);
+}
+
+//处理申请回调
+void Clientservice::ProcessingFriendRequest(const json& js, Timestamp time)
+{
+    CommandReply(js, time);
+}
+void Clientservice::ProcessingGroupRequest(const json& js, Timestamp time)
+{
+    CommandReply(js, time);
+}
+
+//好友相关回调
+void Clientservice::Back_BlockFriend(const json& js, Timestamp time)
+{
+    CommandReply(js, time);
+}
+void Clientservice::Back_DeleteFriend(const json& js, Timestamp time)
+{
+    CommandReply(js, time);
+}
+    
+//群聊相关回调
+void Clientservice::Back_QuitGroup(const json& js, Timestamp time)
+{
+    CommandReply(js, time);
+}
+void Clientservice::Back_CreateGroup(const json& js, Timestamp time)
+{
+    CommandReply(js, time);
+}
+void Clientservice::Back_RemoveGroupUser(const json& js, Timestamp time)
+{
+    CommandReply(js, time);
+}
+void Clientservice::Back_SetAdministrator(const json& js, Timestamp time)
+{
+    CommandReply(js, time);
+}
+void Clientservice::Back_RemoveAdministrator(const json& js, Timestamp time)
+{
+    CommandReply(js, time);
+}
+void Clientservice::Back_DeleteGroup(const json& js, Timestamp time)
+{
+
+}
+
+void Clientservice::CommandReply(const json& js, Timestamp time)
 {
     bool state = true;
 
@@ -157,78 +248,8 @@ void Clientservice::Back_RegistrationRequest(const json& js, Timestamp)
     state &= AssignIfPresent(js, "end", end);
     state &= AssignIfPresent(js, "result", result);
 
-    if (end)
-    {
-
-    }
-    else  
+    if (state)
     {
         std::cout << result << std::endl;
-    }   
-}
-
-//获取聊天历史回调
-void Clientservice::Back_GetPersonalChatHistory(const json& js, Timestamp)
-{
-
-}
-void Clientservice::Back_GetGroupChatHistory(const json& js, Timestamp)
-{
-
-}
-
-//好友与群聊请求回调
-void Clientservice::Back_SendFriendRequest(const json& js, Timestamp)
-{
-
-}
-void Clientservice::Back_SendGroupRequest(const json& js, Timestamp)
-{
-
-}
-
-//处理申请回调
-void Clientservice::ProcessingFriendRequest(const json& js, Timestamp)
-{
-
-}
-void Clientservice::ProcessingGroupRequest(const json& js, Timestamp)
-{
-
-}
-
-//好友相关回调
-void Clientservice::Back_BlockFriend(const json& js, Timestamp)
-{
-
-}
-void Clientservice::Back_DeleteFriend(const json& js, Timestamp)
-{
-
-}
-    
-//群聊相关回调
-void Clientservice::Back_QuitGroup(const json& js, Timestamp)
-{
-
-}
-void Clientservice::Back_CreateGroup(const json& js, Timestamp)
-{
-
-}
-void Clientservice::Back_RemoveGroupUser(const json& js, Timestamp)
-{
-
-}
-void Clientservice::Back_SetAdministrator(const json& js, Timestamp)
-{
-
-}
-void Clientservice::Back_RemoveAdministrator(const json& js, Timestamp)
-{
-
-}
-void Clientservice::Back_DeleteGroup(const json& js, Timestamp)
-{
-
+    }
 }

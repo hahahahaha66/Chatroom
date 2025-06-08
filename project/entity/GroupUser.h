@@ -26,7 +26,7 @@ public:
     time_t GetJoinTime() const;
     time_t GetLastReadTimre() const;
 
-    void SetRole(const std::string& role);
+    void SetRole(const std::string& role); 
     void SetMuted(bool muted);
     void SetLastReadTime(time_t lastreadtime);
 

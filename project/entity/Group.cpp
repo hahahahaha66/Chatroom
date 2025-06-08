@@ -48,7 +48,7 @@ bool Group::DeleteApply(int applicantid)
         return false;
 }
 
-const std::unordered_set<int>& Group::GetApplyList() const
+std::unordered_set<int>& Group::GetApplyList()
 {
     return applylist_;
 }
@@ -77,12 +77,12 @@ bool Group::HasMember(int userid) const
         return true;
 }
 
-const GroupUser* Group::GetMember(int userid) const
+GroupUser* Group::GetMember(int userid)
 {
     return &(members_.at(userid));
 }
 
-const std::unordered_map<int, GroupUser>& Group::GetAllMembers() const
+std::unordered_map<int, GroupUser>& Group::GetAllMembers()
 {
     return members_;
 }
