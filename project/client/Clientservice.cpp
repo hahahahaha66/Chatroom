@@ -104,7 +104,11 @@ void Clientservice::RemoveAdministrator(const TcpConnectionPtr& conn, const int&
 //     conn->send(codec_.encode(j, 14, seq));
 // }
 
-
+void Clientservice::UpdatedUserInterface(const TcpConnectionPtr& conn, int& peeid, std::string& type, const uint16_t seq)
+{
+    json j = js_UserInterface(userid, peeid, type);
+    conn->send(codec_.encode(j, 19, seq));
+}
 
 //消息回调
 void Clientservice::Back_SendToFriend(const json& js, Timestamp time)

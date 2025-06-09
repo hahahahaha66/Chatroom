@@ -8,6 +8,7 @@ struct ChatConnect
     enum class Type {None, Private, Group};
     Type type_;
     int peerid_;
+    ChatConnect() : peerid_(-1), type_(Type::None) {};
     ChatConnect(int peerid, Type type = Type::None) : type_(type), peerid_(peerid) {}
 };
 

@@ -72,6 +72,9 @@ std::string js_GroupData(const int& groupid, const int& userid);
 //群聊成员列表
 std::string js_GroupMemberList(const int& groupid, const std::vector<int>& memberlist);
 
+//更新用户界面信息
+std::string js_UserInterface(const int& userid, const int& peeid, const std::string& type);
+
 //用于申请列表
 std::string js_UserList(const std::vector<int>& userlist);
 //申请结果

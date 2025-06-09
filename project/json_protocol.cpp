@@ -324,6 +324,17 @@ std::string js_GroupMemberList(const int& groupid, const std::vector<int>& membe
     return j.dump();
 }
 
+std::string js_UserInterface(const int& userid, const int& peeid, const std::string& type)
+{
+    json j = {
+        {"userid", userid},
+        {"peeid", peeid},
+        {"type", type}
+    };
+    return j.dump();
+}
+
+
 // 用于申请列表
 std::string js_UserList(const std::vector<int>& userlist)
 {

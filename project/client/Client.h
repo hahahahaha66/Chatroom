@@ -23,6 +23,7 @@ class Client
 {
 public:
     Client(EventLoop* loop, InetAddress& addr, std::string name);
+    ~Client();
     
     void ConnectionCallback(const TcpConnectionPtr& conn);
     void MessageCallback(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time);

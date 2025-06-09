@@ -30,7 +30,7 @@ class Service
 {
 public:
     Service(Dispatcher& dispatcher);
-    ~Service(){};
+    ~Service();
 
     void RegisterAllHanders(Dispatcher& dispatcher);
     
@@ -88,6 +88,11 @@ public:
     //删除
     void DeleteUserAccount  (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
     void DeleteGroup        (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+
+    //更新用户当前界面
+    void UpdatedUserInterface(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+
+    //刷新机制
 
 private:
     void ReadFromDataBase(const std::string& query, std::function<void(MysqlRow&)> rowprocessor);

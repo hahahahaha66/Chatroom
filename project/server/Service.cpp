@@ -36,6 +36,22 @@ Service::Service(Dispatcher& dispatcher) : dispatcher_(dispatcher)
     handermap_[19] = std::bind(&Service::ProcessMessage, this, _1, _2, _3, _4);
     handermap_[20] = std::bind(&Service::GetUserChatInterface, this, _1, _2, _3, _4);
     handermap_[21] = std::bind(&Service::GetGroupChatInterface, this, _1, _2, _3, _4);
+
+    ReadUserFromDataBase();
+    ReadGroupFromDataBase();
+    ReadFriendFromDataBase();
+    ReadChatConnectFromDataBase();
+    ReadGroupApplyFromDataBase();
+    ReadUserApplyFromDataBase();
+    ReadGroupUserFromDataBase();
+    ReadMessageFromDataBase();
+
+    StartAutoFlushToDataBase();
+}
+
+Service::~Service()
+{
+    StopAutoFlush();
 }
 
 void Service::RegisterAllHanders(Dispatcher& dispatcher)
@@ -1102,6 +1118,53 @@ void Service::DeleteUserAccount(const TcpConnectionPtr& conn, const json& js, ui
         result = "Delete account successful!";
     else  
         result = "Delete account failed!";
+
+    json reply_js = js_CommandReply(end, result);
+    uint16_t type = (end == true ? 1 : 0);
+
+    conn->send(codec_.encode(reply_js, type, seq));
+}
+
+void Service::UpdatedUserInterface(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+{
+    bool end = true;
+    std::string result;
+
+    int userid;
+    int peeid;
+    std::string temp_type;
+    end &= AssignIfPresent(js, "peeid", peeid);
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "type", temp_type);
+    ChatConnect::Type type_;
+
+    if (temp_type == "Private")
+    {
+        type_ = ChatConnect::Type::Private;
+    }
+    else if (temp_type == "Group")
+    {
+        type_ = ChatConnect::Type::Group;
+    }
+    else if (temp_type == "None")
+    {
+        type_ = ChatConnect::Type::None;
+    }
+    else 
+    {
+        end = false;
+    }
+
+    if (end)
+    {
+        chatconnect_[userid].peerid_ = peeid;
+        chatconnect_[userid].type_ = type_;
+    }
+   
+    if (end)
+        result = "Updated user interface successful!";
+    else  
+        result = "Updated user interface failed!";
 
     json reply_js = js_CommandReply(end, result);
     uint16_t type = (end == true ? 1 : 0);

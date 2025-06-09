@@ -15,6 +15,11 @@ Client::Client(EventLoop* loop, InetAddress& addr, std::string name)
     InitialInterface();
 }
 
+Client::~Client()
+{
+    client_.stop();
+}
+
 void Client::ConnectionCallback(const TcpConnectionPtr& conn)
 {
     if (conn->connected())
@@ -25,7 +30,6 @@ void Client::ConnectionCallback(const TcpConnectionPtr& conn)
     {
         std::cout << "连接断开" <<std::endl;
     }
-
 }
 
 void Client::WriteCompleteCallback(const TcpConnectionPtr& conn)
