@@ -11,6 +11,14 @@ struct ChatConnect
     ChatConnect(int peerid, Type type = Type::None) : type_(type), peerid_(peerid) {}
 };
 
+struct SimpUser
+{
+    int userid_;
+    std::string username_;
+    SimpUser(int userid) : userid_(userid), username_(nullptr) {}
+    SimpUser(int userid, std::string username) : userid_(userid), username_(username) {}
+};
+
 struct Message
 {
     enum class Type {Private, Group};
@@ -27,7 +35,7 @@ struct Message
           connect_(connect)
     {
     }
-    
+
     Message(int senderid, int receiverid, std::string connect, Status, Type)
         : senderid_(senderid),
           receiverid_(receiverid),

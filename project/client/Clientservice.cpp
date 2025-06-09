@@ -147,7 +147,74 @@ void Clientservice::Back_SendToGroup(const json& js, Timestamp time)
 //登陆注册回调
 void Clientservice::Back_LoginRequest(const json& js, Timestamp time)
 {
+    bool end = true;
 
+    end &= AssignIfPresent(js, "userid", userid);
+
+    int friendid;
+    std::string friendname;
+    std::string status;
+
+    for (const auto& jf : js["friends"])
+    {
+        end &= AssignIfPresent(jf, "friendid", friendid);
+        end &= AssignIfPresent(jf, "friendname", friendname);
+        end &= AssignIfPresent(jf, "status", status);
+
+        Friend f(userid, friendname, friendid, status);
+
+        friendlist_[friendid] = f;
+    }
+
+    int groupid;
+    std::string groupname;
+
+    for (const auto& jg : js["groups"])
+    {
+        end &= AssignIfPresent(jg, "groupid", groupid);
+        end &= AssignIfPresent(jg, "groupname", groupname);
+
+        Group g(groupid, groupname);
+
+        int uid;
+        std::string username;
+        std::string role;
+        bool muted;
+        for (const auto& jm : jg["members"])
+        {
+            end &= AssignIfPresent(jm, "uid", uid);
+            end &= AssignIfPresent(jm, "username", username);
+            end &= AssignIfPresent(jm, "role", role);
+            end &= AssignIfPresent(jm, "muted", muted);
+
+            GroupUser gu(uid, role);
+            gu.SetMuted(muted);
+            gu.SetUserName(username);
+
+            g.AddMember(gu);
+        }
+
+        int applyid;
+        std::string applyname;
+        for (const auto& ja : jg["apply"])
+        {
+            end &= AssignIfPresent(ja, "applyid", applyid);
+            end &= AssignIfPresent(ja, "applyname", applyname);
+
+            g.AddApply(applyid, applyname);
+        }
+
+        grouplist_[groupid] = g;
+    }
+
+    if (end)
+    {
+        std::cout << "Read user data successfully" << std::endl;
+    }
+    else  
+    {
+        std::cout << "Read user data failed" << std::endl;
+    }
 }
 void Clientservice::Back_RegistrationRequest(const json& js, Timestamp time)
 {

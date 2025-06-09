@@ -43,7 +43,7 @@ std::string js_RegisterData(const std::string& username, const std::string& pass
 std::string js_UserId(const int& userid);
 //登陆
 std::string js_Login(const std::string username, const std::string password);
-//登陆后将数据放在客户端缓存
+//登陆后放在客户端缓存的数据包
 std::string js_UserAllData(const int& userid, const std::unordered_map<int, Friend>, const std::unordered_map<int, Group>);
 //用户
 std::string js_User(const int& userid, const std::string& username);

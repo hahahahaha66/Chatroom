@@ -2,7 +2,7 @@
 #define GROUP_H
 
 #include "GroupUser.h"
-#include "User.h"
+#include "other.h"
 
 #include <memory>
 #include <string>
@@ -13,15 +13,17 @@
 class Group  
 {
 public:
+    Group() = default;
     Group(int groupid, const std::string& groupname);
 
     int GetGroupId() const;
     const std::string& GetGroupName() const;
 
-    bool AddApply(User& applicantid);
+    bool AddApply(int applicantid, std::string applyname);
+    bool AddApplyId(int applicantid);
     bool ApprovalApply(int applicantid);
     bool DeleteApply(int applicantid);
-    const std::unordered_map<int, User>& GetApplyList() const;
+    const std::unordered_map<int, SimpUser>& GetApplyList() const;
     
     bool AddMember(const GroupUser& user);
     bool RemoveMember(int userid);
@@ -33,7 +35,7 @@ private:
     int groupid_;
     std::string groupname_;
 
-    std::unordered_map<int, User> applylist_;
+    std::unordered_map<int, SimpUser> applylist_;
     std::unordered_map<int, GroupUser> members_;
     
 };

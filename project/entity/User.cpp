@@ -1,5 +1,6 @@
 #include "User.h"
 #include "Friend.h"
+#include "other.h"
 #include <type_traits>
 #include <unordered_set>
 #include <utility>
@@ -87,6 +88,11 @@ const std::unordered_map<int, Friend>& User::GetFriendList() const
     return friendlist_;
 }
 
+void User::SetFriendname(int friendid, std::string friendname)
+{
+    friendlist_[friendid].SetFriendName(friendname);
+}
+
 void User::SetStatusFriend(int friendid, std::string& status)
 {
     friendlist_[friendid].SetStatus(status);
@@ -113,18 +119,26 @@ const std::vector<int> User::GetBlockList() const
     return result;
 }
 
-bool User::AddApply(int applicantid)
+bool User::AddApply(int applicantid, std::string applyname)
 {
-    if (applylist_.insert(applicantid).second == true)
+    if (applylist_.insert(std::make_pair(applicantid, std::move(SimpUser(applicantid, applyname)))).second == true)
         return true;
     else  
         return false;
 }
 
-void User::ApprovalApply(int id, int applicantid)
+bool User::AddApplyId(int applicantid)
+{
+    if (applylist_.insert(std::make_pair(applicantid, std::move(SimpUser(applicantid)))).second == true)
+        return true;
+    else  
+        return false;
+}
+
+void User::ApprovalApply(int userid, int applicantid)
 {
     applylist_.erase(applicantid);
-    friendlist_.insert(std::make_pair(id, std::move(Friend(userid_, applicantid))));
+    friendlist_.insert(std::make_pair(userid, std::move(Friend(userid_, applicantid))));
 }
 
 void User::DeleteApply(int applicantid)
@@ -140,7 +154,7 @@ bool User::IsApply(int applicantid)
         return true;
 }
 
-const std::unordered_set<int>& User::GetApplyList() const
+const std::unordered_map<int, SimpUser>& User::GetApplyList() const
 {
     return applylist_;
 }

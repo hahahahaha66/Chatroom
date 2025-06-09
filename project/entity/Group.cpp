@@ -1,5 +1,6 @@
 #include "Group.h"
 #include "GroupUser.h"
+#include "other.h"
 #include <unordered_map>
 #include <utility>
 
@@ -19,9 +20,17 @@ const std::string& Group::GetGroupName() const
     return groupname_;
 }
 
-bool Group::AddApply(User& applicant)
+bool Group::AddApply(int applicantid, std::string applyname)
 {
-    if (applylist_.insert(std::make_pair(applicant.GetId(), applicant)).second == true)
+    if (applylist_.insert(std::make_pair(applicantid, std::move(SimpUser(applicantid, applyname)))).second == true)
+        return true;
+    else  
+        return false;
+}
+
+bool Group::AddApplyId(int applicantid)
+{
+    if (applylist_.insert(std::make_pair(applicantid, std::move(SimpUser(applicantid)))).second == true)
         return true;
     else  
         return false;
@@ -48,7 +57,7 @@ bool Group::DeleteApply(int applicantid)
         return false;
 }
 
-const std::unordered_map<int, User>& Group::GetApplyList() const
+const std::unordered_map<int, SimpUser>& Group::GetApplyList() const
 {
     return applylist_;
 }

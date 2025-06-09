@@ -11,6 +11,14 @@ Friend::Friend(int userid, int friendid, std::string status)
    SetStatus(status);
 }
 
+Friend::Friend(int userid,  std::string friendname, int friendid, std::string status)
+    : userid_(userid), friendid_(friendid)
+{
+    SetFriendName(friendname);
+    SetStatus(status);
+}
+
+
 void Friend::SetUserId(int userid)
 {
     userid_ = userid;

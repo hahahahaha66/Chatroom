@@ -8,6 +8,7 @@ class Friend
 public:
     Friend();
     Friend(int userid, int friendid, std::string Status = "Normal");
+    Friend(int userid, std::string friendname, int friendid, std::string Status = "Normal");
 
     void SetUserId(int userid);
     int GetUserId() const;

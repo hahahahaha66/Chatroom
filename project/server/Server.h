@@ -33,6 +33,11 @@ public:
 
     ~Server() {}
 
+    void StartServer()
+    {
+        server_.start();
+    }
+
     void setThreadnum(int& num)
     {
         server_.setThreadNum(num);

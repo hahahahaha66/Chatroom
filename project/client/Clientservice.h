@@ -71,6 +71,9 @@ public:
 private:
     Codec codec_;
 
+    int userid;
+    std::string username;
+    std::string password;
     std::unordered_map<int, Friend> friendlist_;
     std::unordered_map<int, Group> grouplist_;
     std::atomic<long> total_seq;

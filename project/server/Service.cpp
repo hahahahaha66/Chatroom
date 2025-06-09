@@ -98,6 +98,22 @@ void Service::ReadFriendFromDataBase()
         userlist_[userid].SetStatusFriend(friendid, status);
         userfriendlist[userid][friendid] = std::move(Friend(userid, friendid, status));
     });
+
+    for (auto& it : userlist_)
+    {
+        for (auto& fd : userlist_[it.first].GetFriendList())
+        {
+            it.second.SetFriendname(fd.first, userlist_[fd.first].GetUserName());
+        }
+    }
+
+    for (auto& it : userlist_)
+    {
+        for (auto& fd: userfriendlist[it.first])
+        {
+            fd.second.SetFriendName(userlist_[fd.second.GetFriendId()].GetUserName());
+        }
+    }
 }
 
 void Service::ReadChatConnectFromDataBase()
@@ -125,8 +141,16 @@ void Service::ReadGroupApplyFromDataBase()
     ReadFromDataBase(query, [this](MysqlRow& row) {
         int groupid = row.GetInt("groupid");
         int applyid = row.GetInt("applyid");
-        grouplist_[groupid].AddApply(applyid);
+        grouplist_[groupid].AddApplyId(applyid);
     });
+    
+    for (auto& it : grouplist_)
+    {
+        for (auto& apply : it.second.GetApplyList())
+        {
+            it.second.AddApply(apply.second.userid_, userlist_[apply.second.userid_].GetUserName());
+        }
+    }
 }
 
 void Service::ReadUserApplyFromDataBase()
@@ -135,8 +159,16 @@ void Service::ReadUserApplyFromDataBase()
     ReadFromDataBase(query, [this](MysqlRow& row) {
         int userid = row.GetInt("userid");
         int applyid = row.GetInt("applyid");
-        userlist_[userid].AddApply(applyid);
+        userlist_[userid].AddApplyId(applyid);
     });
+
+    for (auto& it : userlist_)
+    {
+        for (auto& apply : it.second.GetApplyList())
+        {
+            it.second.AddApply(apply.second.userid_, userlist_[apply.second.userid_].GetUserName());
+        }
+    }
 }
 
 void Service::ReadGroupUserFromDataBase()
@@ -210,9 +242,9 @@ void Service::FlushToDataBase()
             std::string sql = FormatUpdateUser(user);
             conn.ExcuteUpdata(sql);
 
-            for (auto& applyid : user.GetApplyList())
+            for (auto& it : user.GetApplyList())
             {
-                std::string sql = FormatUpdateUserApply(userid, applyid);
+                std::string sql = FormatUpdateUserApply(userid, it.second.userid_);
                 conn.ExcuteUpdata(sql);
             }
 
@@ -228,9 +260,9 @@ void Service::FlushToDataBase()
             std::string sql_group = FormatUpdateGroup(group);
             conn.ExcuteUpdata(sql_group);
 
-            for (auto& applyid : group.GetApplyList())
+            for (auto& it : group.GetApplyList())
             {
-                std::string sql = FormatUqdateGroupApply(groupid, applyid);
+                std::string sql = FormatUqdateGroupApply(groupid, it.second.userid_);
                 conn.ExcuteUpdata(sql);
             }
 
@@ -384,8 +416,8 @@ void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, uint1
 void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
-    std::unordered_map<int, std::string> friendlist;
-    std::unordered_map<int, std::string> grouplist;
+    std::unordered_map<int, Friend> friendlist;
+    std::unordered_map<int, Group> grouplist;
 
     std::string username;
     std::string password;
@@ -420,16 +452,16 @@ void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, uint
     {
         for (auto& it : userlist_[userid].GetFriendList())
         {
-            friendlist[it.first] = userlist_[it.first].GetUserName();
+            friendlist[it.first] = it.second;
         }
 
         for (auto& it : userlist_[userid].GetGroupList())
         {
-            grouplist[it] = grouplist_[it].GetGroupName();
+            grouplist[it] = grouplist_[it];
         }
     }
 
-    json all_friend = js_AllFriendIdName(userid, friendlist, grouplist);
+    json all_friend = js_UserAllData(userid, friendlist, grouplist);
     conn->send(codec_.encode(all_friend, type, seq));
 }
 
@@ -751,14 +783,14 @@ void Service::AddFriend(const TcpConnectionPtr& conn, const json& js, uint16_t s
     end &= AssignIfPresent(js, "userid", userid);
     end &= AssignIfPresent(js, "friendid", applicantid);
 
-    userlist_[userid].AddApply(applicantid);
+    userlist_[userid].AddApply(applicantid, userlist_[applicantid].GetUserName());
 
     if (end)
         result = "Add apply successful!";
     else  
         result = "Add apply failed!";
 
-    json reply_js = js_CommandReply(end, result);
+    json reply_js = js_CommandReply(end, result);     
     uint16_t type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
@@ -789,6 +821,38 @@ void Service::ProcessFriendApply(const TcpConnectionPtr& conn, const json& js, c
         result = "Process apply successful!";
     else  
         result = "Process apply failed!";
+
+    json reply_js = js_CommandReply(end, result);
+    uint16_t type = (end == true ? 1 : 0);
+
+    conn->send(codec_.encode(reply_js, type, seq));
+}
+
+void Service::AddGroup(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+{
+    bool end = true;
+    std::string result;
+
+    int groupid;
+    int userid;
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "groupid", groupid);
+
+    auto applylist = grouplist_[groupid].GetApplyList();
+    auto it = applylist.find(userid);
+    if (it != applylist.end())
+    {
+        grouplist_[groupid].AddApply(userid, userlist_[userid].GetUserName());
+    }
+    else  
+    {
+        end =false;
+    }
+
+    if (end)
+        result = "Add group apply successful!";
+    else  
+        result = "Add group apply failed!";
 
     json reply_js = js_CommandReply(end, result);
     uint16_t type = (end == true ? 1 : 0);

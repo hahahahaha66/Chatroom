@@ -201,12 +201,12 @@ std::string js_UserAllData(const int& userid, const std::unordered_map<int, Frie
         for (const auto& [uid, apply] : g.GetApplyList())
         {
             json ja;
-            ja["applyid"] = apply.GetId();
-            ja["applyname"] = apply.GetUserName();
+            ja["applyid"] = apply.userid_;
+            ja["applyname"] = apply.username_;
             ja["apply"].push_back(ja);
         }
         
-        j["group"].push_back(jg);
+        j["groups"].push_back(jg);
     }
     
     return j.dump();

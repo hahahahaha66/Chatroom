@@ -4,6 +4,7 @@
 #include "../muduo/net/tcp/TcpConnection.h"
 #include "GroupUser.h"
 #include "Friend.h"
+#include "other.h"
 
 #include <memory>
 #include <sys/types.h>
@@ -14,6 +15,8 @@
 class User 
 {
 public:
+    User() = default;
+
     User(int userid, const std::string& username, const std::string& password);
 
     int GetId() const;
@@ -34,15 +37,18 @@ public:
     bool IsFriend(int friendid) const;
     const std::unordered_map<int, Friend>& GetFriendList() const;
 
+    void SetFriendname(int friendid, std::string friendname);
+
     void SetStatusFriend(int friendid, std::string& status);
     bool IsBlockFriend(int blockuser) const;
     const std::vector<int> GetBlockList() const;
 
-    bool AddApply(int applicantid);
-    void ApprovalApply(int id, int applicantid);
+    bool AddApply(int applicantid, std::string applyname);
+    bool AddApplyId(int applicantid);
+    void ApprovalApply(int userid, int applicantid);
     void DeleteApply(int applicantid);
     bool IsApply(int applicantid);
-    const std::unordered_set<int>& GetApplyList() const;
+    const std::unordered_map<int, SimpUser>& GetApplyList() const;
 
     bool JoinGroup(int groupid);
     bool LeaveGroup(int groupid);
@@ -57,7 +63,7 @@ private:
     std::shared_ptr<TcpConnection> conn_;
 
     std::unordered_map<int, Friend> friendlist_;
-    std::unordered_set<int> applylist_;
+    std::unordered_map<int, SimpUser> applylist_;
     std::unordered_set<int> grouplist_;
 };
 

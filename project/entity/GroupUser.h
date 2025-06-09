@@ -15,7 +15,7 @@ public:
         Member
     };
     
-    GroupUser();
+    GroupUser() = default;
     GroupUser(int userid, const std::string& role);
 
     int GetUserId() const;

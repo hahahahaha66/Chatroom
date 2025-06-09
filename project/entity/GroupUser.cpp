@@ -11,6 +11,11 @@ int GroupUser::GetUserId() const
     return userid_;
 }
 
+const std::string& GroupUser::GetUserName() const
+{
+    return username_;
+}
+
 const std::string GroupUser::GetRole() const
 {
     switch (role_) {
@@ -34,6 +39,11 @@ time_t GroupUser::GetJoinTime() const
 time_t GroupUser::GetLastReadTimre() const
 {
     return lastreadtime_;
+}
+
+void GroupUser::SetUserName(std::string username)
+{
+    username_ = username;
 }
 
 void GroupUser::SetRole(const std::string& role)
