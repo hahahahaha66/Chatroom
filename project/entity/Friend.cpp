@@ -39,6 +39,16 @@ std::string Friend::GetFriendName() const
     return friendname_;
 }
 
+void Friend::SetOnline(bool online)
+{
+    online_ = online;
+}
+
+bool Friend::GetOnline()
+{
+    return online_;
+}
+
 void Friend::SetFriendId(int friendid)
 {
     friendid_ = friendid;

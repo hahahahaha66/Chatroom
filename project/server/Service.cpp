@@ -371,7 +371,7 @@ void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, uint1
     {
         if (type == "private")
         {
-            if (chatconnect_[receiverid].type_ == ChatConnect::Type::Private && chatconnect_[receiverid].peerid_ == senderid)
+            if (userlist_[receiverid].IsOnLine() && chatconnect_[receiverid].type_ == ChatConnect::Type::Private && chatconnect_[receiverid].peerid_ == senderid)
             {
                 std::shared_ptr<TcpConnection> receiver_conn = userlist_[receiverid].GetConnection();
                 status = "read";
@@ -463,6 +463,14 @@ void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, uint
     uint16_t type = (end == true ? 1 : 0);
     if (end) 
         userlist_[userid].SetOnline(conn);
+
+    if (end)
+    {
+        for (auto& it : userlist_[userid].GetFriendList())
+        {
+            userfriendlist[it.second.GetFriendId()][userid].SetOnline(true);
+        }
+    }
 
     if (end)
     {

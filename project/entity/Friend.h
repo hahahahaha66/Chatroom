@@ -16,6 +16,9 @@ public:
     void SetFriendName(const std::string friendname);
     std::string GetFriendName() const;
 
+    void SetOnline(bool online);
+    bool GetOnline();
+
     void SetFriendId(int friendid);
     int GetFriendId() const;
 
@@ -30,6 +33,7 @@ private:
     };
 
     std::string friendname_;
+    bool online_ = false;
     int userid_;
     int friendid_;
     Status status_;
