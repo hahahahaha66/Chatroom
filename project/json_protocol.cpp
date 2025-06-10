@@ -104,14 +104,15 @@ std::string js_SendMessage(const std::string type, const int& senderid, const in
 }
 
 // 消息
-std::string js_Message(const std::string& type, const int& senderid, const int& receiverid, const std::string& text, const std::string& status)
+std::string js_Message(const std::string& type, const int& senderid, const int& receiverid, const std::string& text, const std::string& status, std::string time)
 {
     json j = {
         {"type", type},
         {"senderid", senderid},
         {"receiverid", receiverid},
         {"text", text},
-        {"status", status}
+        {"status", status},
+        {"time", time}
     };
     return j.dump();
 }

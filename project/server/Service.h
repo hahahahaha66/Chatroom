@@ -57,6 +57,7 @@ public:
     std::string FormatUpdateFriend(const Friend& userfriend);
     std::string FormatUpdateUserApply(const int& userid, const int& applyid);
     std::string FormatUqdateGroupApply(const int& groupid, const int& applyid);
+    std::string FormatUpdateMessage(const Message& message);
 
     //消息
     void ProcessMessage(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
@@ -107,7 +108,8 @@ private:
     std::unordered_map<int, std::unordered_map<int, Friend>> userfriendlist;
     std::unordered_map<int, User> userlist_;
     std::unordered_map<int, Group> grouplist_;
-    std::unordered_map<int, Message> messagelist_;
+    std::unordered_map<int, std::unordered_map<int, std::vector<Message>>> usermessage_;
+    std::unordered_map<int, std::vector<Message>> groupmessage_;
     std::unordered_map<uint16_t, MessageHander> handermap_;
 };
 

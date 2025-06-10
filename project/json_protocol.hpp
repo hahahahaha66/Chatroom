@@ -33,7 +33,7 @@ std::string js_data_userapply(const int& id, const int& userid, const int& apply
 //发送消息
 std::string js_SendMessage(const std::string type, const int& userid, const int& friendid, const std::string text);
 //存储消息
-std::string js_Message(const std::string& type, const int& senderid, const int& receiverid, const std::string& text, const std::string& status);
+std::string js_Message(const std::string& type, const int& senderid, const int& receiverid, const std::string& text, const std::string& status, std::string time);
 
 //打印用户信息
 std::string js_UserData(const int& userid, const std::string& username, const int& friendnum, const int& groupnum);

@@ -2,12 +2,10 @@
 #include "../json_protocol.hpp"
 #include "../entity/other.h"
 
-#include <cerrno>
 #include <chrono>
 #include <cstdint>
 #include <functional>
 #include <future>
-#include <locale>
 #include <memory>
 #include <mysql/mariadb_com.h>
 #include <mysql/mysql.h>
@@ -16,7 +14,6 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -110,18 +107,8 @@ void Service::ReadFriendFromDataBase()
         int friendid = row.GetInt("friendid");
         std::string status = row.GetString("Status");
 
-        userlist_[userid].AddFriend(friendid);
-        userlist_[userid].SetStatusFriend(friendid, status);
         userfriendlist[userid][friendid] = std::move(Friend(userid, friendid, status));
     });
-
-    for (auto& it : userlist_)
-    {
-        for (auto& fd : userlist_[it.first].GetFriendList())
-        {
-            it.second.SetFriendname(fd.first, userlist_[fd.first].GetUserName());
-        }
-    }
 
     for (auto& it : userlist_)
     {
@@ -200,24 +187,17 @@ void Service::ReadGroupUserFromDataBase()
 
 void Service::ReadMessageFromDataBase()
 {
-    std::string query = "select * from message;";
+    std::string query = "select * fron message order by timestamp asc;";
     ReadFromDataBase(query, [this](MysqlRow& row) {
         int messageid = row.GetInt("id");
         int senderid = row.GetInt("senderid");
-        int reveiverid = row.GetInt("receiverid");
+        int receiverid = row.GetInt("receiverid");
         std::string temp_type = row.GetString("type");
         std::string temp_status = row.GetString("status");
         std::string message = row.GetString("connect");
+        std::string time = row.GetString("timestamp");
         Message::Type type;
         Message::Status status;
-        if (temp_type == "Group")
-        {
-            type = Message::Type::Group;
-        }
-        else  
-        {
-            type = Message::Type::Private;
-        }
 
         if (temp_status == "read")
         {
@@ -228,7 +208,17 @@ void Service::ReadMessageFromDataBase()
             status = Message::Status::unread;
         }
 
-        messagelist_[messageid] = std::move(Message(senderid, reveiverid, message, status, type));
+        if (temp_type == "Group")
+        {
+            type = Message::Type::Group;
+            groupmessage_[receiverid].emplace_back(std::move(Message(senderid, receiverid, message, status, type, time)));
+        }
+        else  
+        {
+            type = Message::Type::Private;
+            usermessage_[senderid][receiverid].emplace_back(std::move(Message(senderid, receiverid, message, status, type, time)));
+        }
+
     });
 }
 
@@ -269,6 +259,16 @@ void Service::FlushToDataBase()
                 std::string sql = FormatUpdateFriend(userfriend);
                 conn.ExcuteUpdata(sql);
             }
+
+            for (auto& [friendid, message] : usermessage_[userid])
+            {
+
+                for (auto& it : message)
+                {
+                    std::string sql = FormatUpdateMessage(it);
+                    conn.ExcuteUpdata(sql);
+                }
+            }
         }
 
         for (auto& [groupid, group] : grouplist_)
@@ -286,6 +286,12 @@ void Service::FlushToDataBase()
             {
                 std::string sql_groupuser = FormatUpdateGroupUser(groupid, groupuser);
                 conn.ExcuteUpdata(sql_groupuser);
+            }
+
+            for (auto& message : groupmessage_[groupid])
+            {
+                std::string sql = FormatUpdateMessage(message);
+                conn.ExcuteUpdata(sql);
             }
         }
     });
@@ -352,6 +358,15 @@ std::string Service::FormatUqdateGroupApply(const int& groupid, const int& apply
     return oss.str();
 }
 
+std::string Service::FormatUpdateMessage(const Message& message)
+{
+    std::ostringstream oss;
+    oss << "replace into message (type, senderid, receiverid, connect, status, timestamp) values ("
+        << message.GetType() << message.senderid_ << message.receiverid_ 
+        << message.connect_ << message.GetStatus() << message.time_ << ") ;";
+    return oss.str();
+}
+
 void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
 {
     bool end = true;
@@ -367,6 +382,8 @@ void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, uint1
     end &= AssignIfPresent(js, "connect", connect);
     end &= AssignIfPresent(js, "status", status);
 
+    std::string time_ = time.toFormattedString();
+
     if (end)  
     {
         if (type == "private")
@@ -375,15 +392,23 @@ void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, uint1
             {
                 std::shared_ptr<TcpConnection> receiver_conn = userlist_[receiverid].GetConnection();
                 status = "read";
-                json reply_js = js_Message(type, senderid, receiverid, connect, status);
+                json reply_js = js_Message(type, senderid, receiverid, connect, status, time_);
                 uint16_t type = (end == true ? 1 : 0);
                 seq = 0;
                 receiver_conn->send(codec_.encode(reply_js, type, seq));
+
+                usermessage_[senderid][receiverid].emplace_back(std::move(Message(senderid, receiverid, connect, Message::Status::read, Message::Type::Private, time_)));
+                usermessage_[receiverid][senderid].emplace_back(std::move(Message(senderid, receiverid, connect, Message::Status::read, Message::Type::Private, time_)));
+            }
+            else  
+            {
+                usermessage_[senderid][receiverid].emplace_back(std::move(Message(senderid, receiverid, connect, Message::Status::read, Message::Type::Private, time_)));
+                usermessage_[receiverid][senderid].emplace_back(std::move(Message(senderid, receiverid, connect, Message::Status::unread, Message::Type::Private, time_)));
             }
         }        
         else if (type == "group")
         {
-            json reply_js = js_Message(type, senderid, receiverid, connect, status);
+            json reply_js = js_Message(type, senderid, receiverid, connect, status, time_);
             for (auto& it : grouplist_[receiverid].GetAllMembers())
             {
                 if (chatconnect_[it.first].type_ == ChatConnect::Type::Group && chatconnect_[it.first].peerid_ == receiverid)
@@ -393,6 +418,8 @@ void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, uint1
                     seq = 0;
                     receiver_conn->send(codec_.encode(reply_js, type, seq));
                 }
+
+                groupmessage_[receiverid].emplace_back(std::move(Message(senderid, receiverid, connect, Message::Status::unread, Message::Type::Private, time_)));
             }
         }        
         else  
@@ -403,7 +430,7 @@ void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, uint1
 
     if (end)
     {
-        json other_reply_js = js_CommandReply(true, "Message sent failed");
+        json other_reply_js = js_CommandReply(true, "Message sent successful");
         uint16_t type = (end == true ? 1 : 0);
         seq = 14;
         conn->send(codec_.encode(other_reply_js, type, seq));
@@ -415,18 +442,6 @@ void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, uint1
         seq = 14;
         conn->send(codec_.encode(other_reply_js, type, seq));
     }
-
-    if (end)
-    {
-        databasethreadpool_.EnqueueTask([type, senderid, receiverid, connect, status, this](MysqlConnection& conn) {
-            std::ostringstream sql;
-            sql << "insert into message (type, senderid, receiverid, connect, status) values ("
-                << Escape(type) << ", " << senderid << ", " << receiverid << ", " << Escape(connect) << ", "
-                << Escape(status) << ") ;";
-            conn.ExcuteUpdata(sql.str());
-        });
-    }
-
 }
 
 void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
@@ -466,7 +481,7 @@ void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, uint
 
     if (end)
     {
-        for (auto& it : userlist_[userid].GetFriendList())
+        for (auto& it : userfriendlist[userid])
         {
             userfriendlist[it.second.GetFriendId()][userid].SetOnline(true);
         }
@@ -474,7 +489,7 @@ void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, uint
 
     if (end)
     {
-        for (auto& it : userlist_[userid].GetFriendList())
+        for (auto& it : userfriendlist[userid])
         {
             friendlist[it.first] = it.second;
         }
@@ -586,50 +601,8 @@ void Service::GetUserChatInterface(const TcpConnectionPtr& conn, const json& js,
 
     end &= AssignIfPresent(js, "userid", userid);
     end &= AssignIfPresent(js, "friendid", friendid);
-
-    std::promise<std::vector<Message>> promise;
-    std::future<std::vector<Message>> result_future = promise.get_future();
     
-    databasethreadpool_.EnqueueTask([userid, friendid, end, p = std::move(promise), this](MysqlConnection& conn)mutable {
-        std::vector<Message> messages;
-
-        std::ostringstream sql;
-        sql << "select * from message where type = Private and ( ( senderid = " << userid 
-            << " and receiverid = " << friendid << " ) " << "or ( senderid = " << friendid
-            << " and receiverid = " << userid << " ) ) order by timestamp asc ;" ;
-        MYSQL_RES* res = conn.ExcuteQuery(sql.str());
-        if (!res)
-        {
-            p.set_value({});
-            end = false;
-            return;
-        }
-
-        MysqlResult result(res);
-        while (result.Next())
-        {
-            MysqlRow row = result.GetRow();
-            std::string type = row.GetString("type");
-            int senderid = row.GetInt("senderid");
-            int receiverid = row.GetInt("receiverid");
-            std::string connect = row.GetString("connect");
-            std::string status = row.GetString("status");
-
-            Message message_(senderid, receiverid, connect);
-            message_.type_ = Message::Type::Private;
-
-            if (status == "unread")
-                message_.status_ = Message::Status::unread;
-            else  
-                message_.status_ = Message::Status::read;
-
-            messages.push_back(std::move(message_));
-        }
-
-        return p.set_value(std::move(messages));
-    });
-
-    std::vector<Message> messages = result_future.get();
+    std::vector<Message> messages = usermessage_[userid][friendid];
 
     json result;
     result["message"] = json::array();
@@ -638,6 +611,7 @@ void Service::GetUserChatInterface(const TcpConnectionPtr& conn, const json& js,
     int senderid;
     int receiverid;
     std::string connect;
+    std::string time_;
     for (const auto& msg : messages)
     {
         if (msg.status_ == Message::Status::read)
@@ -648,9 +622,10 @@ void Service::GetUserChatInterface(const TcpConnectionPtr& conn, const json& js,
         type = "Private";
         senderid = msg.senderid_;
         receiverid = msg.receiverid_;
-        connect = msg.connect_;    
+        connect = msg.connect_;   
+        time_ = msg.time_; 
 
-        json one = js_Message(type, senderid, receiverid, connect, status);
+        json one = js_Message(type, senderid, receiverid, connect, status, time_);
         result["message"].push_back(one);
     }
 
@@ -669,49 +644,7 @@ void Service::GetGroupChatInterface(const TcpConnectionPtr& conn, const json& js
     end &= AssignIfPresent(js, "userid", userid);
     end &= AssignIfPresent(js, "groupid", groupid);
 
-    std::promise<std::vector<Message>> promise;
-    std::future<std::vector<Message>> result_future = promise.get_future();
-
-    databasethreadpool_.EnqueueTask([userid, groupid, end, p = std::move(promise), this](MysqlConnection& conn)mutable {
-        std::vector<Message> messages;
-
-        std::ostringstream sql;
-        sql << "select * from message where type = Group and receiverid = " << groupid
-            << " order by timestamp asc ;";
-        
-        MYSQL_RES* res = conn.ExcuteQuery(sql.str());
-        if (!res)
-        {
-            p.set_value({});
-            end = false;
-            return;
-        }
-
-        MysqlResult result(res);
-        while (result.Next())
-        {
-            MysqlRow row = result.GetRow();
-            std::string type = row.GetString("type");
-            int senderid = row.GetInt("senderid");
-            int receiverid = row.GetInt("receiverid");
-            std::string connect = row.GetString("connect");
-            std::string status = row.GetString("status");
-
-            Message message_(senderid, receiverid, connect);
-            message_.type_ = Message::Type::Group;
-
-            if (status == "unread")
-                message_.status_ = Message::Status::unread;
-            else  
-                message_.status_ = Message::Status::read;
-
-            messages.push_back(std::move(message_));
-        }
-        
-        return p.set_value(std::move(messages));
-    });
-
-    std::vector<Message> messages = result_future.get();
+    std::vector<Message> messages = groupmessage_[groupid];
 
     json result;
     result["message"] = json::array();
@@ -720,6 +653,7 @@ void Service::GetGroupChatInterface(const TcpConnectionPtr& conn, const json& js
     int senderid;
     int receiverid;
     std::string connect;
+    std::string time_;
     for (const auto& msg : messages)
     {
         if (msg.status_ == Message::Status::read)
@@ -731,8 +665,9 @@ void Service::GetGroupChatInterface(const TcpConnectionPtr& conn, const json& js
         senderid = msg.senderid_;
         receiverid = msg.receiverid_;
         connect = msg.connect_;    
+        time_ = msg.time_;
 
-        json one = js_Message(type, senderid, receiverid, connect, status);
+        json one = js_Message(type, senderid, receiverid, connect, status, time_);
         result["message"].push_back(one);
     }
 
@@ -752,8 +687,8 @@ void Service::DeleteFriend(const TcpConnectionPtr& conn, const json& js, uint16_
     end &= AssignIfPresent(js, "userid", userid);
     end &= AssignIfPresent(js, "friendid", friendid);
 
-    end &= userlist_[userid].DeleteFriend(friendid);
-    userfriendlist[userid].erase(friendid);
+    end &= userfriendlist[userid].erase(friendid);
+    end &= userfriendlist[friendid].erase(userid);
 
     if (end)
         result = "Delete successful!";
@@ -835,9 +770,7 @@ void Service::ProcessFriendApply(const TcpConnectionPtr& conn, const json& js, c
     userlist_[userid].DeleteApply(applicantid);
     if (real_result)
     {
-        userlist_[userid].AddFriend(applicantid);
         userfriendlist[userid][applicantid] = std::move(Friend(userid, applicantid));
-        userlist_[applicantid].AddFriend(userid);
         userfriendlist[applicantid][userid] = std::move(Friend(applicantid,userid));
     }
 
@@ -1099,10 +1032,6 @@ void Service::DeleteUserAccount(const TcpConnectionPtr& conn, const json& js, ui
 
     if (userlist_[userid].GetPassWord() == password)
     {
-        for (auto& it : userlist_[userid].GetFriendList())
-        {
-            userlist_[it.first].DeleteFriend(userid);
-        }
         
         for (auto& it : userlist_[userid].GetGroupList())
         {
@@ -1111,7 +1040,6 @@ void Service::DeleteUserAccount(const TcpConnectionPtr& conn, const json& js, ui
 
         for (auto& it : userfriendlist[userid])
         {
-            userlist_[it.second.GetFriendId()].DeleteFriend(userid);
             userfriendlist[it.second.GetFriendId()].erase(userid);
         }
         

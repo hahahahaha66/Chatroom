@@ -30,19 +30,49 @@ struct Message
     int receiverid_;
     std::string connect_;
     Status status_;
-    Message(int senderid, int receiverid, std::string connect)
+
+    std::string time_;
+
+    Message(int senderid, int receiverid, std::string connect, std::string time)
         : senderid_(senderid),
           receiverid_(receiverid),
-          connect_(connect)
+          connect_(connect),
+          time_(time)
     {
     }
 
-    Message(int senderid, int receiverid, std::string connect, Status, Type)
+    Message(int senderid, int receiverid, std::string connect, Status, Type, std::string time)
         : senderid_(senderid),
           receiverid_(receiverid),
-          connect_(connect)
+          connect_(connect),
+          time_(time)
     {
     }
+
+    std::string GetType() const
+    {
+        if (type_ == Type::Group)
+        {
+            return "Group";
+        }
+        else  
+        {
+            return "Private";
+        }
+    }
+
+    std::string GetStatus () const
+    {
+        if (status_ == Status::read)
+        {
+            return "read";
+        }
+        else  
+        {
+            return "unread";
+        }
+    }
+
 };
 
 #endif

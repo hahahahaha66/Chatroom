@@ -32,17 +32,6 @@ public:
     bool IsOnLine() const;
     std::shared_ptr<TcpConnection> GetConnection() const;
 
-    bool AddFriend(int friendid);
-    bool DeleteFriend(int friendid);
-    bool IsFriend(int friendid) const;
-    const std::unordered_map<int, Friend>& GetFriendList() const;
-
-    void SetFriendname(int friendid, std::string friendname);
-
-    void SetStatusFriend(int friendid, std::string& status);
-    bool IsBlockFriend(int blockuser) const;
-    const std::vector<int> GetBlockList() const;
-
     bool AddApply(int applicantid, std::string applyname);
     bool AddApplyId(int applicantid);
     void ApprovalApply(int userid, int applicantid);
@@ -62,7 +51,6 @@ private:
     bool online_ = false;
     std::shared_ptr<TcpConnection> conn_;
 
-    std::unordered_map<int, Friend> friendlist_;
     std::unordered_map<int, SimpUser> applylist_;
     std::unordered_set<int> grouplist_;
 };
