@@ -79,7 +79,18 @@ public:
 
     void CommandReply(const json& js, Timestamp time);
 
-
+    //处理刷新包
+    void RefreshFriendDelete(const json& js, Timestamp time);
+    void RefreshFriendBlock(const json& js, Timestamp time);
+    void RefreshFriendAddApply(const json& js, Timestamp time);
+    void RefreshGroupAddApply(const json& js, Timestamp time);
+    void RefreshGroupCreate(const json& js, Timestamp time);
+    void RefreshFriendApplyProcess(const json& js, Timestamp time);
+    void RefreshGroupApplyProcess(const json& js, Timestamp time);
+    void RefreshGroupQuitUser(const json& js, Timestamp time);
+    void RefreshGroupRemoveUser(const json& js, Timestamp time);
+    void RefreshGroupAddAdministrator(const json& js, Timestamp time);
+    void RefreshGroupRemoveAdministrator(const json& js, Timestamp time);
 
 private:
     Codec codec_;
@@ -90,7 +101,7 @@ private:
     std::string password;
     std::unordered_map<int, Friend> friendlist_;
     std::unordered_map<int, Group> grouplist_;
-    std::atomic<long> total_seq;
+    std::atomic<unsigned long> total_seq = 1;
 };
 
 #endif

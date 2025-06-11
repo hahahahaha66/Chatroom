@@ -230,26 +230,30 @@ void Clientservice::Back_GetPersonalChatHistory(const json& js, Timestamp time)
 {
     int senderid;  
     std::string connect;
+    std::string time_;
 
     for (const auto& it : js["message"])
     {
         AssignIfPresent(it, "senderid", senderid);
         AssignIfPresent(it, "connect", connect);
+        AssignIfPresent(it, "time", time_);
 
-        std::cout << friendlist_[senderid].GetFriendName() << " : " << connect << std::endl;
+        std::cout << time_ << " " << friendlist_[senderid].GetFriendName() << " : " << connect << std::endl;
     }
 }
 void Clientservice::Back_GetGroupChatHistory(const json& js, Timestamp time)
 {
     int senderid;  
     std::string connect;
+    std::string time_;
 
     for (const auto& it : js["message"])
     {
         AssignIfPresent(it, "senderid", senderid);
         AssignIfPresent(it, "connect", connect);
+        AssignIfPresent(it, "time", time_);
 
-        std::cout << friendlist_[senderid].GetFriendName() << " : " << connect << std::endl;
+        std::cout << time_ << " " << friendlist_[senderid].GetFriendName() << " : " << connect << std::endl;
     }
 }
 
@@ -322,4 +326,63 @@ void Clientservice::CommandReply(const json& js, Timestamp time)
     {
         std::cout << result << std::endl;
     }
+    else  
+    {
+        std::cout << "解析失败" << std::endl;
+    }
+}
+
+void Clientservice::RefreshFriendDelete(const json& js, Timestamp time)
+{
+
+}
+
+void Clientservice::RefreshFriendBlock(const json& js, Timestamp time)
+{
+
+}
+
+void Clientservice::RefreshFriendAddApply(const json& js, Timestamp time)
+{
+
+}
+
+void Clientservice::RefreshGroupAddApply(const json& js, Timestamp time)
+{
+
+}
+
+void Clientservice::RefreshGroupCreate(const json& js, Timestamp time)
+{
+
+}
+
+void Clientservice::RefreshFriendApplyProcess(const json& js, Timestamp time)
+{
+
+}
+
+void Clientservice::RefreshGroupApplyProcess(const json& js, Timestamp time)
+{
+
+}
+    
+void Clientservice::RefreshGroupQuitUser(const json& js, Timestamp time)
+{
+
+}
+    
+void Clientservice::RefreshGroupRemoveUser(const json& js, Timestamp time)
+{
+
+}
+    
+void Clientservice::RefreshGroupAddAdministrator(const json& js, Timestamp time)
+{
+
+}
+    
+void Clientservice::RefreshGroupRemoveAdministrator(const json& js, Timestamp time)
+{
+    
 }

@@ -1,5 +1,4 @@
 #include "User.h"
-#include "Friend.h"
 #include "other.h"
 #include <type_traits>
 #include <unordered_set>

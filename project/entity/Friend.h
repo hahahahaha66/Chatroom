@@ -17,13 +17,16 @@ public:
     std::string GetFriendName() const;
 
     void SetOnline(bool online);
-    bool GetOnline();
+    bool GetOnline() const;
 
     void SetFriendId(int friendid);
     int GetFriendId() const;
 
     void SetStatus(std::string status);
     std::string GetStatus() const;
+
+    void SetBlocked(bool block);
+    bool GetBlocked() const; 
 
 private:
     enum class Status  
@@ -34,6 +37,7 @@ private:
 
     std::string friendname_;
     bool online_ = false;
+    bool blocked_ = false;
     int userid_;
     int friendid_;
     Status status_;

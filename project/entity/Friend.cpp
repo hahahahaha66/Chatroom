@@ -44,7 +44,7 @@ void Friend::SetOnline(bool online)
     online_ = online;
 }
 
-bool Friend::GetOnline()
+bool Friend::GetOnline() const
 {
     return online_;
 }
@@ -81,4 +81,14 @@ std::string Friend::GetStatus() const
     {
         return "Normal";
     }
+}
+
+void Friend::SetBlocked(bool block)
+{
+    blocked_ = block;
+}
+
+bool Friend::GetBlocked() const
+{
+    return blocked_;
 }

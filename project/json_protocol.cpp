@@ -173,6 +173,7 @@ std::string js_UserAllData(const int& userid, const std::unordered_map<int, Frie
 {
     json j;
     j["userid"] = userid;
+    j["friends"] = json::array();
 
     for (const auto& [id, f] : friends)
     {
@@ -180,15 +181,18 @@ std::string js_UserAllData(const int& userid, const std::unordered_map<int, Frie
         jf["friendid"] = f.GetFriendId();
         jf["friendname"] = f.GetFriendName();
         jf["status"] = f.GetStatus();
-        jf["friends"].push_back(jf);
+        j["friends"].push_back(jf);
     }
+
+    j["groups"] = json::array();
 
     for (const auto& [id, g] : groups)
     {
         json jg;
         jg["groupid"] = g.GetGroupId();
         jg["groupname"] = g.GetGroupName();
-        
+        jg["members"] = json::array();
+
         for (const auto& [uid, user] : g.GetAllMembers())
         {
             json jm;
@@ -196,15 +200,17 @@ std::string js_UserAllData(const int& userid, const std::unordered_map<int, Frie
             jm["username"] = user.GetUserName();
             jm["role"] = user.GetRole();
             jm["muted"] = user.IsMuted();
-            jm["members"].push_back(jm);
+            jg["members"].push_back(jm);
         }
+
+        jg["apply"] = json::array();
 
         for (const auto& [uid, apply] : g.GetApplyList())
         {
             json ja;
             ja["applyid"] = apply.userid_;
             ja["applyname"] = apply.username_;
-            ja["apply"].push_back(ja);
+            jg["apply"].push_back(ja);
         }
         
         j["groups"].push_back(jg);
@@ -321,6 +327,26 @@ std::string js_GroupMemberList(const int& groupid, const std::vector<int>& membe
     json j = {
         {"groupid", groupid},
         {"memberlist", memberlist}
+    };
+    return j.dump();
+}
+
+std::string js_RefrushGroupCreate(const int& groupid, const std::string groupname, const std::unordered_map<int, GroupUser>& othermembers)
+{
+    json j;
+
+    j["groupid"] = groupid;
+    j["groupname"] = groupname;
+    j["member"] = json::array();
+
+    for (auto& [id, user] : othermembers)
+    {
+        json jm;
+        jm["userid"] = user.GetUserId();
+        jm["username"] = user.GetUserName();
+        jm["role"] = user.GetRole();
+        jm["muted"] = user.IsMuted();
+        j["members"].push_back(jm);
     };
     return j.dump();
 }

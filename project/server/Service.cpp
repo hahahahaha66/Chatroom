@@ -115,6 +115,10 @@ void Service::ReadFriendFromDataBase()
         for (auto& fd: userfriendlist[it.first])
         {
             fd.second.SetFriendName(userlist_[fd.second.GetFriendId()].GetUserName());
+            if (fd.second.GetStatus() == "Block")
+            {
+                userfriendlist[fd.first][it.first].SetBlocked(true);
+            }
         }
     }
 }
@@ -715,10 +719,12 @@ void Service::BlockFriend(const TcpConnectionPtr& conn, const json& js, uint16_t
     if (userfriendlist[userid][friendid].GetStatus() == "Block")
     {
         userfriendlist[userid][friendid].SetStatus("Normal");
+        userfriendlist[friendid][userid].SetBlocked(false);
     }
     else  
     {
         userfriendlist[userid][friendid].SetStatus("Block");
+        userfriendlist[friendid][userid].SetBlocked(true);
     }
 
     if (end)
@@ -826,10 +832,57 @@ void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js, uint16_t
     std::string groupname;
     int creatorid;
     std::vector<int> othermembers;
-    end &= AssignIfPresent(js, "userid", groupid);
+
     end &= AssignIfPresent(js, "groupname", groupname);
     end &= AssignIfPresent(js, "creatorid", creatorid);
     end &= AssignIfPresent(js, "othermember", othermembers);
+
+    std::promise<int> promise;
+    std::future<int> result_future = promise.get_future();
+
+    if (end)
+    {
+        //检查数据库中有无已创建的账号，有返回false，没有则写入返回true
+        databasethreadpool_.EnqueueTask([groupname, creatorid, othermembers, p = std::move(promise)](MysqlConnection& conn)mutable {
+            std::string insert_sql = "insert into groups groupname value " + groupname + " ;";
+            if (!conn.ExcuteQuery(insert_sql)) 
+            {
+                p.set_value(-3);
+                return;
+            }
+
+            MYSQL_RES* idres = conn.ExcuteQuery("select last_insert_id() as is");
+            if (!idres)
+            {
+                p.set_value(-4);
+                return;
+            }
+
+            int groupid;
+            MysqlResult id_result(idres);
+            if (id_result.Next())
+            {
+                MysqlRow row = id_result.GetRow();
+                groupid = row.GetInt("id");
+                p.set_value(groupid);
+            }
+            else  
+            {
+                p.set_value(-5);
+            }
+
+            insert_sql = "insert into groupuser (id, groupid, level) value (" + std::to_string(creatorid) + 
+                         " , " +  std::to_string(groupid) + " , " + "Group_owner" + ") ;";
+
+            for (auto& it : othermembers)
+            {
+                 insert_sql = "insert into groupuser (id, groupid, level) value (" + std::to_string(it) + 
+                         " , " +  std::to_string(groupid) + " , " + "Member" + ") ;";
+            }
+        });
+    }
+
+    groupid = result_future.get();
 
     grouplist_[groupid] = {groupid, groupname};
     grouplist_[groupid].AddMember(std::move(GroupUser(creatorid, "Group_owner")));
@@ -1106,4 +1159,161 @@ void Service::UpdatedUserInterface(const TcpConnectionPtr& conn, const json& js,
     uint16_t type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
+}
+
+void Service::RefreshFriendDelete(int userid, int friendid, Timestamp time)
+{
+    if (userlist_[friendid].IsOnLine())
+    {
+        TcpConnectionPtr conn = userlist_[friendid].GetConnection();
+        json reply_js = js_UserWithFriend(userid, friendid);
+
+        conn->send(codec_.encode(reply_js, 1, -1));
+    }
+}
+
+void Service::RefreshFriendBlock(int userid, int friendid, Timestamp time)
+{
+    if (userlist_[friendid].IsOnLine())
+    {
+        TcpConnectionPtr conn = userlist_[friendid].GetConnection();
+        json reply_js = js_UserWithFriend(userid, friendid);
+
+        conn->send(codec_.encode(reply_js, 1, -2));
+    }
+}
+
+void Service::RefreshFriendAddApply(int userid, int friendid, Timestamp time)
+{
+    if (userlist_[friendid].IsOnLine())
+    {
+        TcpConnectionPtr conn = userlist_[friendid].GetConnection();
+        json reply_js = js_UserWithFriend(userid, friendid);
+
+        conn->send(codec_.encode(reply_js, 1, -3));   
+    }
+}
+
+void Service::RefreshGroupAddApply(int groupid, int userid, Timestamp time)
+{
+    TcpConnectionPtr conn;
+
+    for (auto& it : grouplist_[groupid].GetAllMembers())
+    {
+        if (userlist_[it.first].IsOnLine())
+        {
+            conn = userlist_[it.first].GetConnection();
+            json reply_js = js_GroupData(groupid, userid);
+
+            conn->send(codec_.encode(reply_js, 1, -4));
+        }
+    }
+}
+
+void Service::RefreshGroupCreate(int groupid, Timestamp time)
+{
+    TcpConnectionPtr conn;
+    std::string groupname = grouplist_[groupid].GetGroupName();
+    std::unordered_map<int, GroupUser> othermember = grouplist_[groupid].GetAllMembers();
+    
+    for (auto& it : grouplist_[groupid].GetAllMembers())
+    {
+        if (userlist_[it.first].IsOnLine())
+        {
+            conn = userlist_[it.first].GetConnection();
+            json reply_js = js_RefrushGroupCreate(groupid, groupname, othermember);
+
+            conn->send(codec_.encode(reply_js, 1, -5));
+        }
+    }
+}
+
+void Service::RefreshFriendApplyProcess(int userid, int friendid, bool result, Timestamp time)
+{
+    if (userlist_[friendid].IsOnLine())
+    {
+        TcpConnectionPtr conn = userlist_[friendid].GetConnection();
+
+        json reply_js = js_ApplyResult(userid, friendid, result);
+        conn->send(codec_.encode(reply_js, 1, -6));
+    }
+}
+
+void Service::RefreshGroupApplyProcess(int groupid, int userid, bool result, Timestamp time)
+{
+    TcpConnectionPtr conn;
+
+    for (auto& it : grouplist_[groupid].GetAllMembers())
+    {
+        if (userlist_[it.first].IsOnLine())
+        {
+            conn = userlist_[it.first].GetConnection();
+            json reply_js = js_ApplyResult(groupid, userid, result);
+            conn->send(codec_.encode(reply_js, 1, -8));
+        }
+    }
+}
+
+void Service::RefreshGroupQuitUser(int groupid, int userid, Timestamp time)
+{
+    TcpConnectionPtr conn;
+
+    for (auto& it : grouplist_[groupid].GetAllMembers())
+    {
+        if (userlist_[it.first].IsOnLine())
+        {
+            conn = userlist_[it.first].GetConnection();
+            json reply_js = js_GroupData(groupid, userid);
+
+            conn->send(codec_.encode(reply_js, 1, -8));
+        }
+    }
+}
+
+void Service::RefreshGroupRemoveUser(int groupid, int userid, Timestamp time)
+{
+    TcpConnectionPtr conn;
+
+    for (auto& it : grouplist_[groupid].GetAllMembers())
+    {
+        if (userlist_[it.first].IsOnLine())
+        {
+            conn = userlist_[it.first].GetConnection();
+            json reply_js = js_GroupData(groupid, userid);
+
+            conn->send(codec_.encode(reply_js, 1, -9));
+        }
+    }
+}
+
+void Service::RefreshGroupAddAdministrator(int groupid, int userid, Timestamp time)
+{
+    TcpConnectionPtr conn;
+
+    for (auto& it : grouplist_[groupid].GetAllMembers())
+    {
+        if (userlist_[it.first].IsOnLine())
+        {
+            conn = userlist_[it.first].GetConnection();
+            json reply_js = js_GroupData(groupid, userid);
+
+            conn->send(codec_.encode(reply_js, 1, -10));
+        }
+    }
+}
+
+void Service::RefreshGroupRemoveAdministrator(int groupid, int userid, Timestamp time)
+{
+    TcpConnectionPtr conn;
+
+    for (auto& it : grouplist_[groupid].GetAllMembers())
+    {
+        if (userlist_[it.first].IsOnLine())
+        {
+            conn = userlist_[it.first].GetConnection();
+            json reply_js = js_GroupData(groupid, userid);
+
+            conn->send(codec_.encode(reply_js, 1, -11));
+        }
+    }
 }

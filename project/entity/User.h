@@ -3,7 +3,6 @@
 
 #include "../muduo/net/tcp/TcpConnection.h"
 #include "GroupUser.h"
-#include "Friend.h"
 #include "other.h"
 
 #include <memory>

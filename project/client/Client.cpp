@@ -55,7 +55,13 @@ void Client::MessageCallback(const TcpConnectionPtr& conn, Buffer* buf, Timestam
 
     if (seq == 0)
     {
+        //处理消息的刷新包
 
+    }
+    else if (seq < 0)
+    {
+        //处理其他逻辑的刷新包
+        
     }
     else  
     {

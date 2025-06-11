@@ -94,6 +94,17 @@ public:
     void UpdatedUserInterface(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
 
     //刷新机制
+    void RefreshFriendDelete(int userid, int friendid, Timestamp time);
+    void RefreshFriendBlock(int userid, int friendid, Timestamp time);
+    void RefreshFriendAddApply(int userid, int friendid, Timestamp time);
+    void RefreshGroupAddApply(int groupid, int userid, Timestamp time);
+    void RefreshGroupCreate(int groupid, Timestamp time);
+    void RefreshFriendApplyProcess(int userid, int friendid, bool result, Timestamp time);
+    void RefreshGroupApplyProcess(int groupid, int userid, bool result, Timestamp time);
+    void RefreshGroupQuitUser(int groupid, int userid, Timestamp time);
+    void RefreshGroupRemoveUser(int groupid, int userid, Timestamp time);
+    void RefreshGroupAddAdministrator(int groupid, int userid, Timestamp time);
+    void RefreshGroupRemoveAdministrator(int groupid, int userid, Timestamp time);
 
 private:
     void ReadFromDataBase(const std::string& query, std::function<void(MysqlRow&)> rowprocessor);

@@ -3,6 +3,7 @@
 
 #include "entity/Friend.h"
 #include "entity/Group.h"
+#include "entity/GroupUser.h"
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
@@ -71,6 +72,8 @@ std::string js_GroupCreateData(const std::string groupname, const int& creator, 
 std::string js_GroupData(const int& groupid, const int& userid);
 //群聊成员列表
 std::string js_GroupMemberList(const int& groupid, const std::vector<int>& memberlist);
+//刷新群聊创建
+std::string js_RefrushGroupCreate(const int& groupid, const std::string groupname, const std::unordered_map<int, GroupUser>& othermembers);
 
 //更新用户界面信息
 std::string js_UserInterface(const int& userid, const int& peeid, const std::string& type);
