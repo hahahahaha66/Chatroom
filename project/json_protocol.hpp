@@ -4,6 +4,7 @@
 #include "entity/Friend.h"
 #include "entity/Group.h"
 #include "entity/GroupUser.h"
+#include "entity/other.h"
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
@@ -45,7 +46,7 @@ std::string js_UserId(const int& userid);
 //登陆
 std::string js_Login(const std::string username, const std::string password);
 //登陆后放在客户端缓存的数据包
-std::string js_UserAllData(const int& userid, const std::unordered_map<int, Friend>, const std::unordered_map<int, Group>);
+std::string js_UserAllData(const int& userid, const std::unordered_map<int, Friend>& friends, const std::unordered_map<int, Group>& groups, const std::unordered_map<int, SimpUser>& friendapplyllist);
 //用户
 std::string js_User(const int& userid, const std::string& username);
 
@@ -75,15 +76,21 @@ std::string js_GroupMemberList(const int& groupid, const std::vector<int>& membe
 //刷新群聊创建
 std::string js_RefrushGroupCreate(const int& groupid, const std::string groupname, const std::unordered_map<int, GroupUser>& othermembers);
 
+//通用申请
+std::string js_Apply(const int& userid, const int& applyid, const std::string& applyname);
+
 //更新用户界面信息
 std::string js_UserInterface(const int& userid, const int& peeid, const std::string& type);
 
 //用于申请列表
 std::string js_UserList(const std::vector<int>& userlist);
+//用户申请
+std::string js_UserApply(const int& userid, const int& applicantid, bool result);
 //申请结果
-std::string js_ApplyResult(const int& userid, const int& applicantid, bool result);
+std::string js_ApplyResult(const int& userid, const int& applicantid, const std::string applicantname, bool result);
 
 //回复
+std::string js_CommandReplyWithData(const std::string& json_str, const bool& end, const std::string& result);
 std::string js_CommandReply(const bool& end, const std::string& result);
 
 //提取json变量

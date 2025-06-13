@@ -453,6 +453,7 @@ void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, uint
     bool end = true;
     std::unordered_map<int, Friend> friendlist;
     std::unordered_map<int, Group> grouplist;
+    std::unordered_map<int, SimpUser> friendapplylist;
 
     std::string username;
     std::string password;
@@ -504,7 +505,12 @@ void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, uint
         }
     }
 
-    json all_friend = js_UserAllData(userid, friendlist, grouplist);
+    if (end)
+    {
+        friendapplylist = userlist_[userid].GetApplyList();
+    }
+
+    json all_friend = js_UserAllData(userid, friendlist, grouplist, friendapplylist);
     conn->send(codec_.encode(all_friend, type, seq));
 }
 
@@ -699,7 +705,10 @@ void Service::DeleteFriend(const TcpConnectionPtr& conn, const json& js, uint16_
     else  
         result = "Delete failed!";
 
-    json reply_js = js_CommandReply(end, result);
+    json data = js_UserWithFriend(userid, friendid);
+
+    std::string json_str = data.dump();
+    json reply_js = js_CommandReplyWithData(json_str, end, result);
     uint16_t type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
@@ -732,7 +741,10 @@ void Service::BlockFriend(const TcpConnectionPtr& conn, const json& js, uint16_t
     else  
         result = "Block failed!";
 
-    json reply_js = js_CommandReply(end, result);
+    json data = js_UserWithFriend(userid, friendid);
+
+    std::string json_str = data.dump();
+    json reply_js = js_CommandReplyWithData(json_str, end, result);
     uint16_t type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
@@ -785,7 +797,10 @@ void Service::ProcessFriendApply(const TcpConnectionPtr& conn, const json& js, c
     else  
         result = "Process apply failed!";
 
-    json reply_js = js_CommandReply(end, result);
+    json data = js_ApplyResult(userid, applicantid, userlist_[applicantid].GetUserName(), real_result);
+
+    std::string json_str = data.dump();
+    json reply_js = js_CommandReplyWithData(json_str, end, result);
     uint16_t type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
@@ -1188,7 +1203,7 @@ void Service::RefreshFriendAddApply(int userid, int friendid, Timestamp time)
     if (userlist_[friendid].IsOnLine())
     {
         TcpConnectionPtr conn = userlist_[friendid].GetConnection();
-        json reply_js = js_UserWithFriend(userid, friendid);
+        json reply_js = js_Apply(friendid, userid, userlist_[userid].GetUserName());
 
         conn->send(codec_.encode(reply_js, 1, -3));   
     }
@@ -1203,7 +1218,7 @@ void Service::RefreshGroupAddApply(int groupid, int userid, Timestamp time)
         if (userlist_[it.first].IsOnLine())
         {
             conn = userlist_[it.first].GetConnection();
-            json reply_js = js_GroupData(groupid, userid);
+            json reply_js = js_Apply(groupid, userid, userlist_[userid].GetUserName());
 
             conn->send(codec_.encode(reply_js, 1, -4));
         }
@@ -1234,7 +1249,7 @@ void Service::RefreshFriendApplyProcess(int userid, int friendid, bool result, T
     {
         TcpConnectionPtr conn = userlist_[friendid].GetConnection();
 
-        json reply_js = js_ApplyResult(userid, friendid, result);
+        json reply_js = js_ApplyResult(friendid, userid, userlist_[userid].GetUserName(), result);
         conn->send(codec_.encode(reply_js, 1, -6));
     }
 }
@@ -1248,7 +1263,7 @@ void Service::RefreshGroupApplyProcess(int groupid, int userid, bool result, Tim
         if (userlist_[it.first].IsOnLine())
         {
             conn = userlist_[it.first].GetConnection();
-            json reply_js = js_ApplyResult(groupid, userid, result);
+            json reply_js = js_ApplyResult(groupid, userid, userlist_[userid].GetUserName(), result);
             conn->send(codec_.encode(reply_js, 1, -8));
         }
     }

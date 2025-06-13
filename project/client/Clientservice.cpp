@@ -1,5 +1,7 @@
 #include "Clientservice.h"
 
+#include <unordered_map>
+
 //消息
 void Clientservice::SendToFriend(const TcpConnectionPtr& conn, const int& userid, const int& friendid, const std::string& message, const uint16_t seq)
 {
@@ -51,12 +53,12 @@ void Clientservice::SendGroupRequest(const TcpConnectionPtr& conn, const int& us
 //处理加好友和加群请求
 void Clientservice::ProcessingFriendRequest(const TcpConnectionPtr& conn, const int& userid, const int& friendid, bool result, const uint16_t seq)
 {
-    json j = js_ApplyResult(userid, friendid, result);
+    json j = js_UserApply(userid, friendid, result);
     conn->send(codec_.encode(j, 8, seq));
 }
 void Clientservice::ProcessingGroupRequest(const TcpConnectionPtr& conn, const int& groupid, const int& userid, bool result, const uint16_t seq)
 {
-    json j = js_ApplyResult(groupid, userid, result);
+    json j = js_UserApply(groupid, userid, result);
     conn->send(codec_.encode(j, 9, seq));
 }
 
@@ -106,9 +108,11 @@ void Clientservice::RemoveAdministrator(const TcpConnectionPtr& conn, const int&
 
 void Clientservice::UpdatedUserInterface(const TcpConnectionPtr& conn, int& peeid, std::string& type, const uint16_t seq)
 {
-    json j = js_UserInterface(userid, peeid, type);
+    json j = js_UserInterface(userid_, peeid, type);
     conn->send(codec_.encode(j, 19, seq));
 }
+
+
 
 //消息回调
 void Clientservice::Back_SendToFriend(const json& js, Timestamp time)
@@ -153,62 +157,82 @@ void Clientservice::Back_LoginRequest(const json& js, Timestamp time)
 {
     bool end = true;
 
-    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "userid", userid_);
 
     int friendid;
     std::string friendname;
     std::string status;
 
-    for (const auto& jf : js["friends"])
+    if (end)
     {
-        end &= AssignIfPresent(jf, "friendid", friendid);
-        end &= AssignIfPresent(jf, "friendname", friendname);
-        end &= AssignIfPresent(jf, "status", status);
+        for (const auto& jf : js["friends"])
+        {
+            end &= AssignIfPresent(jf, "friendid", friendid);
+            end &= AssignIfPresent(jf, "friendname", friendname);
+            end &= AssignIfPresent(jf, "status", status);
 
-        Friend f(userid, friendname, friendid, status);
+            Friend f(userid_, friendname, friendid, status);
 
-        friendlist_[friendid] = f;
+            friendlist_[friendid] = f;
+        }
     }
 
     int groupid;
     std::string groupname;
 
-    for (const auto& jg : js["groups"])
+    if (end)
     {
-        end &= AssignIfPresent(jg, "groupid", groupid);
-        end &= AssignIfPresent(jg, "groupname", groupname);
-
-        Group g(groupid, groupname);
-
-        int uid;
-        std::string username;
-        std::string role;
-        bool muted;
-        for (const auto& jm : jg["members"])
+        for (const auto& jg : js["groups"])
         {
-            end &= AssignIfPresent(jm, "uid", uid);
-            end &= AssignIfPresent(jm, "username", username);
-            end &= AssignIfPresent(jm, "role", role);
-            end &= AssignIfPresent(jm, "muted", muted);
+            end &= AssignIfPresent(jg, "groupid", groupid);
+            end &= AssignIfPresent(jg, "groupname", groupname);
 
-            GroupUser gu(uid, role);
-            gu.SetMuted(muted);
-            gu.SetUserName(username);
+            Group g(groupid, groupname);
 
-            g.AddMember(gu);
+            int uid;
+            std::string username;
+            std::string role;
+            bool muted;
+            for (const auto& jm : jg["members"])
+            {
+                end &= AssignIfPresent(jm, "uid", uid);
+                end &= AssignIfPresent(jm, "username", username);
+                end &= AssignIfPresent(jm, "role", role);
+                end &= AssignIfPresent(jm, "muted", muted);
+
+                GroupUser gu(uid, role);
+                gu.SetMuted(muted);
+                gu.SetUserName(username);
+
+                g.AddMember(gu);
+            }
+
+            int applyid;
+            std::string applyname;
+            for (const auto& ja : jg["apply"])
+            {
+                end &= AssignIfPresent(ja, "applyid", applyid);
+                end &= AssignIfPresent(ja, "applyname", applyname);
+
+                g.AddApply(applyid, applyname);
+            }
+
+            grouplist_[groupid] = g;
         }
+    }
 
-        int applyid;
-        std::string applyname;
-        for (const auto& ja : jg["apply"])
+    if (end)
+    {
+        for (auto& ja : js["friendapplylist"])
         {
+            int applyid;
+            std::string applyname;
+
             end &= AssignIfPresent(ja, "applyid", applyid);
             end &= AssignIfPresent(ja, "applyname", applyname);
 
-            g.AddApply(applyid, applyname);
+            friendapplylist[applyid] = std::move(SimpUser(applyid, applyname));
         }
-
-        grouplist_[groupid] = g;
     }
 
     if (end)
@@ -244,6 +268,7 @@ void Clientservice::Back_GetPersonalChatHistory(const json& js, Timestamp time)
 void Clientservice::Back_GetGroupChatHistory(const json& js, Timestamp time)
 {
     int senderid;  
+    int receiverid;
     std::string connect;
     std::string time_;
 
@@ -252,8 +277,9 @@ void Clientservice::Back_GetGroupChatHistory(const json& js, Timestamp time)
         AssignIfPresent(it, "senderid", senderid);
         AssignIfPresent(it, "connect", connect);
         AssignIfPresent(it, "time", time_);
+        AssignIfPresent(it, "receiverid", receiverid);
 
-        std::cout << time_ << " " << friendlist_[senderid].GetFriendName() << " : " << connect << std::endl;
+        std::cout << time_ << " " << grouplist_[receiverid].GetMember(senderid)->GetUserName() << " : " << connect << std::endl;
     }
 }
 
@@ -270,7 +296,32 @@ void Clientservice::Back_SendGroupRequest(const json& js, Timestamp time)
 //处理申请回调
 void Clientservice::ProcessingFriendRequest(const json& js, Timestamp time)
 {
-    CommandReply(js, time);
+    bool end = true;
+    std::string json_dump;
+    end &= AssignIfPresent(js, "json_dump", json_dump);
+    json data = json::parse(json_dump);
+
+    int userid;
+    int applicantid;
+    std::string applicantname;
+    bool result;
+    end &= AssignIfPresent(data, "userid", userid);
+    end &= AssignIfPresent(data, "applicantid", applicantid);
+    end &= AssignIfPresent(data, "applicantname", applicantname);
+    end &= AssignIfPresent(data, "result", result);
+
+    if (CommandReply(js, time) && userid ==userid_ && end)
+    {
+        friendapplylist.erase(applicantid);
+        if (result)
+        {
+            friendlist_[applicantid] = std::move(Friend(userid, applicantid, applicantname));
+        }            
+    }
+    else
+    {
+        std::cout << "Wrong happened" << std::endl;
+    }
 }
 void Clientservice::ProcessingGroupRequest(const json& js, Timestamp time)
 {
@@ -280,11 +331,52 @@ void Clientservice::ProcessingGroupRequest(const json& js, Timestamp time)
 //好友相关回调
 void Clientservice::Back_BlockFriend(const json& js, Timestamp time)
 {
-    CommandReply(js, time);
+    bool end = true;
+    std::string json_dump;
+    end &= AssignIfPresent(js, "json_dump", json_dump);
+    json data = json::parse(json_dump);
+
+    int userid;
+    int friendid;
+    end &= AssignIfPresent(data, "userid", userid);
+    end &= AssignIfPresent(data, "friendid", friendid);
+
+    if (CommandReply(js, time) && userid ==userid_ && end)
+    {
+        if (friendlist_[friendid].GetBlocked())
+        {
+            friendlist_[friendid].SetBlocked(false);
+        }
+        else  
+        {
+            friendlist_[friendid].SetBlocked(true);
+        }
+    }
+    else
+    {
+        std::cout << "Wrong happened" << std::endl;
+    }
 }
 void Clientservice::Back_DeleteFriend(const json& js, Timestamp time)
 {
-    CommandReply(js, time);
+    bool end = true;
+    std::string json_dump;
+    end &= AssignIfPresent(js, "json_dump", json_dump);
+    json data = json::parse(json_dump);
+
+    int userid;
+    int friendid;
+    end &= AssignIfPresent(data, "userid", userid);
+    end &= AssignIfPresent(data, "friendid", friendid);
+
+    if (CommandReply(js, time) && userid ==userid_ && end)
+    {
+        friendlist_.erase(userid);
+    }
+    else
+    {
+        std::cout << "Wrong happened" << std::endl;
+    }
 }
     
 //群聊相关回调
@@ -313,7 +405,7 @@ void Clientservice::Back_DeleteGroup(const json& js, Timestamp time)
 
 }
 
-void Clientservice::CommandReply(const json& js, Timestamp time)
+bool Clientservice::CommandReply(const json& js, Timestamp time)
 {
     bool state = true;
 
@@ -330,59 +422,329 @@ void Clientservice::CommandReply(const json& js, Timestamp time)
     {
         std::cout << "解析失败" << std::endl;
     }
+
+    return state && end;
+}
+
+void Clientservice::RefreshMessage(const json& js, Timestamp time)
+{
+    bool end = true;
+
+    std::string type;
+    int senderid;
+    int receiverid;
+    std::string connect;
+    std::string status;
+    std::string time_;
+    end &= AssignIfPresent(js, "type", type);
+    end &= AssignIfPresent(js, "senderid", senderid);
+    end &= AssignIfPresent(js, "receiverid", receiverid);
+    end &= AssignIfPresent(js, "connect", connect);
+    end &= AssignIfPresent(js, "status", status);
+    end &= AssignIfPresent(js, "time", time_);
+
+    if (end)
+    {
+        if (type == "Private")
+        {
+            std::cout << time_ << " " << friendlist_[senderid].GetFriendName() << " : " << connect << std::endl;
+        }
+        else if (type == "Group")
+        {
+            std::cout << time_ << " " << grouplist_[receiverid].GetMember(senderid)->GetUserName() << " : " << connect << std::endl;
+        }
+    }
+    else 
+    {
+        std::cout << "Wrong happened" << std::endl;
+    }
 }
 
 void Clientservice::RefreshFriendDelete(const json& js, Timestamp time)
 {
+    bool end = true;
 
+    int userid;
+    int friendid;
+
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "friendid", friendid);
+
+    if (end)
+    {
+        friendlist_.erase(userid);
+    }
+    else 
+    {
+        std::cout << "Wrong happened" << std::endl;
+    }
 }
 
 void Clientservice::RefreshFriendBlock(const json& js, Timestamp time)
 {
+    bool end = true;
 
+    int userid;
+    int friendid;
+
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "friendid", friendid);
+
+    if (end)
+    {
+        friendlist_[userid].SetBlocked(true);
+    }
+    else 
+    {
+        std::cout << "Wrong happened" << std::endl;
+    }
 }
 
 void Clientservice::RefreshFriendAddApply(const json& js, Timestamp time)
 {
+    bool end = true;
 
+    int userid;
+    int friendid;
+    std::string friendname;
+
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "applyid", friendid);
+    end &= AssignIfPresent(js, "applyname", friendname);
+    if (end)
+    {
+        if (userid == userid_)
+        {
+            friendapplylist[friendid] = std::move(SimpUser(friendid, friendname));
+        }
+        else  
+        {
+            std::cout << "Wrong happened" << std::endl;
+        }
+    }
+    else  
+    {
+        std::cout << "Wrong happened" << std::endl;
+    }
 }
 
 void Clientservice::RefreshGroupAddApply(const json& js, Timestamp time)
 {
+    bool end = true;
 
+    int groupid;
+    int userid;
+    std::string username;
+
+    end &= AssignIfPresent(js, "userid", groupid);
+    end &= AssignIfPresent(js, "applyid", userid);
+    end &= AssignIfPresent(js, "applyname", username);
+
+    if (end)
+    {
+        grouplist_[groupid].AddApply(userid, username);
+    }
+    else 
+    {
+        std::cout << "Wrong happened" << std::endl;
+    }
 }
 
 void Clientservice::RefreshGroupCreate(const json& js, Timestamp time)
 {
+    bool end = true;
+
+    int groupid;
+    std::string groupname;
+
+    end &= AssignIfPresent(js, "groupid", groupid);
+    end &= AssignIfPresent(js, "groupname", groupname);
+
+    if (end)
+        grouplist_[groupid] = std::move(Group(groupid, groupname));
+    else  
+        std::cout << "Wrong happened" << std::endl;
+
+    int userid; 
+    std::string username;
+    std::string userrole;
+    bool usermuted;
+    for (auto& it : js["members"])
+    {
+        end &= AssignIfPresent(it, "userid", userid);
+        end &= AssignIfPresent(it, "username", username);
+        end &= AssignIfPresent(it, "role", userrole);
+        end &= AssignIfPresent(it, "muted", usermuted);
+
+        if (end)
+        {
+            grouplist_[groupid].AddMember(std::move(GroupUser(userid, userrole)));
+            grouplist_[groupid].GetMember(userid)->SetUserName(username);
+            grouplist_[groupid].GetMember(userid)->SetMuted(usermuted);
+        }
+        else 
+        {
+            std::cout << "Wrong happened" << std::endl;
+        }
+        
+    }
 
 }
 
 void Clientservice::RefreshFriendApplyProcess(const json& js, Timestamp time)
 {
+    bool end = true;
 
+    int userid;
+    int applyid;
+    std::string applyname;
+    bool result;
+
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "applicantid", applyid);
+    end &= AssignIfPresent(js, "applicantname", applyname);
+    end &= AssignIfPresent(js, "result", result);
+
+    if (end)
+    {
+        if (userid == userid_)
+        {
+            friendapplylist.erase(applyid);
+            if (result)
+            {
+                friendlist_[applyid] = std::move(Friend(userid, applyid, applyname));
+            }
+        }
+        
+    }
+    else 
+    {
+        std::cout << "Wrong happened" << std::endl;
+    }
 }
 
 void Clientservice::RefreshGroupApplyProcess(const json& js, Timestamp time)
 {
+    bool end = true;
 
+    int groupid;
+    int applyid;
+    std::string applyname;
+    bool result;
+
+    end &= AssignIfPresent(js, "userid", groupid);
+    end &= AssignIfPresent(js, "applicantid", applyid);
+    end &= AssignIfPresent(js, "applicantname", applyname);
+    end &= AssignIfPresent(js, "result", result);
+
+    if (end)
+    {
+        if (result)
+        {
+            grouplist_[groupid].ApprovalApply(applyid);
+            grouplist_[groupid].GetMember(applyid)->SetUserName(applyname);
+        }
+        else  
+        {
+            grouplist_[groupid].DeleteApply(applyid);
+        }
+    }
+    else 
+    {
+        std::cout << "Wrong happened" << std::endl;
+    }
 }
     
 void Clientservice::RefreshGroupQuitUser(const json& js, Timestamp time)
 {
+    bool end = true;
 
+    int userid;
+    int groupid;
+
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "groupid", groupid);
+
+    if (end)
+    {
+        if (userid == userid_)
+        {
+            grouplist_.erase(groupid);
+        }
+        else  
+        {
+            grouplist_[groupid].RemoveMember(userid);
+        }
+    }
+    else 
+    {
+        std::cout << "Wrong happened" << std::endl;
+    }
 }
     
 void Clientservice::RefreshGroupRemoveUser(const json& js, Timestamp time)
 {
+    bool end = true;
 
+    int userid;
+    int groupid;
+
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "groupid", groupid);
+
+    if (end)
+    {
+        if (userid == userid_)
+        {
+            grouplist_.erase(groupid);
+        }
+        else  
+        {
+            grouplist_[groupid].RemoveMember(userid);
+        }
+    }
+    else  
+    {
+        std::cout << "Wrong happened" << std::endl;
+    }
 }
     
 void Clientservice::RefreshGroupAddAdministrator(const json& js, Timestamp time)
 {
+    bool end = true;
 
+    int userid;
+    int groupid;
+
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "groupid", groupid);
+
+    if (end)
+    {
+        grouplist_[groupid].GetMember(userid)->SetRole("Administrator");
+    }
+    else  
+    {
+        std::cout << "Wrong happened" << std::endl;
+    }
 }
     
 void Clientservice::RefreshGroupRemoveAdministrator(const json& js, Timestamp time)
 {
-    
+    bool end = true;
+
+    int userid;
+    int groupid;
+
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "groupid", groupid);
+
+    if (end)
+    {
+        grouplist_[groupid].GetMember(userid)->SetRole("Member");
+    }
+    else  
+    {
+        std::cout << "Wrong happened" << std::endl;
+    }
 }

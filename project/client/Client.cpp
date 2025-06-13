@@ -56,12 +56,49 @@ void Client::MessageCallback(const TcpConnectionPtr& conn, Buffer* buf, Timestam
     if (seq == 0)
     {
         //处理消息的刷新包
-
+        clientservice_.RefreshMessage(js, time);
     }
     else if (seq < 0)
     {
         //处理其他逻辑的刷新包
-        
+        switch (seq) 
+        {
+            case -1 :
+                clientservice_.RefreshFriendDelete(js, time);
+            break;
+            case -2 :
+                clientservice_.RefreshFriendBlock(js, time);
+            break;
+            case -3 :
+                clientservice_.RefreshFriendAddApply(js, time);
+            break;
+            case -4 :
+                clientservice_.RefreshGroupAddApply(js, time);
+            break;
+            case -5 :
+                clientservice_.RefreshGroupCreate(js, time);
+            break;
+            case -6 :
+                clientservice_.RefreshFriendApplyProcess(js, time);
+            break;
+            case -7 :
+                clientservice_.RefreshGroupApplyProcess(js, time);
+            break;
+            case -8 :
+                clientservice_.RefreshGroupQuitUser(js, time);
+            break;
+            case -9 :
+                clientservice_.RefreshGroupRemoveUser(js, time);
+            break;
+            case -10 :
+                clientservice_.RefreshGroupAddAdministrator(js, time);
+            break;
+            case -11 :
+                clientservice_.Back_RemoveAdministrator(js, time);
+            break;
+            default:
+                std::cout << "未识别的消息包格式" << std::endl;
+        }
     }
     else  
     {

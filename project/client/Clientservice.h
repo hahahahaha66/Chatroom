@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 class Clientservice  
@@ -77,9 +78,11 @@ public:
     void Back_RemoveAdministrator(const json& js, Timestamp time);
     void Back_DeleteGroup(const json& js, Timestamp time);
 
-    void CommandReply(const json& js, Timestamp time);
+    bool CommandReply(const json& js, Timestamp time);
 
     //处理刷新包
+    void RefreshMessage(const json& js, Timestamp time);
+
     void RefreshFriendDelete(const json& js, Timestamp time);
     void RefreshFriendBlock(const json& js, Timestamp time);
     void RefreshFriendAddApply(const json& js, Timestamp time);
@@ -96,9 +99,10 @@ private:
     Codec codec_;
 
     ChatConnect chatconnect_;
-    int userid;
-    std::string username;
-    std::string password;
+    int userid_;
+    std::string username_;
+    std::string password_;
+    std::unordered_map<int, SimpUser> friendapplylist;
     std::unordered_map<int, Friend> friendlist_;
     std::unordered_map<int, Group> grouplist_;
     std::atomic<unsigned long> total_seq = 1;

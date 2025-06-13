@@ -1,4 +1,5 @@
 #include "json_protocol.hpp"
+#include "entity/other.h"
 #include "muduo/logging/Logging.h"
 #include <optional>
 #include <unordered_map>
@@ -169,7 +170,7 @@ std::string js_Login(const std::string username, const std::string password)
 }
 
 // 登陆后数据包
-std::string js_UserAllData(const int& userid, const std::unordered_map<int, Friend>& friends, const std::unordered_map<int, Group>& groups)
+std::string js_UserAllData(const int& userid, const std::unordered_map<int, Friend>& friends, const std::unordered_map<int, Group>& groups, const std::unordered_map<int, SimpUser>& friendapplylist)
 {
     json j;
     j["userid"] = userid;
@@ -214,6 +215,16 @@ std::string js_UserAllData(const int& userid, const std::unordered_map<int, Frie
         }
         
         j["groups"].push_back(jg);
+    }
+
+    j["friendapplylist"] = json::array();
+
+    for (auto& [uid, apply]: friendapplylist)
+    {
+        json ja;
+        ja["applyid"] = apply.userid_;
+        ja["applyname"] = apply.username_;
+        j["friendapplylist"].push_back(ja);
     }
     
     return j.dump();
@@ -337,7 +348,7 @@ std::string js_RefrushGroupCreate(const int& groupid, const std::string groupnam
 
     j["groupid"] = groupid;
     j["groupname"] = groupname;
-    j["member"] = json::array();
+    j["members"] = json::array();
 
     for (auto& [id, user] : othermembers)
     {
@@ -347,6 +358,16 @@ std::string js_RefrushGroupCreate(const int& groupid, const std::string groupnam
         jm["role"] = user.GetRole();
         jm["muted"] = user.IsMuted();
         j["members"].push_back(jm);
+    };
+    return j.dump();
+}
+
+std::string js_Apply(const int& userid, const int& applyid, const std::string& applyname)
+{
+    json j = {
+        {"userid", userid},
+        {"applyid", applyid},
+        {"applyname", applyname}
     };
     return j.dump();
 }
@@ -371,7 +392,7 @@ std::string js_UserList(const std::vector<int>& userlist)
     return j.dump();
 }
 
-std::string js_ApplyResult(const int& userid, const int& applicantid, bool result)
+std::string js_UserApply(const int& userid, const int& applicantid, bool result)
 {
     json j = {
         {"userid", userid},
@@ -381,10 +402,31 @@ std::string js_ApplyResult(const int& userid, const int& applicantid, bool resul
     return j.dump();
 }
 
-// 回复
-std::string js_CommandReply(const bool& end, const std::string& result)
+std::string js_ApplyResult(const int& userid, const int& applicantid, const std::string applicantname, bool result)
 {
     json j = {
+        {"userid", userid},
+        {"applicantid", applicantid},
+        {"applicantname", applicantname},
+        {"result", result}
+    };
+    return j.dump();
+}
+
+// 回复
+std::string js_CommandReplyWithData(const std::string& json_str, const bool& end, const std::string& result)
+{
+    json j = {
+        {"json_dump", json_str},
+        {"end", end},
+        {"result", result}
+    };
+    return j.dump();
+}
+
+std::string js_CommandReply(const bool& end, const std::string& result)
+{
+     json j = {
         {"end", end},
         {"result", result}
     };
