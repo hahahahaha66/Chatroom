@@ -34,9 +34,9 @@ public:
         client_.connect();
     }
 
-    Clientservice* Getclientservice()
+    std::weak_ptr<Clientservice> Getclientservice()
     {
-        return &clientservice_;
+        return clientservice_;
     }
 
     TcpClient* GetTcpclient()
@@ -56,7 +56,7 @@ private:
 
     Codec codec_;
     Processpend processpend_;
-    Clientservice clientservice_;
+    std::shared_ptr<Clientservice> clientservice_;
 };
 
 void InitialInterface(EventLoop* loop, Client* client, int &seq);

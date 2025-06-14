@@ -67,37 +67,37 @@ void Client::MessageCallback(const TcpConnectionPtr& conn, Buffer* buf, Timestam
         switch (seq) 
         {
             case -1 :
-                clientservice_.RefreshFriendDelete(js, time);
+                clientservice_->RefreshFriendDelete(js, time);
             break;
             case -2 :
-                clientservice_.RefreshFriendBlock(js, time);
+                clientservice_->RefreshFriendBlock(js, time);
             break;
             case -3 :
-                clientservice_.RefreshFriendAddApply(js, time);
+                clientservice_->RefreshFriendAddApply(js, time);
             break;
             case -4 :
-                clientservice_.RefreshGroupAddApply(js, time);
+                clientservice_->RefreshGroupAddApply(js, time);
             break;
             case -5 :
-                clientservice_.RefreshGroupCreate(js, time);
+                clientservice_->RefreshGroupCreate(js, time);
             break;
             case -6 :
-                clientservice_.RefreshFriendApplyProcess(js, time);
+                clientservice_->RefreshFriendApplyProcess(js, time);
             break;
             case -7 :
-                clientservice_.RefreshGroupApplyProcess(js, time);
+                clientservice_->RefreshGroupApplyProcess(js, time);
             break;
             case -8 :
-                clientservice_.RefreshGroupQuitUser(js, time);
+                clientservice_->RefreshGroupQuitUser(js, time);
             break;
             case -9 :
-                clientservice_.RefreshGroupRemoveUser(js, time);
+                clientservice_->RefreshGroupRemoveUser(js, time);
             break;
             case -10 :
-                clientservice_.RefreshGroupAddAdministrator(js, time);
+                clientservice_->RefreshGroupAddAdministrator(js, time);
             break;
             case -11 :
-                clientservice_.Back_RemoveAdministrator(js, time);
+                clientservice_->Back_RemoveAdministrator(js, time);
             break;
             default:
                 std::cout << "未识别的消息包格式" << std::endl;
@@ -169,7 +169,7 @@ void InitialInterface(EventLoop* loop, Client* client, int& seq)
                 if (client->GetTcpclient()->connected())
                 {
                     loop->runInLoop([client, username, password, seq]() {
-                        client->Getclientservice()->LoginRequest(client->GetTcpclient()->connection(), username, password, seq);
+                        client->Getclientservice()LoginRequest(client->GetTcpclient()->connection(), username, password, seq);
                     });
                 }
 

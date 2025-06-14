@@ -1,6 +1,7 @@
 #include "client/Client.h"
 #include "muduo/net/EventLoop.h"
 #include "muduo/net/tcp/InetAddress.h"
+#include <atomic>
 
 int main ()
 {
