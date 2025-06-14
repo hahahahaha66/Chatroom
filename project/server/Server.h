@@ -24,7 +24,7 @@ public:
     {
         LOG_INFO << "Server initializing";
 
-        MysqlConnectionPool::Instance().Init("localhost", 3306, "root", "123456", "Chatroombase", 10);
+        MysqlConnectionPool::Instance().Init("localhost", 3306, "chatroom_user", "StrongPassword123!", "Chatroombase", 10);
         
         server_.setConnectionCallback(std::bind(&Server::ConnectionCallback, this, _1));
         server_.setMessageCallback(std::bind(&Server::MessageCallback, this, _1, _2, _3));

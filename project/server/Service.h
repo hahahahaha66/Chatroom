@@ -45,7 +45,7 @@ public:
     void ReadMessageFromDataBase();
 
     //启动另一线程在背后实现定期刷新
-    void StartAutoFlushToDataBase(int seconds = 5);
+    void StartAutoFlushToDataBase(int seconds = 10);
     void StopAutoFlush();
     void FlushToDataBase();
 

@@ -195,7 +195,7 @@ void Service::ReadGroupUserFromDataBase()
 
 void Service::ReadMessageFromDataBase()
 {
-    std::string query = "select * fron message order by timestamp asc;";
+    std::string query = "select * from message order by timestamp asc;";
     ReadFromDataBase(query, [this](MysqlRow& row) {
         int messageid = row.GetInt("id");
         int senderid = row.GetInt("senderid");
@@ -317,7 +317,7 @@ std::string Service::Escape(const std::string& input) {
 std::string Service::FormatUpdateUser(const User& user)
 {
     std::ostringstream oss;
-    oss << "replace into user (id, name, password, online) values (" 
+    oss << "replace into user (id, username, password, online) values (" 
         << user.GetId() << ", "<< Escape(user.GetUserName()) << ", "
         << Escape(user.GetPassWord()) << ", " << (user.IsOnLine() ? 1 : 0) << ") ;";
     return oss.str();
@@ -534,11 +534,16 @@ void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, int 
     std::promise<int> promise;
     std::future<int> result_future = promise.get_future();
 
+    LOG_INFO << username << "  " << password ;
+
     if (end)
     {
         //检查数据库中有无已创建的账号，有返回false，没有则写入返回true
         auto p_shared = std::make_shared<std::promise<int>>(std::move(promise));
         databasethreadpool_.EnqueueTask([username, password, p = p_shared](MysqlConnection& conn)mutable {
+
+            LOG_DEBUG << "Start database task for: " << username;
+
             std::string check_sql = 
                 "select exists (select 1 from user where username = '" + username + "' ) as user_exists;";
             MYSQL_RES* res = conn.ExcuteQuery(check_sql);
@@ -547,6 +552,8 @@ void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, int 
                 p->set_value(-2);
                 return ;
             }
+
+            LOG_DEBUG << "Check query completed";
 
             MysqlResult result(res);
             if (result.Next())
@@ -561,12 +568,15 @@ void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, int 
             }
             
             std::string insert_sql = 
-                "insert into user (username, password) value ('" + username + "' , '" + password + "');";
+                "insert into user (username, password) values (" + username + " , " + password + ");";
             if (!conn.ExcuteQuery(insert_sql)) 
             {
                 p->set_value(-3);
                 return;
             }
+
+            LOG_DEBUG << "Insert query completed";
+
 
             MYSQL_RES* idres = conn.ExcuteQuery("select last_insert_id() as id");
             if (!idres)
@@ -590,6 +600,10 @@ void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, int 
     }
 
     int userid = result_future.get();
+
+    LOG_INFO << userid ;
+
+    userlist_.emplace(userid, User(userid, username, password));
     
     if (userid < 0)
         end = false;
@@ -871,7 +885,7 @@ void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js, int seq,
         auto p_shared = std::make_shared<std::promise<int>>(std::move(promise));
 
         databasethreadpool_.EnqueueTask([groupname, creatorid, othermembers, p = p_shared](MysqlConnection& conn)mutable {
-            std::string insert_sql = "insert into groups groupname value " + groupname + " ;";
+            std::string insert_sql = "insert into groups groupname values " + groupname + " ;";
             if (!conn.ExcuteQuery(insert_sql)) 
             {
                 p->set_value(-3);
@@ -898,12 +912,12 @@ void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js, int seq,
                 p->set_value(-5);
             }
 
-            insert_sql = "insert into groupuser (id, groupid, level) value (" + std::to_string(creatorid) + 
+            insert_sql = "insert into groupuser (id, groupid, level) values (" + std::to_string(creatorid) + 
                          " , " +  std::to_string(groupid) + " , " + "Group_owner" + ") ;";
 
             for (auto& it : othermembers)
             {
-                 insert_sql = "insert into groupuser (id, groupid, level) value (" + std::to_string(it) + 
+                 insert_sql = "insert into groupuser (id, groupid, level) values (" + std::to_string(it) + 
                          " , " +  std::to_string(groupid) + " , " + "Member" + ") ;";
             }
         });

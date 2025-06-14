@@ -1,6 +1,7 @@
 #include "MysqlConnectionpool.h"
 #include "MysqlConnection.h"
 
+#include <cctype>
 #include <cstddef>
 #include <chrono>
 #include <memory>
@@ -39,9 +40,16 @@ void MysqlConnectionPool::Init(const std::string& host, unsigned short port, con
     for (int i = 0; i < maxsize_ / 2; i++)
     {
         auto conn = new MysqlConnection;
-        conn->Connect(host_, port, user_, password_, name);
-        conn->RefrushAliveTime();
-        connectionqueue_.push(conn);
+        if(conn->Connect(host_, port, user_, password_, name))
+        {
+            conn->RefrushAliveTime();
+            connectionqueue_.push(conn);
+        }
+        else  
+        {
+            LOG_ERROR << "Failed to create initial connection to database";
+            delete conn;
+        }
     }
 
     std::thread(&MysqlConnectionPool::ProduceConnectionTask, this).detach();
@@ -53,11 +61,19 @@ std::shared_ptr<MysqlConnection> MysqlConnectionPool::GetConnection()
     std::unique_lock<std::mutex> lock(mutex_);
     while (connectionqueue_.empty()) 
     {
-        cond_.wait(lock);
+        if (cond_.wait_for(lock, std::chrono::seconds(1)) == std::cv_status::timeout) {
+        LOG_ERROR << "Timeout waiting for connection";
+        return nullptr;
+}
     }
 
     auto conn = connectionqueue_.front();
     connectionqueue_.pop();
+
+    if (!conn->IsConnected() && !conn->Reconnect()) {
+        delete conn;
+        return nullptr; 
+    }
 
     std::shared_ptr<MysqlConnection> sp(conn, [this](MysqlConnection* ptr)
     {
@@ -75,22 +91,25 @@ void MysqlConnectionPool::ProduceConnectionTask()
     while (isrunning_)
     {
         std::unique_lock<std::mutex> lock(mutex_);
-        while (!connectionqueue_.empty())
+        while (connectionqueue_.size() >= static_cast<size_t>(maxsize_))
         {
+            if (!isrunning_) return;
             cond_.wait_for(lock, std::chrono::seconds(1));
         }
 
-        if (connectionqueue_.size() < static_cast<size_t>(maxsize_))
-        {
-            auto conn  = new MysqlConnection;
-            if (conn->Connect(host_, port_, user_, password_, name_))
-            {
+        size_t total_connections = connectionqueue_.size();
+        size_t new_connections = std::min(
+            static_cast<size_t>(maxsize_) - total_connections,
+            static_cast<size_t>(maxsize_ / 2)
+        );
+
+        for (size_t i = 0; i < new_connections; ++i) {
+            auto conn = new MysqlConnection;
+            if (conn->Connect(host_, port_, user_, password_, name_)) {
                 conn->RefrushAliveTime();
                 connectionqueue_.push(conn);
-                cond_.notify_one();
-            }
-            else  
-            {
+                cond_.notify_one(); 
+            } else {
                 delete conn;
             }
         }

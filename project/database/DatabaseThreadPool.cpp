@@ -4,7 +4,10 @@ DatabaseThreadPool::DatabaseThreadPool(size_t threadcount) : isrunning_(true)
 {
     for (int i = 0; i < threadcount; i++)
     {
-        workers_.emplace_back([this] () { this->Worker(); });
+        workers_.emplace_back([this, i] () { 
+            LOG_INFO << "Worker thread " << i << " started";
+            this->Worker(); 
+        });
     }
 }
 
@@ -21,7 +24,7 @@ void DatabaseThreadPool::EnqueueTask(std::function<void(MysqlConnection&)> fn)
         std::unique_lock<std::mutex> lock(mutex_);
         tasks_.push(std::move(fn));
     }
-    con_.notify_one();
+    con_.notify_all();
 }
 
 void DatabaseThreadPool::Stop()
@@ -40,22 +43,59 @@ void DatabaseThreadPool::Stop()
 
 void DatabaseThreadPool::Worker()
 {
+
+    LOG_DEBUG << "Database worker thread started";
+
     while (true)
     {
         DatabaseTask task(nullptr);
         {
             std::unique_lock<std::mutex> lock(mutex_);
+
             //只要任务队列中有任务，或者线程池已经不运行了，就让当前线程从 wait 状态唤醒
             con_.wait(lock, [this]() {return !tasks_.empty() || !isrunning_; });
+
             if (!isrunning_ && tasks_.empty()) return ;
-            task = std::move(tasks_.front());
-            tasks_.pop();
+
+            if (tasks_.empty()) 
+            {
+                LOG_DEBUG << "Worker spurious wakeup, continuing";
+                continue;
+            }
+            else  
+            {
+                task = std::move(tasks_.front());
+                tasks_.pop();
+                LOG_DEBUG << "Task acquired, queue size: " << tasks_.size();
+            }
         }
 
-        auto conn = MysqlConnectionPool::Instance().GetConnection();
-        if (conn && task.task)
+        MysqlConnPtr conn = MysqlConnectionPool::Instance().GetConnection();
+        for (int attempt = 0; attempt < 3; ++attempt) 
         {
+            conn = MysqlConnectionPool::Instance().GetConnection();
+            if (conn) break;
+            LOG_WARN << "Failed to get connection (attempt " << (attempt+1) << ")";
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
+        if (!conn) {
+            LOG_ERROR << "Giving up after 3 connection attempts";
+            continue;
+        }
+
+        try 
+        {
+            // 执行前验证连接
+            if (!conn->IsConnected()) {
+                if (!conn->Reconnect()) {
+                    throw std::runtime_error("Reconnect failed");
+                }
+            }
             task.task(*conn);
+        } 
+        catch (const std::exception& e) {
+            LOG_ERROR << "Database operation failed: " << e.what();
         }
     }
 }

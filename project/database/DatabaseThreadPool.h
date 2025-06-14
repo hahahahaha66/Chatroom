@@ -19,10 +19,12 @@ struct DatabaseTask
     DatabaseTask(std::function<void(MysqlConnection&)> fn) : task(std::move(fn)) {}
 };
 
+using MysqlConnPtr = std::shared_ptr<MysqlConnection>;
+
 class DatabaseThreadPool  
 {
 public:
-    DatabaseThreadPool(size_t threadcount = 2);
+    DatabaseThreadPool(size_t threadcount = 4);
     ~DatabaseThreadPool();
 
     void EnqueueTask(std::function<void(MysqlConnection&)> fn);

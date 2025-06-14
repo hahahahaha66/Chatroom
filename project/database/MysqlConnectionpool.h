@@ -2,6 +2,7 @@
 #define MYSQLCONNECTIONPOOL_H
 
 #include "MysqlConnection.h"
+#include "../muduo/logging/Logging.h"
 
 #include <mutex>
 #include <condition_variable>
