@@ -3,6 +3,7 @@
 
 #include "MysqlConnection.h"
 #include "MysqlConnectionpool.h"
+#include "../muduo/logging/Logging.h"
 
 #include <condition_variable>
 #include <cstddef>
@@ -21,7 +22,7 @@ struct DatabaseTask
 class DatabaseThreadPool  
 {
 public:
-    DatabaseThreadPool(size_t threadcount = 4);
+    DatabaseThreadPool(size_t threadcount = 2);
     ~DatabaseThreadPool();
 
     void EnqueueTask(std::function<void(MysqlConnection&)> fn);

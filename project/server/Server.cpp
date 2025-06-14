@@ -21,15 +21,24 @@ void Server::MessageCompleteCallback(const TcpConnectionPtr& conn)
     }
 }
 
+void Server::ThreadInitCallback(EventLoop* loop)
+{
+    
+}
+
 void Server::MessageCallback(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time)
 {
     auto msgopt = codec_.tryDecode(buf);
+
     if (!msgopt.has_value())
     {
-        conn->send("Data sending failed, please resend");
-        return ;
+        LOG_INFO << "Recv from " << conn->peerAddress().toIpPort() << " failed";
     }
+    
     auto [type, seq, js] = msgopt.value();
 
+    LOG_INFO << "Recv from " << conn->peerAddress().toIpPort() << " type : " << type << js.dump();
+
     dispatcher_.dispatch(type, conn, js, seq, time);
+
 }

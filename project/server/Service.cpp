@@ -34,6 +34,8 @@ Service::Service(Dispatcher& dispatcher) : dispatcher_(dispatcher)
     handermap_[20] = std::bind(&Service::GetUserChatInterface, this, _1, _2, _3, _4);
     handermap_[21] = std::bind(&Service::GetGroupChatInterface, this, _1, _2, _3, _4);
 
+    LOG_INFO << "Reading data from the database for initialization";
+
     ReadUserFromDataBase();
     ReadGroupFromDataBase();
     ReadFriendFromDataBase();
@@ -42,6 +44,8 @@ Service::Service(Dispatcher& dispatcher) : dispatcher_(dispatcher)
     ReadUserApplyFromDataBase();
     ReadGroupUserFromDataBase();
     ReadMessageFromDataBase();
+
+    LOG_INFO << "Database reading completed";
 
     StartAutoFlushToDataBase();
 }
@@ -371,7 +375,7 @@ std::string Service::FormatUpdateMessage(const Message& message)
     return oss.str();
 }
 
-void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time)
 {
     bool end = true;
 
@@ -397,7 +401,7 @@ void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, uint1
                 std::shared_ptr<TcpConnection> receiver_conn = userlist_[receiverid].GetConnection();
                 status = "read";
                 json reply_js = js_Message(type, senderid, receiverid, connect, status, time_);
-                uint16_t type = (end == true ? 1 : 0);
+                int type = (end == true ? 1 : 0);
                 seq = 0;
                 receiver_conn->send(codec_.encode(reply_js, type, seq));
 
@@ -418,7 +422,7 @@ void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, uint1
                 if (chatconnect_[it.first].type_ == ChatConnect::Type::Group && chatconnect_[it.first].peerid_ == receiverid)
                 {
                     std::shared_ptr<TcpConnection> receiver_conn = userlist_[it.first].GetConnection();
-                    uint16_t type = (end == true ? 1 : 0);
+                    int type = (end == true ? 1 : 0);
                     seq = 0;
                     receiver_conn->send(codec_.encode(reply_js, type, seq));
                 }
@@ -435,20 +439,20 @@ void Service::ProcessMessage(const TcpConnectionPtr& conn, const json& js, uint1
     if (end)
     {
         json other_reply_js = js_CommandReply(true, "Message sent successful");
-        uint16_t type = (end == true ? 1 : 0);
+        int type = (end == true ? 1 : 0);
         seq = 14;
         conn->send(codec_.encode(other_reply_js, type, seq));
     }
     else  
     {
         json other_reply_js = js_CommandReply(true, "Message sent failed");
-        uint16_t type = (end == true ? 1 : 0);
+        int type = (end == true ? 1 : 0);
         seq = 14;
         conn->send(codec_.encode(other_reply_js, type, seq));
     }
 }
 
-void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time)
 {
     bool end = true;
     std::unordered_map<int, Friend> friendlist;
@@ -480,7 +484,7 @@ void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, uint
             end = false;
     }
     
-    uint16_t type = (end == true ? 1 : 0);
+    int type = (end == true ? 1 : 0);
     if (end) 
         userlist_[userid].SetOnline(conn);
 
@@ -515,8 +519,10 @@ void Service::ProcessingLogin(const TcpConnectionPtr& conn, const json& js, uint
 }
 
 
-void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time)
 {
+    LOG_INFO << js.dump();
+
     bool end = true;
     std::string result;
 
@@ -531,13 +537,14 @@ void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, uint
     if (end)
     {
         //检查数据库中有无已创建的账号，有返回false，没有则写入返回true
-        databasethreadpool_.EnqueueTask([username, password, p = std::move(promise)](MysqlConnection& conn)mutable {
+        auto p_shared = std::make_shared<std::promise<int>>(std::move(promise));
+        databasethreadpool_.EnqueueTask([username, password, p = p_shared](MysqlConnection& conn)mutable {
             std::string check_sql = 
                 "select exists (select 1 from user where username = '" + username + "' ) as user_exists;";
             MYSQL_RES* res = conn.ExcuteQuery(check_sql);
             if (!res) 
             {
-                p.set_value(-2);
+                p->set_value(-2);
                 return ;
             }
 
@@ -545,10 +552,10 @@ void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, uint
             if (result.Next())
             {
                 MysqlRow row = result.GetRow();
-                bool exists = row.GetBool("user_exixts");
+                bool exists = row.GetBool("user_exists");
                 if (exists)
                 {
-                    p.set_value(-1);
+                    p->set_value(-1);
                     return;
                 }
             }
@@ -557,14 +564,14 @@ void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, uint
                 "insert into user (username, password) value ('" + username + "' , '" + password + "');";
             if (!conn.ExcuteQuery(insert_sql)) 
             {
-                p.set_value(-3);
+                p->set_value(-3);
                 return;
             }
 
-            MYSQL_RES* idres = conn.ExcuteQuery("select last_insert_id() as is");
+            MYSQL_RES* idres = conn.ExcuteQuery("select last_insert_id() as id");
             if (!idres)
             {
-                p.set_value(-4);
+                p->set_value(-4);
                 return;
             }
 
@@ -573,11 +580,11 @@ void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, uint
             {
                 MysqlRow row = id_result.GetRow();
                 int id = row.GetInt("id");
-                p.set_value(id);
+                p->set_value(id);
             }
             else  
             {
-                p.set_value(-5);
+                p->set_value(-5);
             }
         });
     }
@@ -592,8 +599,11 @@ void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, uint
     else  
         result = "Register failed!";
 
+    LOG_INFO << "registeraccount " << username << "  " << password << "  " << end;
+    LOG_INFO << "result : " << result;
+
     json reply_js = js_CommandReply(end, result);
-    uint16_t type = (end == true ? 1 : 0);
+    int type = (end == true ? 1 : 0);
     if (end)
     {
         userlist_[userid] = {userid, username, password};
@@ -602,7 +612,7 @@ void Service::RegisterAccount(const TcpConnectionPtr& conn, const json& js, uint
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::GetUserChatInterface(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+void Service::GetUserChatInterface(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time)
 {
     bool end = true;
     
@@ -639,12 +649,12 @@ void Service::GetUserChatInterface(const TcpConnectionPtr& conn, const json& js,
         result["message"].push_back(one);
     }
 
-    uint16_t type_ = (end == true ? 1 : 0);
+    int type_ = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(result, type_, seq));
 }
 
-void Service::GetGroupChatInterface(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+void Service::GetGroupChatInterface(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time)
 {
     bool end = true;
 
@@ -681,12 +691,12 @@ void Service::GetGroupChatInterface(const TcpConnectionPtr& conn, const json& js
         result["message"].push_back(one);
     }
 
-    uint16_t type_ = (end == true ? 1 : 0);
+    int type_ = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(result, type_, seq));
 }  
 
-void Service::DeleteFriend(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+void Service::DeleteFriend(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -709,12 +719,12 @@ void Service::DeleteFriend(const TcpConnectionPtr& conn, const json& js, uint16_
 
     std::string json_str = data.dump();
     json reply_js = js_CommandReplyWithData(json_str, end, result);
-    uint16_t type = (end == true ? 1 : 0);
+    int type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::BlockFriend(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+void Service::BlockFriend(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -745,12 +755,12 @@ void Service::BlockFriend(const TcpConnectionPtr& conn, const json& js, uint16_t
 
     std::string json_str = data.dump();
     json reply_js = js_CommandReplyWithData(json_str, end, result);
-    uint16_t type = (end == true ? 1 : 0);
+    int type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::AddFriend(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+void Service::AddFriend(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -768,12 +778,12 @@ void Service::AddFriend(const TcpConnectionPtr& conn, const json& js, uint16_t s
         result = "Add apply failed!";
 
     json reply_js = js_CommandReply(end, result);     
-    uint16_t type = (end == true ? 1 : 0);
+    int type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::ProcessFriendApply(const TcpConnectionPtr& conn, const json& js, const uint16_t seq, Timestamp time)
+void Service::ProcessFriendApply(const TcpConnectionPtr& conn, const json& js, const int seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -801,12 +811,12 @@ void Service::ProcessFriendApply(const TcpConnectionPtr& conn, const json& js, c
 
     std::string json_str = data.dump();
     json reply_js = js_CommandReplyWithData(json_str, end, result);
-    uint16_t type = (end == true ? 1 : 0);
+    int type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::AddGroup(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+void Service::AddGroup(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -833,12 +843,12 @@ void Service::AddGroup(const TcpConnectionPtr& conn, const json& js, uint16_t se
         result = "Add group apply failed!";
 
     json reply_js = js_CommandReply(end, result);
-    uint16_t type = (end == true ? 1 : 0);
+    int type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -858,18 +868,20 @@ void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js, uint16_t
     if (end)
     {
         //检查数据库中有无已创建的账号，有返回false，没有则写入返回true
-        databasethreadpool_.EnqueueTask([groupname, creatorid, othermembers, p = std::move(promise)](MysqlConnection& conn)mutable {
+        auto p_shared = std::make_shared<std::promise<int>>(std::move(promise));
+
+        databasethreadpool_.EnqueueTask([groupname, creatorid, othermembers, p = p_shared](MysqlConnection& conn)mutable {
             std::string insert_sql = "insert into groups groupname value " + groupname + " ;";
             if (!conn.ExcuteQuery(insert_sql)) 
             {
-                p.set_value(-3);
+                p->set_value(-3);
                 return;
             }
 
             MYSQL_RES* idres = conn.ExcuteQuery("select last_insert_id() as is");
             if (!idres)
             {
-                p.set_value(-4);
+                p->set_value(-4);
                 return;
             }
 
@@ -879,11 +891,11 @@ void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js, uint16_t
             {
                 MysqlRow row = id_result.GetRow();
                 groupid = row.GetInt("id");
-                p.set_value(groupid);
+                p->set_value(groupid);
             }
             else  
             {
-                p.set_value(-5);
+                p->set_value(-5);
             }
 
             insert_sql = "insert into groupuser (id, groupid, level) value (" + std::to_string(creatorid) + 
@@ -918,12 +930,12 @@ void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js, uint16_t
         result = "Create group failed!";
 
     json reply_js = js_CommandReply(end, result);
-    uint16_t type = (end == true ? 1 : 0);
+    int type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::ProcessGroupApply(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+void Service::ProcessGroupApply(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -947,12 +959,12 @@ void Service::ProcessGroupApply(const TcpConnectionPtr& conn, const json& js, ui
         result = "Process apply failed!";
 
     json reply_js = js_CommandReply(end, result);
-    uint16_t type = (end == true ? 1 : 0);
+    int type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::QuitGroup(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+void Service::QuitGroup(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -971,12 +983,12 @@ void Service::QuitGroup(const TcpConnectionPtr& conn, const json& js, uint16_t s
         result = "Quit group failed!";
 
     json reply_js = js_CommandReply(end, result);
-    uint16_t type = (end == true ? 1 : 0);
+    int type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::RemoveGroupUser(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+void Service::RemoveGroupUser(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -995,12 +1007,12 @@ void Service::RemoveGroupUser(const TcpConnectionPtr& conn, const json& js, uint
         result = "Remove groupuser failed!";
 
     json reply_js = js_CommandReply(end, result);
-    uint16_t type = (end == true ? 1 : 0);
+    int type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::SetAdministrator(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+void Service::SetAdministrator(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -1018,12 +1030,12 @@ void Service::SetAdministrator(const TcpConnectionPtr& conn, const json& js, uin
         result = "Set administrator failed!";
 
     json reply_js = js_CommandReply(end, result);
-    uint16_t type = (end == true ? 1 : 0);
+    int type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::RemoveAdministrator(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+void Service::RemoveAdministrator(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -1048,12 +1060,12 @@ void Service::RemoveAdministrator(const TcpConnectionPtr& conn, const json& js, 
         result = "Remove administrator failed!";
 
     json reply_js = js_CommandReply(end, result);
-    uint16_t type = (end == true ? 1 : 0);
+    int type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::DeleteGroup(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+void Service::DeleteGroup(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -1083,12 +1095,12 @@ void Service::DeleteGroup(const TcpConnectionPtr& conn, const json& js, uint16_t
         result = "Delete group failed!";
 
     json reply_js = js_CommandReply(end, result);
-    uint16_t type = (end == true ? 1 : 0);
+    int type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::DeleteUserAccount(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+void Service::DeleteUserAccount(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -1124,12 +1136,12 @@ void Service::DeleteUserAccount(const TcpConnectionPtr& conn, const json& js, ui
         result = "Delete account failed!";
 
     json reply_js = js_CommandReply(end, result);
-    uint16_t type = (end == true ? 1 : 0);
+    int type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
 }
 
-void Service::UpdatedUserInterface(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time)
+void Service::UpdatedUserInterface(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time)
 {
     bool end = true;
     std::string result;
@@ -1171,7 +1183,7 @@ void Service::UpdatedUserInterface(const TcpConnectionPtr& conn, const json& js,
         result = "Updated user interface failed!";
 
     json reply_js = js_CommandReply(end, result);
-    uint16_t type = (end == true ? 1 : 0);
+    int type = (end == true ? 1 : 0);
 
     conn->send(codec_.encode(reply_js, type, seq));
 }

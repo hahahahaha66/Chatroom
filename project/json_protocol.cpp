@@ -312,7 +312,7 @@ std::string js_GroupList(const int& userid, const std::vector<int>& grouplist)
 }
 
 // 创建群聊
-std::string js_GroupCreateData(const int& groupid, const std::string groupname, const int& creator, const std::vector<int>& othermembers)
+std::string js_GroupCreateData(const std::string groupname, const int& creator, const std::vector<int>& othermembers)
 {
     json j = {
         {"groupname", groupname},
@@ -431,33 +431,4 @@ std::string js_CommandReply(const bool& end, const std::string& result)
         {"result", result}
     };
     return j.dump();
-}
-
-
-template<typename  T>
-std::optional<T> ExtractCommonField(const json& j, const std::string& key)
-{
-    try 
-    {
-        if (j.contains(key) && !j.at(key).is_null())
-        {
-            return j.at(key).get<T>();
-        }
-    }
-    catch (const std::exception& e)
-    {
-        LOG_ERROR << e.what();
-    }
-    return std::nullopt;
-}
-
-template<typename T>
-bool AssignIfPresent(const json& j, const std::string& key, T& out)
-{
-    auto opt = ExtractCommonField<T>(j, key);
-    if (opt.has_value()) {
-        out = std::move(opt.value());
-        return true;
-    }
-    return false;
 }

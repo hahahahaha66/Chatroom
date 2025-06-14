@@ -15,6 +15,8 @@ DatabaseThreadPool::~DatabaseThreadPool()
 
 void DatabaseThreadPool::EnqueueTask(std::function<void(MysqlConnection&)> fn)
 {
+    LOG_INFO << "one database task add";
+
     {
         std::unique_lock<std::mutex> lock(mutex_);
         tasks_.push(std::move(fn));

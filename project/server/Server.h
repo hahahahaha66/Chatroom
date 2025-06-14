@@ -8,6 +8,7 @@
 #include "Service.h"
 #include "../tool/Codec.h"
 #include "../tool/Dispatcher.h"
+#include "../muduo/logging/Logging.h"
 #include "../database/MysqlConnectionpool.h"
 
 #include <functional>
@@ -21,6 +22,8 @@ public:
           server_(loop, addr, name),
           service_(dispatcher_)
     {
+        LOG_INFO << "Server initializing";
+
         MysqlConnectionPool::Instance().Init("localhost", 3306, "root", "123456", "Chatroombase", 10);
         
         server_.setConnectionCallback(std::bind(&Server::ConnectionCallback, this, _1));
@@ -29,6 +32,12 @@ public:
         server_.setThreadInitCallback(std::bind(&Server::ThreadInitCallback, this, _1));
 
         service_.RegisterAllHanders(dispatcher_);
+
+        LOG_INFO << "Server initialization completed";
+
+        LOG_INFO << "Listening started " << server_.inPort();
+
+        StartServer();
     }
 
     ~Server() {}

@@ -1,18 +1,21 @@
 #include "Client.h"
+#include "Clientservice.h"
+
+#include <cstdio>
 #include <functional>
 #include <ostream>
 #include <string>
+#include <future>
 
 Client::Client(EventLoop* loop, InetAddress& addr, std::string name)
     : loop_(loop), client_(loop, addr, name)
 {
-    client_.connect();
+    LOG_INFO << client_.connected();
 
     client_.setConnectionCallback(std::bind(&Client::ConnectionCallback, this, _1));
     client_.setMessageCallback(std::bind(&Client::MessageCallback, this, _1, _2, _3));
     client_.setWriteCompleteCallback(std::bind(&Client::WriteCompleteCallback, this, _1));
 
-    InitialInterface();
 }
 
 Client::~Client()
@@ -24,17 +27,17 @@ void Client::ConnectionCallback(const TcpConnectionPtr& conn)
 {
     if (conn->connected())
     {
-        std::cout << "连接成功" << std::endl;
+        LOG_INFO << "Connection established to " << conn->peerAddress().toIpPort();
     }
     else  
     {
-        std::cout << "连接断开" <<std::endl;
+       LOG_INFO << "Connection disconnected";
     }
 }
 
 void Client::WriteCompleteCallback(const TcpConnectionPtr& conn)
 {
-
+    LOG_INFO << "send a message";
 }
 
 void Client::MessageCallback(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time)
@@ -106,7 +109,7 @@ void Client::MessageCallback(const TcpConnectionPtr& conn, Buffer* buf, Timestam
     }
 }
 
-bool Client::ReadingIntegers(std::string input, int &result)
+bool ReadingIntegers(std::string input, int &result)
 {
     int value;
     std::stringstream ss(input);
@@ -123,7 +126,7 @@ bool Client::ReadingIntegers(std::string input, int &result)
     }
 }
 
-void Client::InitialInterface()
+void InitialInterface(EventLoop* loop, Client* client, int& seq)
 {
     while (true)
     {
@@ -162,15 +165,20 @@ void Client::InitialInterface()
                 }
 
                 //~
-                //登陆成功成功调用一下函数，否则循环
-                if (1)
+
+                if (client->GetTcpclient()->connected())
                 {
-                    //~
-                    //初始化个人信息
-                    MainInterface();
+                    loop->runInLoop([client, username, password, seq]() {
+                        client->Getclientservice()->LoginRequest(client->GetTcpclient()->connection(), username, password, seq);
+                    });
+                }
+
+                std::future<bool> fut = client->GetProcessend()->addRequest(seq++, std::bind(&Clientservice::Back_LoginRequest, client->Getclientservice(), _1, _2));
+                if (fut.get())
+                {
+                    MainInterface(loop, client, seq);
                     break;
                 }
-                
             }
         }
         else if (order_ == "2")
@@ -201,7 +209,7 @@ void Client::InitialInterface()
                 }
 
                 std::cout << "请再次输入账户密码 : ";
-                std::getline(std::cin, password);
+                std::getline(std::cin, password_again);
                 if (password == "q") break;
 
                 if (password != password_again)
@@ -212,6 +220,20 @@ void Client::InitialInterface()
 
                 //~
                 //注册成功后自动返回上级界面
+
+                if (client->GetTcpclient()->connected())
+                {
+                    loop->runInLoop([client, username, password, seq]() {
+                        client->Getclientservice()->RegistrationRequest(client->GetTcpclient()->connection(), username, password, seq);
+                    });
+                }
+
+                std::future<bool> fut = client->GetProcessend()->addRequest(seq++, std::bind(&Clientservice::Back_RegistrationRequest, client->Getclientservice(), _1, _2));
+                if (fut.get())
+                {
+                    MainInterface(loop, client, seq);
+                    break;
+                }
             }
         }
         else if (order_ == "q")
@@ -225,7 +247,7 @@ void Client::InitialInterface()
     }
 }
 
-void Client::MainInterface()
+void MainInterface(EventLoop* loop, Client* client, int &seq)
 {
     while (true)
     {
@@ -239,11 +261,11 @@ void Client::MainInterface()
 
         if (order_ == "1")
         {
-            FriendInterface();
+            FriendInterface(loop, client, seq);
         }
         else if (order_ == "2")
         {
-            GroupInterface();
+            GroupInterface(loop, client, seq);
         }
         else if (order_ == "3")
         {
@@ -262,7 +284,7 @@ void Client::MainInterface()
     }
 }
 
-void Client::FriendInterface()
+void FriendInterface(EventLoop* loop, Client* client, int &seq)
 {
     while (true)
     {
@@ -288,7 +310,7 @@ void Client::FriendInterface()
                 ClearScreen();
                 //~
                 //获取历史记录
-                PrivateChatInterface(friendid);
+                PrivateChatInterface(loop, client, seq, friendid);
             }
         }
         else if (order_ == "2")
@@ -328,7 +350,7 @@ void Client::FriendInterface()
     }
 }
 
-void Client::GroupInterface()
+void GroupInterface(EventLoop* loop, Client* client, int &seq)
 {
     while (true)
     {
@@ -356,7 +378,7 @@ void Client::GroupInterface()
                 ClearScreen();
                 //~
                 //获取历史记录
-                GroupChatInterface(groupid);
+                GroupChatInterface(loop, client, seq, groupid);
             }
         }
         else if (order_ == "2")
@@ -445,7 +467,7 @@ void Client::GroupInterface()
     }
 }
 
-void Client::PrivateChatInterface(int friendid)
+void PrivateChatInterface(EventLoop* loop, Client* client, int &seq, int friendid)
 {
     while (true)
     {
@@ -510,7 +532,7 @@ void Client::PrivateChatInterface(int friendid)
     }
 }
 
-void Client::GroupChatInterface(int groupid)
+void GroupChatInterface(EventLoop* loop, Client* client, int &seq, int groupid)
 {
     while (true)
     {
@@ -769,4 +791,9 @@ void Client::GroupChatInterface(int groupid)
             std::cout << "命令错误,请重新输入" << std::endl;
         }
     }
+}
+
+void ClearScreen() 
+{
+    std::cout << "\033[2J\033[H";
 }

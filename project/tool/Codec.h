@@ -3,6 +3,7 @@
 
 #include "../muduo/net/Buffer.h"
 #include "../muduo/net/tcp/TcpConnection.h"
+#include "../muduo/logging/Logging.h"
 
 #include <memory>
 #include <nlohmann/json.hpp>
@@ -15,18 +16,18 @@ using json = nlohmann::json;
 
 struct MessageHeader {
         size_t length;
-        uint16_t type;
-        uint16_t seq;
+        int type;
+        int seq;
 };
 
 class Codec
 {
 public:
     //编码，添加包头
-    static std::string encode(const json& js, uint16_t type, uint16_t seq);
+    static std::string encode(const json& js, int type, int seq);
 
     //解码，解析包头
-    static std::optional<std::tuple<uint16_t, uint16_t, json>> tryDecode(Buffer* buf);
+    static std::optional<std::tuple<int, int, json>> tryDecode(Buffer* buf);
     
 };
 

@@ -29,27 +29,46 @@ public:
     void MessageCallback(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time);
     void WriteCompleteCallback(const TcpConnectionPtr& conn);
 
-    void InitialInterface();
-    void MainInterface();
-    void FriendInterface();
-    void GroupInterface();
-    void PrivateChatInterface(int friendid);
-    void GroupChatInterface(int groupid);
-
-    void ClearScreen() 
+    void Connect()
     {
-        std::cout << "\033[2J\033[H";
+        client_.connect();
     }
 
-    bool ReadingIntegers(std::string input, int &result);
+    Clientservice* Getclientservice()
+    {
+        return &clientservice_;
+    }
+
+    TcpClient* GetTcpclient()
+    {
+        return &client_;
+    }
+
+    Processpend* GetProcessend()
+    {
+        return &processpend_;
+    }
 
 private:
     EventLoop* loop_;
     TcpClient client_;
+    TcpConnectionPtr conn_;
+
     Codec codec_;
     Processpend processpend_;
     Clientservice clientservice_;
-
 };
+
+void InitialInterface(EventLoop* loop, Client* client, int &seq);
+void MainInterface(EventLoop* loop, Client* client, int &seq);
+void FriendInterface(EventLoop* loop, Client* client, int &seq);
+void GroupInterface(EventLoop* loop, Client* client, int &seq);
+
+void PrivateChatInterface(EventLoop* loop, Client* client, int &seq, int friendid);
+void GroupChatInterface(EventLoop* loop, Client* client, int &seq, int groupid);
+
+void ClearScreen();
+
+bool ReadingIntegers(std::string input, int &result);
 
 #endif

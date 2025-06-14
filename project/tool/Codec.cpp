@@ -3,7 +3,7 @@
 #include <optional>
 #include <tuple>
 
-std::string Codec::encode(const json& js, uint16_t type, uint16_t seq)
+std::string Codec::encode(const json& js, int type, int seq)
 {
     std::string body = js.dump();
     uint32_t len = sizeof(MessageHeader) + body.size();
@@ -16,7 +16,7 @@ std::string Codec::encode(const json& js, uint16_t type, uint16_t seq)
     return result;
 }
 
-std::optional<std::tuple<uint16_t, uint16_t, json>> Codec::tryDecode(Buffer* buf)
+std::optional<std::tuple<int, int, json>> Codec::tryDecode(Buffer* buf)
 {
     if (buf->readableBytes() < sizeof(MessageHeader))
     {
@@ -35,6 +35,9 @@ std::optional<std::tuple<uint16_t, uint16_t, json>> Codec::tryDecode(Buffer* buf
 
     try {
         json js = json::parse(body);
+
+        LOG_INFO << js.dump();
+
         return std::make_tuple(hdr->type, hdr->seq, js);
     } catch (...) {
         return std::nullopt;

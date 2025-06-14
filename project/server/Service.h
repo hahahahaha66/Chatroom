@@ -20,7 +20,7 @@
 #include <unordered_map>
 
 using json = nlohmann::json;
-using MessageHander = std::function<void(const TcpConnectionPtr&, const json&, const uint16_t, Timestamp)>;
+using MessageHander = std::function<void(const TcpConnectionPtr&, const json&, const int, Timestamp)>;
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
@@ -60,38 +60,38 @@ public:
     std::string FormatUpdateMessage(const Message& message);
 
     //消息
-    void ProcessMessage(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void ProcessMessage(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
     //历史消息
-    void GetUserChatInterface(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
-    void GetGroupChatInterface(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void GetUserChatInterface(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
+    void GetGroupChatInterface(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
 
     //登陆与注册
-    void ProcessingLogin    (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
-    void RegisterAccount    (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void ProcessingLogin    (const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
+    void RegisterAccount    (const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
     
     //朋友操作
-    void DeleteFriend       (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
-    void BlockFriend        (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
-    void AddFriend          (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void DeleteFriend       (const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
+    void BlockFriend        (const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
+    void AddFriend          (const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
     
     //群聊操作
-    void AddGroup           (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
-    void CreateGroup        (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
-    void QuitGroup          (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
-    void RemoveGroupUser    (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
-    void SetAdministrator   (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
-    void RemoveAdministrator(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void AddGroup           (const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
+    void CreateGroup        (const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
+    void QuitGroup          (const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
+    void RemoveGroupUser    (const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
+    void SetAdministrator   (const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
+    void RemoveAdministrator(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
 
     //处理申请
-    void ProcessFriendApply (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
-    void ProcessGroupApply  (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void ProcessFriendApply (const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
+    void ProcessGroupApply  (const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
 
     //删除
-    void DeleteUserAccount  (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
-    void DeleteGroup        (const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void DeleteUserAccount  (const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
+    void DeleteGroup        (const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
 
     //更新用户当前界面
-    void UpdatedUserInterface(const TcpConnectionPtr& conn, const json& js, uint16_t seq, Timestamp time);
+    void UpdatedUserInterface(const TcpConnectionPtr& conn, const json& js, int seq, Timestamp time);
 
     //刷新机制
     void RefreshFriendDelete(int userid, int friendid, Timestamp time);
@@ -121,7 +121,7 @@ private:
     std::unordered_map<int, Group> grouplist_;
     std::unordered_map<int, std::unordered_map<int, std::vector<Message>>> usermessage_;
     std::unordered_map<int, std::vector<Message>> groupmessage_;
-    std::unordered_map<uint16_t, MessageHander> handermap_;
+    std::unordered_map<int, MessageHander> handermap_;
 };
 
 #endif
