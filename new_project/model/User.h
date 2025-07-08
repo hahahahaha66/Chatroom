@@ -13,6 +13,7 @@ public:
     std::string GetName() const { return name_; }
     std::string GetPassword() const { return password_; }
     std::string GetEmail() const { return email_; }
+    TcpConnectionPtr GetConn() const {return conn_; }
 
     void SetOnline(bool online) { online_ = online; }
     bool IsOnline() const { return online_; }

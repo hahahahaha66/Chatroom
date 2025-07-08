@@ -6,8 +6,8 @@
 class Message 
 {
 public:
-    Message(int messageid, int senderid, int receiverid, std::string context, const std::string type, const std::string status, Timestamp time)
-        : messsageid_(messageid), senderid_(senderid), receiverid_(receiverid), content_(context), type_(type), status_(status), time_(time) {}
+    Message(int messageid, int senderid, int receiverid, std::string content, const std::string type, const std::string status, std::string time)
+        : messsageid_(messageid), senderid_(senderid), receiverid_(receiverid), content_(content), type_(type), status_(status), time_(time) {}
 
     int GetId() const { return messsageid_; }
     int GetSenderId() const { return senderid_; }
@@ -15,7 +15,7 @@ public:
     std::string GetContent() const { return content_; }
     std::string GetType() const { return type_; }
     std::string GetStatus() const { return status_; }
-    Timestamp GetTime() const { return time_; }
+    std::string GetTime() const { return time_; }
 
     void SetStatus(std::string status) { status_ = status; }
 
@@ -26,5 +26,5 @@ private:
     std::string content_;
     std::string type_;
     std::string status_;
-    Timestamp time_;
+    std::string time_;
 };

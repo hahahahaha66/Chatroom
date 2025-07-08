@@ -11,22 +11,20 @@ std::shared_ptr<User> UserManager::GetUser(int userId)
     return it != users_.end() ? it->second : nullptr;
 }
 
-bool UserManager::addUserToSystem(const std::string& name, const std::string& password, const std::string& email, TcpConnectionPtr conn) 
+bool UserManager::addUserToSystem(int id, const std::string& name, const std::string& password, const std::string& email, TcpConnectionPtr conn) 
 {
 
     std::lock_guard<std::mutex> lock(mutex_);
 
-    if (emailtoidmap_.count(name)) {
+    if (emailtoidmap_.count(email)) {
         return false;  // 重复注册
     }
 
-    int id = 1001;
-    //insertUserIntoDB(name);
     if (id <= 0) return false;  // 插入失败
 
-    auto user = std::make_shared<User>(id, name);
+    auto user = std::make_shared<User>(id, name, password, email, conn);
     users_[id] = user;
-    emailtoidmap_[name] = id;
+    emailtoidmap_[email] = id;
     idtoemailmap_[id] = email;
     return true;
 }

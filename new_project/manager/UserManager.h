@@ -17,7 +17,7 @@ public:
     std::shared_ptr<User> GetUser(int userId); // 获取用户信息
     void RemoveUser(int userId);               // 注销用户
 
-    bool addUserToSystem(const std::string& name, const std::string& password, const std::string& email, TcpConnectionPtr conn);
+    bool addUserToSystem(int id, const std::string& name, const std::string& password, const std::string& email, TcpConnectionPtr conn);
 
     void SetOnline(int userId);  // 登录
     void SetOffline(int userId); // 下线
