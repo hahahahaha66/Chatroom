@@ -1,13 +1,13 @@
 #pragma once
 
+#include "../muduo/net/tcp/TcpConnection.h"
 #include <string>
-
 
 class User 
 {
 public:
-    User(int id, const std::string& name, const std::string& password, const std::string& email = "")
-        : id_(id), name_(name), password_(password), email_(email), online_(false) {}
+    User(int id, const std::string& name, const std::string& password, const std::string& email, const TcpConnectionPtr& conn)
+        : id_(id), name_(name), password_(password), email_(email), online_(false), conn_(conn) {}
 
     int GetId() const { return id_; }
     std::string GetName() const { return name_; }
@@ -23,4 +23,5 @@ private:
     std::string password_;
     std::string email_;
     bool online_;
+    TcpConnectionPtr conn_;
 };

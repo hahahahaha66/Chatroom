@@ -1,12 +1,34 @@
 #include "Server.h"
 #include "../muduo/logging/Logging.h"
+#include <functional>
 
 Server::Server(EventLoop* loop,const InetAddress& listenAddr)
     : server_(loop, listenAddr, "ChatServer"), 
       dispatcher_() 
 {
-    server_.setConnectionCallback(std::bind(&Server::OnConnection, this, std::placeholders::_1));
-    server_.setMessageCallback(std::bind(&Server::OnMessage, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+    server_.setConnectionCallback(std::bind(&Server::OnConnection, this, _1));
+    server_.setMessageCallback(std::bind(&Server::OnMessage, this, _1, _2, _3));
+    server_.setWriteCompleteCallback(std::bind(&Server::MessageCompleteCallback, this, _1));
+
+    dispatcher_.registerHander("Register", [this](const std::shared_ptr<TcpConnection>& conn,
+        const nlohmann::json& json, Timestamp time) {
+        this->service_.UserRegister(conn, json, time);
+    });
+
+    dispatcher_.registerHander("Login", [this](const std::shared_ptr<TcpConnection>& conn,
+        const nlohmann::json& json, Timestamp time) {
+        this->service_.UserLogin(conn, json, time);
+    });
+
+    dispatcher_.registerHander("SendMessage", [this](const std::shared_ptr<TcpConnection>& conn,
+        const nlohmann::json& json, Timestamp time) {
+        this->service_.MessageSend(conn, json, time);
+    });
+
+    dispatcher_.registerHander("ChatHistory", [this](const std::shared_ptr<TcpConnection>& conn,
+        const nlohmann::json& json, Timestamp time) {
+        this->service_.GetChatHistory(conn, json, time);
+    });
 }
 
 void Server::start()

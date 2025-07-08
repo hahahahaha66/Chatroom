@@ -3,7 +3,13 @@
 #include "../muduo/net/EventLoop.h"
 #include "../tool/Dispatcher.h"
 #include "../tool/Codec.h"
-#include "service/UserService.h"
+#include "Service.h"
+
+
+using std::placeholders::_1;
+using std::placeholders::_2;
+using std::placeholders::_3;
+using std::placeholders::_4;
 
 class Server 
 {
@@ -22,5 +28,5 @@ private:
     Codec codec_;
     Dispatcher dispatcher_;
 
-    UserService userservice_;
+    Service service_;
 };
