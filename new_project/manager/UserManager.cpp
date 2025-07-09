@@ -1,7 +1,7 @@
 #include "UserManager.h"
 #include <iostream>
-
-// 模拟数据库操作（你应该用自己的 Database 类封装）
+#include <memory>
+#include <unordered_map>
 
 std::shared_ptr<User> UserManager::GetUser(int userId) 
 {
@@ -11,7 +11,7 @@ std::shared_ptr<User> UserManager::GetUser(int userId)
     return it != users_.end() ? it->second : nullptr;
 }
 
-bool UserManager::addUserToSystem(int id, const std::string& name, const std::string& password, const std::string& email, TcpConnectionPtr conn) 
+bool UserManager::AddUser(int id, const std::string& name, const std::string& password, const std::string& email) 
 {
 
     std::lock_guard<std::mutex> lock(mutex_);
@@ -22,18 +22,21 @@ bool UserManager::addUserToSystem(int id, const std::string& name, const std::st
 
     if (id <= 0) return false;  // 插入失败
 
-    auto user = std::make_shared<User>(id, name, password, email, conn);
+    auto user = std::make_shared<User>(id, name, password, email);
     users_[id] = user;
     emailtoidmap_[email] = id;
     idtoemailmap_[id] = email;
     return true;
 }
 
-void UserManager::RemoveUser(int userId) 
+void UserManager::RemoveUser(int id) 
 {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    users_.erase(userId);
+    users_.erase(id);
+    std::string email = idtoemailmap_[id];
+    emailtoidmap_.erase(email);
+    idtoemailmap_.erase(id);
 }
 
 void UserManager::SetOnline(int userId) 
@@ -62,6 +65,11 @@ bool UserManager::IsOnline(int userId)
 
     auto it = users_.find(userId);
     return (it != users_.end()) && it->second->IsOnline();
+}
+
+std::unordered_map<int, std::shared_ptr<User>> UserManager::GetAllUser()
+{
+    return users_;
 }
 
 std::unordered_map<std::string, int> UserManager::GetEmailToId()

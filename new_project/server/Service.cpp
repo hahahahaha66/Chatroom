@@ -1,5 +1,8 @@
 #include "Service.h"
 #include "../muduo/logging/Logging.h"
+#include <memory>
+#include <mysql/mariadb_com.h>
+#include <unistd.h>
 
 //提取json变量
 template<typename  T>
@@ -47,6 +50,15 @@ bool AssignIfPresent(const json& j, const std::string& key, T& out)
     return false;
 }
 
+std::string Escape(const std::string& input) {
+    std::string output;
+    for (char c : input) {
+        if (c == '\'' || c == '\"' || c == '\\') output += '\\';
+        output += c;
+    }
+    return output;
+}
+
 void Service::ReadFromDataBase(const std::string& query, std::function<void(MysqlRow&)> rowhander)
 {
     databasethreadpool_.EnqueueTask([this, query, rowhander](MysqlConnection& conn) {
@@ -65,21 +77,117 @@ void Service::ReadFromDataBase(const std::string& query, std::function<void(Mysq
     });
 }
 
+void Service::InitIdsFromMySQL() {
+    ReadFromDataBase("select max(id) as id from users;", 
+        [this](MysqlRow& userRow) {
+            int maxUserId = userRow.GetInt("id");
+
+            ReadFromDataBase("select max(id) as id from messages;", 
+                [this, maxUserId](MysqlRow& msgRow) {
+                    int maxMsgId = msgRow.GetInt("id");
+
+                    gen_.InitUserId(maxUserId);
+                    gen_.InitMsgId(maxMsgId);
+
+                    LOG_INFO << "已从 MySQL 初始化 Redis ID:user=" << maxUserId << ", msg=" << maxMsgId;
+                }
+            );
+        }
+    );
+}
+
+void Service::ReadUserFromDB()
+{
+    std::string query = "select * from users;";
+    ReadFromDataBase(query, [this](MysqlRow& row) {
+        int id = row.GetInt("id");
+        std::string email = row.GetString("email");
+        std::string username = row.GetString("name");
+        std::string password = row.GetString("password");
+        usermanager_.AddUser(id, username, password, email);
+    });
+}
+
+void Service::ReadMessageFromDB()
+{
+    std::string query = "select * from messages;";
+    ReadFromDataBase(query, [this](MysqlRow& row) {
+        int id = row.GetInt("id");
+        int senderid = row.GetInt("senderid");
+        int receiverid = row.GetInt("receiverid");
+        std::string content = row.GetString("email");
+        std::string type = row.GetString("type");
+        std::string status = row.GetString("status");
+        std::string time = row.GetString("timestamp");
+        Message message(id, senderid, receiverid, content, type, status, time);
+        messagemanager_.AddMessage(message);
+    });
+}
+
+void Service::StartAutoFlushToDataBase(int seconds)
+{
+    running_ = true;
+    flush_thread_ = std::thread([this, seconds]() {
+        while (running_)
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(seconds));
+            FlushToDataBase();
+        }
+    });
+}
+
+void Service::FlushToDataBase()
+{
+    for (auto it : usermanager_.GetAllUser())
+    {
+        FormatUpdateUser(it.second);
+    }
+
+    for (auto it : messagemanager_.GetAllMessage())
+    {
+        FormatUpdateMessage(it.second);
+    }
+}
+
+std::string Service::FormatUpdateUser(std::shared_ptr<User> user)
+{
+    std::ostringstream oss;
+    oss << "replace into user (id, username, password, email) values (" 
+        << user->GetId() << ", "<< Escape(user->GetName()) << ", "
+        << Escape(user->GetPassword()) << ", " << Escape(user->GetEmail()) << ") ;";
+    return oss.str();
+}
+
+std::string Service::FormatUpdateMessage(std::shared_ptr<Message> message)
+{
+    std::ostringstream oss;
+    oss << "replace into message (id, senderid, receiverid, connect, type, status, timestamp) values ("
+        << message->GetId() << message->GetSenderId() << message->GetReveiverId() 
+        << Escape(message->GetContent()) << Escape(message->GetType())
+        << Escape(message->GetStatus()) << Escape(message->GetTime()) << ") ;";
+    return oss.str();
+}
+
+void Service::StopAutoFlush()
+{
+    if (flush_thread_.joinable())
+        flush_thread_.join();
+}
+
 Service::Service()
 {
-    int maxuserid = 0;
-    int maxmsgid = 0;
-    std::string query = "select max(id) from users;";
-    ReadFromDataBase(query, [this, maxuserid](MysqlRow& row)mutable {
-        maxuserid = row.GetInt("id");
-    });
-    query = "select max(id) from messages;";
-    ReadFromDataBase(query, [this, maxmsgid](MysqlRow& row)mutable {
-        maxmsgid = row.GetInt("id");
-    });
+    InitIdsFromMySQL();
+    ReadUserFromDB();
+    ReadMessageFromDB();
 
-    gen_.InitUserId(maxuserid);
-    gen_.InitMsgId(maxmsgid);
+    StartAutoFlushToDataBase(10);
+}
+
+Service::~Service()
+{
+    FlushToDataBase();
+
+    StopAutoFlush();
 }
 
 void Service::UserRegister(const TcpConnectionPtr& conn, const json& js, Timestamp time)
@@ -94,7 +202,9 @@ void Service::UserRegister(const TcpConnectionPtr& conn, const json& js, Timesta
 
     int userid = gen_.GetNextUserId();
 
-    bool end = usermanager_.addUserToSystem(userid, username, password, email, conn);
+    std::cout << username << userid << password << email << std::endl;
+
+    bool end = usermanager_.AddUser(userid, username, password, email);
     gen_.GetRedis()->set("global:userid", std::to_string(userid));
     
     json j = {
@@ -186,3 +296,4 @@ void Service::GetChatHistory(const TcpConnectionPtr& conn, const json& js, Times
 {
 
 }
+

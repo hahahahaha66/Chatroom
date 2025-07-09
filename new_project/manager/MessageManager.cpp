@@ -1,12 +1,18 @@
 #include "MessageManager.h"
 #include <memory>
 #include <mutex>
+#include <unordered_map>
 
 void MessageManager::AddMessage(Message& message)
 {
     std::lock_guard<std::mutex> lock(mutex_);
 
     messages_[message.GetId()] = std::make_shared<Message>(message);
+}
+
+std::unordered_map<int, std::shared_ptr<Message>> MessageManager::GetAllMessage()
+{
+    return messages_;
 }
 
 std::vector<Message> MessageManager::GetSenderidAndReceiveridMessage(int senderid, int receiverid)

@@ -11,9 +11,8 @@
 class MessageManager
 {
 public:
-    void LoadAllMessageFromDB();
-
     void AddMessage(Message& message); //添加一条消息
+    std::unordered_map<int, std::shared_ptr<Message>> GetAllMessage();
 
     std::vector<Message> GetSenderidAndReceiveridMessage(int senderid, int receiverid); // 查询
 

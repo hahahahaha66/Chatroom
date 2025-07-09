@@ -6,8 +6,8 @@
 class User 
 {
 public:
-    User(int id, const std::string& name, const std::string& password, const std::string& email, const TcpConnectionPtr& conn)
-        : id_(id), name_(name), password_(password), email_(email), online_(false), conn_(conn) {}
+    User(int id, const std::string& name, const std::string& password, const std::string& email)
+        : id_(id), name_(name), password_(password), email_(email), online_(false) {}
 
     int GetId() const { return id_; }
     std::string GetName() const { return name_; }
@@ -15,6 +15,7 @@ public:
     std::string GetEmail() const { return email_; }
     TcpConnectionPtr GetConn() const {return conn_; }
 
+    void SetConn(TcpConnectionPtr conn) { conn_ = conn; }
     void SetOnline(bool online) { online_ = online; }
     bool IsOnline() const { return online_; }
 

@@ -12,17 +12,16 @@
 class UserManager 
 {
 public:
-    void LoadAllUsersFromDB();  // 初始化时调用
-
     std::shared_ptr<User> GetUser(int userId); // 获取用户信息
     void RemoveUser(int userId);               // 注销用户
 
-    bool addUserToSystem(int id, const std::string& name, const std::string& password, const std::string& email, TcpConnectionPtr conn);
+    bool AddUser(int id, const std::string& name, const std::string& password, const std::string& email);
 
     void SetOnline(int userId);  // 登录
     void SetOffline(int userId); // 下线
     bool IsOnline(int userId);
 
+    std::unordered_map<int, std::shared_ptr<User>> GetAllUser();
     std::unordered_map<std::string, int> GetEmailToId();
     std::unordered_map<int, std::string> GetIdToEmail();
 

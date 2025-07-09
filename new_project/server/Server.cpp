@@ -2,33 +2,24 @@
 #include "../muduo/logging/Logging.h"
 #include <functional>
 
-Server::Server(EventLoop* loop,const InetAddress& listenAddr)
-    : server_(loop, listenAddr, "ChatServer"), 
+Server::Server(EventLoop* loop,const InetAddress& listenAddr, std::string name)
+    : server_(loop, listenAddr, name), 
       dispatcher_() 
 {
+    MysqlConnectionPool::Instance().Init("localhost", 3306, "hahaha", "123456", "chatroom", 10);
+
     server_.setConnectionCallback(std::bind(&Server::OnConnection, this, _1));
     server_.setMessageCallback(std::bind(&Server::OnMessage, this, _1, _2, _3));
     server_.setWriteCompleteCallback(std::bind(&Server::MessageCompleteCallback, this, _1));
+    server_.setThreadInitCallback(std::bind(&Server::ThreadInitCallback, this, _1));
 
-    dispatcher_.registerHander("Register", [this](const std::shared_ptr<TcpConnection>& conn,
-        const nlohmann::json& json, Timestamp time) {
-        this->service_.UserRegister(conn, json, time);
-    });
+    dispatcher_.registerHander("Register", std::bind(&Service::UserRegister, &service_, _1, _2, _3));
 
-    dispatcher_.registerHander("Login", [this](const std::shared_ptr<TcpConnection>& conn,
-        const nlohmann::json& json, Timestamp time) {
-        this->service_.UserLogin(conn, json, time);
-    });
+    dispatcher_.registerHander("Login", std::bind(&Service::UserLogin, &service_, _1, _2, _3));
 
-    dispatcher_.registerHander("SendMessage", [this](const std::shared_ptr<TcpConnection>& conn,
-        const nlohmann::json& json, Timestamp time) {
-        this->service_.MessageSend(conn, json, time);
-    });
+    dispatcher_.registerHander("SendMessage", std::bind(&Service::MessageSend, &service_, _1, _2, _3));
 
-    dispatcher_.registerHander("ChatHistory", [this](const std::shared_ptr<TcpConnection>& conn,
-        const nlohmann::json& json, Timestamp time) {
-        this->service_.GetChatHistory(conn, json, time);
-    });
+    dispatcher_.registerHander("ChatHistory", std::bind(&Service::GetChatHistory, &service_, _1, _2, _3));
 }
 
 void Server::start()
@@ -63,11 +54,14 @@ void Server::OnConnection(const TcpConnectionPtr& conn)
 
 void Server::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timestamp time) 
 {
+    LOG_INFO << "tryDecode: buffer size = " << buffer->readableBytes();
+    
     auto msgopt = codec_.tryDecode(buffer);
 
     if (!msgopt.has_value())
     {
         LOG_INFO << "Recv from " << conn->peerAddress().toIpPort() << " failed";
+        return ;
     }
 
     auto [type, js] = msgopt.value();

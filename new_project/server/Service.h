@@ -14,9 +14,20 @@ using json = nlohmann::json;
 class Service {
 public:
     Service();
+    ~Service();
 
     //Database
     void ReadFromDataBase(const std::string& query, std::function<void(MysqlRow&)> rowhander);
+    void InitIdsFromMySQL();
+    void ReadUserFromDB();
+    void ReadMessageFromDB();
+
+    //flush
+    void StartAutoFlushToDataBase(int seconds);
+    void FlushToDataBase();
+    void StopAutoFlush();
+    std::string FormatUpdateUser(std::shared_ptr<User> user);
+    std::string FormatUpdateMessage(std::shared_ptr<Message> message);
 
     //User
     void UserRegister(const TcpConnectionPtr& conn, const json& json, Timestamp);
@@ -28,6 +39,9 @@ public:
     //Group
     
 private:
+    std::atomic<bool> running_ = false;
+    std::thread flush_thread_;
+
     IdGenerator gen_;
     Codec code_;
     DatabaseThreadPool databasethreadpool_;

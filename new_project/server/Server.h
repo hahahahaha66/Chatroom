@@ -5,7 +5,6 @@
 #include "../tool/Codec.h"
 #include "Service.h"
 
-
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
@@ -14,7 +13,7 @@ using std::placeholders::_4;
 class Server 
 {
 public:
-    Server(EventLoop* loop, const InetAddress& listenAddr);
+    Server(EventLoop* loop, const InetAddress& listenAddr, std::string name);
 
     void start();
 
