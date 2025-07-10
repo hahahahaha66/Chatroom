@@ -3,6 +3,7 @@
 
 #include "../muduo/net/tcp/TcpConnection.h"
 #include "../muduo/logging/Logging.h"
+#include "ThreadPool.h"
 
 #include <cstdint>
 #include <functional>
@@ -17,6 +18,16 @@ using MessageHander = std::function<void(const TcpConnectionPtr&, const json&, T
 class Dispatcher
 {
 public:
+    Dispatcher()
+    {
+        threadpool_.Start();
+    }
+
+    ~Dispatcher()
+    {
+        threadpool_.Stop();
+    }
+
     //注册一个命令对应的回调函数
     void registerHander(std::string type, MessageHander hander) 
     {
@@ -44,11 +55,14 @@ public:
         
         if (cb)
         {
-            cb(conn, js, time);
+            threadpool_.SubmitTask([=]() {
+                cb(conn, js, time);
+            });
         }
     }
 
 private:
+    ThreadPool threadpool_;
     std::unordered_map<std::string, MessageHander> handers_;
     std::mutex mutex_;
 };

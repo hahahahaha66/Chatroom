@@ -4,6 +4,7 @@
 #include "../tool/Codec.h"
 #include "../tool/Dispatcher.h"
 #include <atomic>
+#include <condition_variable>
 #include <iostream>
 #include <thread>
 #include <unistd.h>
@@ -73,7 +74,7 @@ public:
 
         dispatcher_.registerHander("RegisterBack", std::bind(&Client::RegisterBack, this, _1, _2, _3));
         dispatcher_.registerHander("LoginBack", std::bind(&Client::LoginBack, this, _1, _2, _3));
-        dispatcher_.registerHander("SendMessage", std::bind(&Client::SendMessageBack, this, _1, _2, _3));
+        dispatcher_.registerHander("SendMessageBack", std::bind(&Client::SendMessageBack, this, _1, _2, _3));
         dispatcher_.registerHander("RecvMessage", std::bind(&Client::RecvMessageBack, this, _1, _2, _3));
     }
 
@@ -96,6 +97,7 @@ public:
         if (!msgopt.has_value())
         {
             LOG_INFO << "Recv from " << conn->peerAddress().toIpPort() << " failed";
+            return;
         }
 
         auto [type, js] = msgopt.value();
@@ -118,7 +120,7 @@ public:
 
     void RegisterBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
     {
-        bool end;
+        bool end = false;
         AssignIfPresent(js, "end", end);
         if (end)
         {
@@ -128,6 +130,7 @@ public:
         {
             std::cout << "Register failed" << std::endl;
         }
+        notifyInputReady();
     }
 
     void Login(const json& js)
@@ -137,19 +140,21 @@ public:
 
     void LoginBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
     {
-        bool end;
-        int id;
+        bool end = false;
+        int id = 0;
         AssignIfPresent(js, "end", end);
         AssignIfPresent(js, "id", id);
         if (end)
         {
             std::cout << "Login successful" << std::endl;
+            currentState_ = "chat_menu";
             userid = id;
         }
         else
         {
             std::cout << "Login failed" << std::endl;
         }
+        notifyInputReady();
     }
 
     void SendMessage(const json& js)
@@ -159,7 +164,7 @@ public:
 
     void SendMessageBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
     {
-        bool end;
+        bool end = false;
         AssignIfPresent(js, "end", end);
         if (end)
         {
@@ -169,6 +174,7 @@ public:
         {
             std::cout << "Send failed" << std::endl;
         }
+        notifyInputReady();
     }
 
     void RecvMessageBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
@@ -198,104 +204,98 @@ public:
     void send(const std::string& msg)
     {
         client_.getLoop()->runInLoop([this, msg]() {
-            client_.connection()->send(msg);
+            if (client_.connection() && client_.connection()->connected())
+            {
+                client_.connection()->send(msg);
+            }
         });
     }
 
-    void interface()
+    inline void notifyInputReady() 
     {
-        std::string username, password, email;
-        // while (authed_) {
-        //     std::string cmd;
-        //     std::cout << authed_ << std::endl;
-        //     std::cout << "Enter command (register/login): ";
-        //     std::cin >> cmd;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            waitingback_ = false;
+        }
+        cv_.notify_one();
+    }
 
-        //     json js;
-        //     if (cmd == "register")
-        //     {
-        //         std::cout << "email: ";
-        //         std::cin >> email;
-        //         std::cout << "Username: ";
-        //         std::cin >> username;
-        //         std::cout << "Password: ";
-        //         std::cin >> password;
-
-        //         js["email"] = email;
-        //         js["username"] = username;
-        //         js["password"] = password;
-
-        //         this->Register(js);
-        //     }
-        //     else if ("login")
-        //     {
-        //         std::cout << "email: ";
-        //         std::cin >> email;
-        //         std::cout << "Password: ";
-        //         std::cin >> password;
-
-        //         js["email"] = email;
-        //         js["password"] = password;
-
-        //         this->Login(js);
-        //     }
-        //     else  
-        //     {
-        //         std::cout << "worng" << std::endl;
-        //         continue;
-        //     }
-        //     waiting = false;
-        //     std::cout << "响应中";
-        //     while (waiting)
-        //     {
-        //         std::cout << ".";
-        //         sleep(1);
-        //     }
-        //     std::cout << std::endl;
-        // }    
-        sleep(2);
-        json js;
-        std::cout << "email: ";
-        std::cin >> email;
-        std::cout << "Password: ";
-        std::cin >> password;
-
-        js["email"] = email;
-        js["password"] = password;
-
-        this->Login(js);
-
-        sleep(2);
-
+    void InputLoop()
+    {
         while (true)
         {
-            //1005
-            int receiverid;
-            std::cout << "receiverid: ";
-            std::cin >> receiverid;
-            
-            std::string message;
-            std::cout << "Input Message: " ;
-            std::cin >> message;
-            json js {
-                {"senderid", userid},
-                {"receiverid", receiverid},
-                {"content", message},
-                {"type", "Private"},
-                {"status", "Unread"},
-                {"timestamp", timestamp.toString()}
-            };
-            SendMessage(js);
-            sleep(1);
+            if (waitingback_)
+            {
+                std::unique_lock<std::mutex> lock(mutex_);
+                cv_.wait(lock, [this] { return !waitingback_; });
+            }
+
+            if (currentState_ == "main_menu")
+            {
+                std::string username, password, email;
+                std::this_thread::sleep_for(std::chrono::seconds(2));
+                json js;
+                std::cout << "email: ";
+                std::cin >> email;
+                std::cout << "Password: ";
+                std::cin >> password;
+
+                js["email"] = email;
+                js["password"] = password;
+
+                waitingback_ = true;
+
+                this->Login(js);
+            }
+            else if (currentState_ == "chat_menu")
+            {
+                int receiverid;
+                std::cout << "receiverid: ";
+                std::cin >> receiverid;
+                
+                std::string message;
+                std::cout << "Input Message: " ;
+                std::cin >> message;
+
+                //获取时间戳
+                auto now = std::chrono::system_clock::now();
+                auto time_t = std::chrono::system_clock::to_time_t(now);
+                std::string timestamp_str = std::ctime(&time_t);
+                // 移除换行符
+                if (!timestamp_str.empty() && timestamp_str.back() == '\n') {
+                    timestamp_str.pop_back();
+                }
+
+                json js {
+                    {"senderid", userid},
+                    {"receiverid", receiverid},
+                    {"content", message},
+                    {"type", "Private"},
+                    {"status", "Unread"},
+                   {"timestamp", timestamp_str}
+                };
+
+                waitingback_ = true;
+                SendMessage(js);
+            }
+            else  
+            {
+                LOG_ERROR << "!!!!Wrong!!!!";
+                return;
+            }
         }
     }
 private:
-    TcpClient client_;
+    std::atomic<bool> waitingback_ = false;
+    std::string currentState_ = "main_menu";
+    std::mutex mutex_;
+    std::condition_variable cv_;
 
+    TcpClient client_;
     Codec codec_;
     Dispatcher dispatcher_;
 
-    int userid;
+    int userid = 0;
 };
 
 int main ()
@@ -308,9 +308,8 @@ int main ()
     client.start();
 
     std::thread th([&client]() {
-        client.interface();
+        client.InputLoop();
     });
 
     loop.loop();
-    th.join();
 }

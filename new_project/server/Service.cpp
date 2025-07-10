@@ -238,6 +238,7 @@ void Service::UserLogin(const TcpConnectionPtr& conn, const json& js, Timestamp 
             userid = it->second;
             end = true;
             usermanager_.SetOnline(userid);
+            usermanager_.GetUser(userid)->SetConn(conn);
         }
     }
 
@@ -267,7 +268,16 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js, Timestam
 
     //添加到redis,获取自增id
     int msgid = gen_.GetNextMsgId();
-    gen_.GetRedis()->set("global:userid", std::to_string(msgid));
+    gen_.GetRedis()->set("global:msgid", std::to_string(msgid));
+
+    json j;
+
+    j = {
+        {"end", true}
+    };
+    
+    auto seconn = usermanager_.GetUser(sendid)->GetConn();
+    seconn->send(code_.encode(j, "SendMessageBack"));
 
     if (type == "Group")
     {
@@ -279,7 +289,7 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js, Timestam
         {
             status = "Read";
             auto reconn = usermanager_.GetUser(receiverid)->GetConn();
-            json j = {
+            j = {
                 {"senderid", sendid},
                 {"receiverid", receiverid},
                 {"content", content},
@@ -287,7 +297,7 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js, Timestam
                 {"status", status},
                 {"timestamp", timestamp}
             };
-            conn->send(code_.encode(j, "RecvMessage"));
+            reconn->send(code_.encode(j, "RecvMessage"));
         }
     }
     else
