@@ -7,6 +7,8 @@
 #include "../tool/Codec.h"
 #include "../database/DatabaseThreadPool.h"
 #include "../database/MysqlResult.h"
+#include "../manager/FriendManager.h"
+
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -21,6 +23,7 @@ public:
     void InitIdsFromMySQL();
     void ReadUserFromDB();
     void ReadMessageFromDB();
+    void ReadFriendFromDB();
 
     //flush
     void StartAutoFlushToDataBase(int seconds);
@@ -28,6 +31,7 @@ public:
     void StopAutoFlush();
     std::string FormatUpdateUser(std::shared_ptr<User> user);
     std::string FormatUpdateMessage(std::shared_ptr<Message> message);
+    std::string FormatUpdataFriend(std::shared_ptr<Friend> frienda);
 
     //User
     void UserRegister(const TcpConnectionPtr& conn, const json& json, Timestamp);
@@ -48,5 +52,5 @@ private:
 
     UserManager usermanager_;
     MessageManager messagemanager_;
-    
+    FriendManager friendmanager_;
 };

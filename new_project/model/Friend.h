@@ -3,8 +3,8 @@
 class Friend 
 {
 public:
-    Friend(int userid, int friendid)
-        : userid_(userid), friendid_(friendid)
+    Friend(int id, int userid, int friendid)
+        : id_(id), userid_(userid), friendid_(friendid)
     {
     }
 
@@ -15,6 +15,7 @@ public:
     void SetBlock(bool block) { block_ = block; }
 
 private:
+    int id_;
     int userid_;
     int friendid_;
     bool block_ = false;
