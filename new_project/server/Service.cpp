@@ -138,33 +138,36 @@ void Service::StartAutoFlushToDataBase(int seconds)
 
 void Service::FlushToDataBase()
 {
-    for (auto it : usermanager_.GetAllUser())
-    {
-        FormatUpdateUser(it.second);
-    }
+    databasethreadpool_.EnqueueTask([this](MysqlConnection& conn) {
+        for (auto it : usermanager_.GetAllUser())
+        {
+            conn.ExcuteUpdata(FormatUpdateUser(it.second));
+        }
 
-    for (auto it : messagemanager_.GetAllMessage())
-    {
-        FormatUpdateMessage(it.second);
-    }
+        for (auto it : messagemanager_.GetAllMessage())
+        {    
+            conn.ExcuteUpdata(FormatUpdateMessage(it.second));
+        }
+    });
 }
 
 std::string Service::FormatUpdateUser(std::shared_ptr<User> user)
 {
     std::ostringstream oss;
-    oss << "replace into user (id, username, password, email) values (" 
-        << user->GetId() << ", "<< Escape(user->GetName()) << ", "
-        << Escape(user->GetPassword()) << ", " << Escape(user->GetEmail()) << ") ;";
+    oss << "replace into users (id, name, password, email) values (" 
+        << user->GetId() << ", '"<< Escape(user->GetName()) << "', '"
+        << Escape(user->GetPassword()) << "', '" << Escape(user->GetEmail()) << "') ;";
     return oss.str();
 }
 
 std::string Service::FormatUpdateMessage(std::shared_ptr<Message> message)
 {
     std::ostringstream oss;
-    oss << "replace into message (id, senderid, receiverid, connect, type, status, timestamp) values ("
-        << message->GetId() << message->GetSenderId() << message->GetReveiverId() 
-        << Escape(message->GetContent()) << Escape(message->GetType())
-        << Escape(message->GetStatus()) << Escape(message->GetTime()) << ") ;";
+    oss << "replace into messages (id, senderid, receiverid, content, type, status, timestamp) values ("
+        << message->GetId() << ", '"<< message->GetSenderId() << "', "<< message->GetReveiverId() 
+        << ", '"<< Escape(message->GetContent()) << "', '"<< Escape(message->GetType())
+        << "', '"<< Escape(message->GetStatus()) << "', '"<< Escape(message->GetTime()) << "') ;";
+    std::cout << oss.str() << std::endl;
     return oss.str();
 }
 
@@ -230,13 +233,17 @@ void Service::UserLogin(const TcpConnectionPtr& conn, const json& js, Timestamp 
 
     if (it != emailtoid.end())
     {
-        userid = it->second;
-        end = true;
-        usermanager_.SetOnline(userid);
+        if (usermanager_.GetUser(it->second)->GetPassword() == password)
+        {
+            userid = it->second;
+            end = true;
+            usermanager_.SetOnline(userid);
+        }
     }
 
     json j = {
-        {"end", end}
+        {"end", end},
+        {"id", userid}
     };
 
     conn->send(code_.encode(j, "LoginBack"));
@@ -251,9 +258,9 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js, Timestam
     std::string status;
     std::string timestamp;
 
-    AssignIfPresent(js, "sendid", sendid);
-    AssignIfPresent(js, "recevierid", receiverid);
-    AssignIfPresent(js, "contect", content);
+    AssignIfPresent(js, "senderid", sendid);
+    AssignIfPresent(js, "receiverid", receiverid);
+    AssignIfPresent(js, "content", content);
     AssignIfPresent(js, "type", type);
     AssignIfPresent(js, "status", status);
     AssignIfPresent(js, "timestamp", timestamp);
@@ -273,15 +280,14 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js, Timestam
             status = "Read";
             auto reconn = usermanager_.GetUser(receiverid)->GetConn();
             json j = {
-                {"sendid", sendid},
-                {"recevierid", receiverid},
-                {"contect", content},
+                {"senderid", sendid},
+                {"receiverid", receiverid},
+                {"content", content},
                 {"type", type},
                 {"status", status},
                 {"timestamp", timestamp}
             };
-
-            conn->send(code_.encode(j, "Message"));
+            conn->send(code_.encode(j, "RecvMessage"));
         }
     }
     else

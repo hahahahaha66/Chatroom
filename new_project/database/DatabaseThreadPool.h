@@ -24,7 +24,7 @@ using MysqlConnPtr = std::shared_ptr<MysqlConnection>;
 class DatabaseThreadPool  
 {
 public:
-    DatabaseThreadPool(size_t threadcount = 4);
+    DatabaseThreadPool(size_t threadcount = 3);
     ~DatabaseThreadPool();
 
     void EnqueueTask(std::function<void(MysqlConnection&)> fn);
@@ -38,7 +38,6 @@ private:
     std::mutex mutex_;
     std::condition_variable con_;
     bool isrunning_;
-
 };
 
 #endif

@@ -1,8 +1,9 @@
 #include "DatabaseThreadPool.h"
+#include <cstddef>
 
 DatabaseThreadPool::DatabaseThreadPool(size_t threadcount) : isrunning_(true)
 {
-    for (int i = 0; i < threadcount; i++)
+    for (size_t i = 0; i < threadcount; i++)
     {
         workers_.emplace_back([this, i] () { 
             LOG_INFO << "Worker thread " << i << " started";
@@ -22,6 +23,10 @@ void DatabaseThreadPool::EnqueueTask(std::function<void(MysqlConnection&)> fn)
 
     {
         std::unique_lock<std::mutex> lock(mutex_);
+        if (!isrunning_) {
+            LOG_WARN << "DatabaseThreadPool stopped, task rejected";
+            return;
+        }
         tasks_.push(std::move(fn));
     }
     con_.notify_all();

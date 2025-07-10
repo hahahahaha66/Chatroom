@@ -6,12 +6,14 @@
 #include <atomic>
 #include <iostream>
 #include <thread>
+#include <unistd.h>
 
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
 using std::placeholders::_4;
 
+Timestamp timestamp;
 
 //提取json变量
 template<typename  T>
@@ -71,7 +73,8 @@ public:
 
         dispatcher_.registerHander("RegisterBack", std::bind(&Client::RegisterBack, this, _1, _2, _3));
         dispatcher_.registerHander("LoginBack", std::bind(&Client::LoginBack, this, _1, _2, _3));
-        //dispatcher_.registerHander("Message", );
+        dispatcher_.registerHander("SendMessage", std::bind(&Client::SendMessageBack, this, _1, _2, _3));
+        dispatcher_.registerHander("RecvMessage", std::bind(&Client::RecvMessageBack, this, _1, _2, _3));
     }
 
     void ConnectionCallBack(const TcpConnectionPtr& conn)
@@ -135,16 +138,56 @@ public:
     void LoginBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
     {
         bool end;
+        int id;
         AssignIfPresent(js, "end", end);
+        AssignIfPresent(js, "id", id);
         if (end)
         {
             std::cout << "Login successful" << std::endl;
-            authed_ = true;
+            userid = id;
         }
         else
         {
             std::cout << "Login failed" << std::endl;
         }
+    }
+
+    void SendMessage(const json& js)
+    {
+        this->send(codec_.encode(js, "SendMessage"));
+    }
+
+    void SendMessageBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
+    {
+        bool end;
+        AssignIfPresent(js, "end", end);
+        if (end)
+        {
+            std::cout << "Send successful" << std::endl;
+        }
+        else
+        {
+            std::cout << "Send failed" << std::endl;
+        }
+    }
+
+    void RecvMessageBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
+    {
+        int sendid = 0;
+        int receiverid = 0;
+        std::string content;
+        std::string type;
+        std::string status;
+        std::string timestamp;
+
+        AssignIfPresent(js, "senderid", sendid);
+        AssignIfPresent(js, "receiverid", receiverid);
+        AssignIfPresent(js, "content", content);
+        AssignIfPresent(js, "type", type);
+        AssignIfPresent(js, "status", status);
+        AssignIfPresent(js, "timestamp", timestamp);     
+        
+        std::cout << "Recv: " << content << std::endl;
     }
 
     void start()
@@ -161,47 +204,90 @@ public:
 
     void interface()
     {
-        while (authed_) {
-            std::string cmd;
-            std::cout << "Enter command (register/login): ";
-            std::cin >> cmd;
+        std::string username, password, email;
+        // while (authed_) {
+        //     std::string cmd;
+        //     std::cout << authed_ << std::endl;
+        //     std::cout << "Enter command (register/login): ";
+        //     std::cin >> cmd;
 
-            std::string username, password, email;
-            json js;
-            if (cmd == "register")
-            {
-                std::cout << "email:  ";
-                std::cin >> email;
-                std::cout << "Username: ";
-                std::cin >> username;
-                std::cout << "Password: ";
-                std::cin >> password;
+        //     json js;
+        //     if (cmd == "register")
+        //     {
+        //         std::cout << "email: ";
+        //         std::cin >> email;
+        //         std::cout << "Username: ";
+        //         std::cin >> username;
+        //         std::cout << "Password: ";
+        //         std::cin >> password;
 
-                js["email"] = email;
-                js["username"] = username;
-                js["password"] = password;
+        //         js["email"] = email;
+        //         js["username"] = username;
+        //         js["password"] = password;
 
-                this->Register(js);
-            }
-            else if ("login")
-            {
-                std::cout << "email:  ";
-                std::cin >> email;
-                std::cout << "Password: ";
-                std::cin >> password;
+        //         this->Register(js);
+        //     }
+        //     else if ("login")
+        //     {
+        //         std::cout << "email: ";
+        //         std::cin >> email;
+        //         std::cout << "Password: ";
+        //         std::cin >> password;
 
-                js["email"] = email;
-                js["password"] = password;
+        //         js["email"] = email;
+        //         js["password"] = password;
 
-                this->Login(js);
-            }
-            else  
-            {
-                std::cout << "worng" << std::endl;
-                continue;
-            }
-        }    
-        std::cout << "ok" << std::endl;
+        //         this->Login(js);
+        //     }
+        //     else  
+        //     {
+        //         std::cout << "worng" << std::endl;
+        //         continue;
+        //     }
+        //     waiting = false;
+        //     std::cout << "响应中";
+        //     while (waiting)
+        //     {
+        //         std::cout << ".";
+        //         sleep(1);
+        //     }
+        //     std::cout << std::endl;
+        // }    
+        sleep(2);
+        json js;
+        std::cout << "email: ";
+        std::cin >> email;
+        std::cout << "Password: ";
+        std::cin >> password;
+
+        js["email"] = email;
+        js["password"] = password;
+
+        this->Login(js);
+
+        sleep(2);
+
+        while (true)
+        {
+            //1005
+            int receiverid;
+            std::cout << "receiverid: ";
+            std::cin >> receiverid;
+            
+            std::string message;
+            std::cout << "Input Message: " ;
+            std::cin >> message;
+            json js {
+                {"senderid", userid},
+                {"receiverid", receiverid},
+                {"content", message},
+                {"type", "Private"},
+                {"status", "Unread"},
+                {"timestamp", timestamp.toString()}
+            };
+            SendMessage(js);
+            sleep(1);
+        }
     }
 private:
     TcpClient client_;
@@ -209,7 +295,7 @@ private:
     Codec codec_;
     Dispatcher dispatcher_;
 
-    bool authed_;
+    int userid;
 };
 
 int main ()

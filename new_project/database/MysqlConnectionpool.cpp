@@ -1,7 +1,6 @@
 #include "MysqlConnectionpool.h"
 #include "MysqlConnection.h"
 
-#include <cctype>
 #include <cstddef>
 #include <chrono>
 #include <memory>

@@ -34,7 +34,7 @@ public:
             auto it = handers_.find(type);
             if (it != handers_.end())
             {
-                cb = std::move(it->second);
+                cb = it->second;
             }
             else 
             {
