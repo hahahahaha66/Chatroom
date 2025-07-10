@@ -7,7 +7,8 @@ bool FriendApplyManager::AddAplly(int id, int fromid, int targetid, std::string 
         return false;
     }
 
-    applys[targetid][fromid] = std::make_shared<Apply>(id, fromid, targetid, type, status);
+    Apply apply(id, fromid, targetid, type, status);
+    applys[targetid][fromid] = std::make_shared<Apply>(apply);
     return true;
 }
 
@@ -150,4 +151,9 @@ std::string FriendApplyManager::GetApplyStatus(int fromid, int targetid)
     }
     
     return apply->GetStatus();
+}
+
+std::unordered_map<int, std::unordered_map<int, std::shared_ptr<Apply>>> FriendApplyManager::GetAllApply()
+{
+    return applys;
 }

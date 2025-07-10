@@ -2,7 +2,7 @@
 #include <memory>
 #include <vector>
 
-bool FriendManager::AddFriend(int id, int userid, int friendid)
+bool FriendManager::AddFriend(int id, int userid, int friendid, bool block)
 {
     if (userid == friendid) {
         return false;
@@ -13,7 +13,8 @@ bool FriendManager::AddFriend(int id, int userid, int friendid)
         return false;
     }
 
-    friends_[userid][friendid] = std::make_shared<Friend>(id, userid, friendid);
+    Friend fd(id, userid, friendid, block);
+    friends_[userid][friendid] = std::make_shared<Friend>(fd);
     return true;
 }
 
@@ -83,4 +84,9 @@ std::vector<int> FriendManager::GetUnblockedFriendList(int userid)
     }
     
     return friendlist;
+}
+
+std::unordered_map<int, std::unordered_map<int, std::shared_ptr<Friend>>> FriendManager::GetAllFriend()
+{
+    return friends_;
 }

@@ -2,6 +2,7 @@
 #include "../muduo/logging/Logging.h"
 #include <memory>
 #include <mysql/mariadb_com.h>
+#include <sw/redis++/shards.h>
 #include <unistd.h>
 
 //提取json变量
@@ -78,22 +79,37 @@ void Service::ReadFromDataBase(const std::string& query, std::function<void(Mysq
 }
 
 void Service::InitIdsFromMySQL() {
-    ReadFromDataBase("select max(id) as id from users;", 
-        [this](MysqlRow& userRow) {
-            int maxUserId = userRow.GetInt("id");
+    ReadFromDataBase("select max(id) as id from users;", [this](MysqlRow& userRow) 
+    {
+        int maxuserid = userRow.GetInt("id");
+        gen_.InitUserId(maxuserid);
+        LOG_INFO << "已从 MySQL 初始化 Redis ID:user=" << maxuserid;
+    });
 
-            ReadFromDataBase("select max(id) as id from messages;", 
-                [this, maxUserId](MysqlRow& msgRow) {
-                    int maxMsgId = msgRow.GetInt("id");
+    ReadFromDataBase("select max(id) as id from messages;", [this](MysqlRow& msgRow) 
+    {
+        int maxmsgid = msgRow.GetInt("id");
+        gen_.InitMsgId(maxmsgid);
 
-                    gen_.InitUserId(maxUserId);
-                    gen_.InitMsgId(maxMsgId);
+        LOG_INFO << "已从 MySQL 初始化 Redis ID:msg=" << maxmsgid;
+    });
 
-                    LOG_INFO << "已从 MySQL 初始化 Redis ID:user=" << maxUserId << ", msg=" << maxMsgId;
-                }
-            );
-        }
-    );
+    ReadFromDataBase("select max(id) as id from friends;", [this](MysqlRow& msgRow) 
+    {
+        int maxfriendid = msgRow.GetInt("id");
+        gen_.InitFriendId(maxfriendid);
+
+        LOG_INFO << "已从 MySQL 初始化 Redis ID:friend=" << maxfriendid;
+    });
+
+    ReadFromDataBase("select max(id) as id from friendapplys;", [this](MysqlRow& msgRow) 
+    {
+        int maxfriendapplyid = msgRow.GetInt("id");
+        gen_.InitFriendAppltId(maxfriendapplyid);
+
+        LOG_INFO << "已从 MySQL 初始化 Redis ID:friendapplys=" << maxfriendapplyid;
+    });
+
 }
 
 void Service::ReadUserFromDB()
@@ -115,12 +131,38 @@ void Service::ReadMessageFromDB()
         int id = row.GetInt("id");
         int senderid = row.GetInt("senderid");
         int receiverid = row.GetInt("receiverid");
-        std::string content = row.GetString("email");
+        std::string content = row.GetString("content");
         std::string type = row.GetString("type");
         std::string status = row.GetString("status");
         std::string time = row.GetString("timestamp");
         Message message(id, senderid, receiverid, content, type, status, time);
         messagemanager_.AddMessage(message);
+    });
+}
+
+void Service::ReadFriendFromDB()
+{
+    std::string query = "select * from friends;";
+    ReadFromDataBase(query, [this](MysqlRow& row) {
+        int id = row.GetInt("id");
+        int userid = row.GetInt("userid");
+        int friendid = row.GetInt("friendid");
+        bool block = row.GetBool("block");
+
+        friendmanager_.AddFriend(id, userid, friendid, block);
+    });
+}
+
+void Service::ReadFriendApplyFromDB()
+{
+    std::string query = "select * from friendapplys;";
+    ReadFromDataBase(query, [this](MysqlRow& row) {
+        int applyid = row.GetInt("id");
+        int fromid = row.GetInt("fromid");
+        int targetid = row.GetInt("targetid");
+        std::string status = row.GetString("status");
+
+        friendapplymanager_.AddAplly(applyid, fromid, targetid, "Friend", status);
     });
 }
 
@@ -148,6 +190,22 @@ void Service::FlushToDataBase()
         {    
             conn.ExcuteUpdata(FormatUpdateMessage(it.second));
         }
+
+        for (auto it : friendmanager_.GetAllFriend())
+        {
+            for (auto its : it.second)
+            {
+                conn.ExcuteUpdata(FormatUpdataFriend(its.second));
+            }
+        }
+
+        for (auto it : friendapplymanager_.GetAllApply())
+        {
+            for (auto its : it.second)
+            {
+                conn.ExcuteUpdata(FormatUpdataFriendApply(its.second));
+            }
+        }
     });
 }
 
@@ -171,6 +229,24 @@ std::string Service::FormatUpdateMessage(std::shared_ptr<Message> message)
     return oss.str();
 }
 
+std::string Service::FormatUpdataFriend(std::shared_ptr<Friend> frienda)
+{
+    std::ostringstream oss;
+    oss << "replace into friends (id, userid, friendid, block) values (" 
+        << frienda->GetId() << ", "<< frienda->GetUserId() << ", "
+        << frienda->GetFriendId() << ", " << frienda->GetBlock() << ") ;";
+    return oss.str();
+}
+
+std::string Service::FormatUpdataFriendApply(std::shared_ptr<Apply> friendapply)
+{
+    std::ostringstream oss;
+    oss << "replace into friendapplys (id, fromid, targetid, status) values (" 
+        << friendapply->GetApplyId() << ", "<< friendapply->GetFromId() << ", "
+        << friendapply->GetTargetId() << ", '" << friendapply->GetStatus() << "') ;";
+    return oss.str();
+}
+
 void Service::StopAutoFlush()
 {
     if (flush_thread_.joinable())
@@ -182,6 +258,8 @@ Service::Service()
     InitIdsFromMySQL();
     ReadUserFromDB();
     ReadMessageFromDB();
+    ReadFriendFromDB();
+    ReadFriendApplyFromDB();
 
     StartAutoFlushToDataBase(10);
 }
@@ -306,6 +384,36 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js, Timestam
     }
     Message message(msgid, sendid, receiverid, content, type, status, timestamp);
     messagemanager_.AddMessage(message);
+}
+
+void Service::AddFriend(const TcpConnectionPtr& conn, const json& json, Timestamp)
+{
+
+}
+
+void Service::ListFriendProceApplys(const TcpConnectionPtr& conn, const json& json, Timestamp)
+{
+
+}
+
+void Service::ListFriendUnproceApplys(const TcpConnectionPtr& conn, const json& json, Timestamp)
+{
+
+}
+
+void Service::ListFriendSentApplys(const TcpConnectionPtr& conn, const json& json, Timestamp)
+{
+
+}
+
+void Service::ProceFriendApplys(const TcpConnectionPtr& conn, const json& json, Timestamp)
+{
+
+}
+
+void Service::ListFriends(const TcpConnectionPtr& conn, const json& json, Timestamp)
+{
+
 }
 
 void Service::GetChatHistory(const TcpConnectionPtr& conn, const json& js, Timestamp time)

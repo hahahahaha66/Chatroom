@@ -10,6 +10,7 @@ public:
     {
     }
 
+    int GetApplyId() { return applyid_; }
     int GetFromId() { return fromid_; }
     int GetTargetId() { return targetid_; }
     std::string GetType() { return type_; }

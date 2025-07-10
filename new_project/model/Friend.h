@@ -3,11 +3,12 @@
 class Friend 
 {
 public:
-    Friend(int id, int userid, int friendid)
-        : id_(id), userid_(userid), friendid_(friendid)
+    Friend(int id, int userid, int friendid, bool block)
+        : id_(id), userid_(userid), friendid_(friendid), block_(block)
     {
     }
 
+    int GetId() { return id_; }
     int GetUserId() { return userid_; }
     int GetFriendId() { return friendid_; }
 

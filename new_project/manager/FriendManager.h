@@ -10,7 +10,7 @@ class FriendManager
 {
 public:
     //记得添加双向好友
-    bool AddFriend(int id, int userid, int friendid);
+    bool AddFriend(int id, int userid, int friendid, bool block = false);
     bool RemoveFriend(int useid, int friendid);
     bool SetFriendBlock(int userid, int friendid, bool block);
     bool GetFriendBlock(int userid, int friendid);
@@ -19,6 +19,7 @@ public:
     std::vector<int> GetFriendList(int userid);
     std::vector<int> GetUnblockedFriendList(int userid);
     size_t GetFriendCount(int userid);
+    std::unordered_map<int, std::unordered_map<int, std::shared_ptr<Friend>>> GetAllFriend();
 
 private:
     std::unordered_map<int, std::unordered_map<int, std::shared_ptr<Friend>>> friends_;

@@ -1,3 +1,4 @@
+#include <memory>
 #pragma one
 
 #include "../muduo/net/tcp/TcpConnection.h"
@@ -8,6 +9,7 @@
 #include "../database/DatabaseThreadPool.h"
 #include "../database/MysqlResult.h"
 #include "../manager/FriendManager.h"
+#include "../manager/FriendApplyManager.h"
 
 #include <nlohmann/json.hpp>
 
@@ -24,6 +26,7 @@ public:
     void ReadUserFromDB();
     void ReadMessageFromDB();
     void ReadFriendFromDB();
+    void ReadFriendApplyFromDB();
 
     //flush
     void StartAutoFlushToDataBase(int seconds);
@@ -32,14 +35,24 @@ public:
     std::string FormatUpdateUser(std::shared_ptr<User> user);
     std::string FormatUpdateMessage(std::shared_ptr<Message> message);
     std::string FormatUpdataFriend(std::shared_ptr<Friend> frienda);
+    std::string FormatUpdataFriendApply(std::shared_ptr<Apply> friendapply);
 
     //User
     void UserRegister(const TcpConnectionPtr& conn, const json& json, Timestamp);
     void UserLogin(const TcpConnectionPtr& conn, const json& json, Timestamp);
+
     //Message
     void MessageSend(const TcpConnectionPtr& conn, const json& json, Timestamp);
     void GetChatHistory(const TcpConnectionPtr& conn, const json& json, Timestamp);
+
     //Friend
+    void AddFriend(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void ListFriendProceApplys(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void ListFriendUnproceApplys(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void ListFriendSentApplys(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void ProceFriendApplys(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void ListFriends(const TcpConnectionPtr& conn, const json& json, Timestamp);
+
     //Group
     
 private:
@@ -53,4 +66,5 @@ private:
     UserManager usermanager_;
     MessageManager messagemanager_;
     FriendManager friendmanager_;
+    FriendApplyManager friendapplymanager_;
 };

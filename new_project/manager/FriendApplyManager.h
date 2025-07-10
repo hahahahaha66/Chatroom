@@ -26,6 +26,7 @@ public:
     std::vector<std::shared_ptr<Apply>> GetPendingApplies(int targetid);
     //获取申请状态
     std::string GetApplyStatus(int fromId, int targetId);
+    std::unordered_map<int, std::unordered_map<int, std::shared_ptr<Apply>>> GetAllApply();
     
 private:
     //以被发送申请人作为索引,[target][from]->apply

@@ -27,14 +27,34 @@ public:
         return redis_->incr("global:msgid");
     }
 
-    void InitUserId(int startId)
+    int GetNextFriendId()
     {
-        redis_->set("global:userid", std::to_string(startId));
+        return redis_->incr("global:friendid");
     }
 
-    void InitMsgId(int startId)
+    int GetNextFriendApplyId()
     {
-        redis_->set("global:msgid", std::to_string(startId));
+        return redis_->incr("global:applyid");
+    }
+
+    void InitUserId(int startid)
+    {
+        redis_->set("global:userid", std::to_string(startid));
+    }
+
+    void InitMsgId(int startid)
+    {
+        redis_->set("global:msgid", std::to_string(startid));
+    }
+
+    void InitFriendId(int startid)
+    {
+        redis_->set("global:friendid", std::to_string(startid));
+    }
+
+    void InitFriendAppltId(int startid)
+    {
+        redis_->set("global:applyid", std::to_string(startid));
     }
 
     std::shared_ptr<sw::redis::Redis> GetRedis()
