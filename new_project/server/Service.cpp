@@ -225,7 +225,6 @@ std::string Service::FormatUpdateMessage(std::shared_ptr<Message> message)
         << message->GetId() << ", '"<< message->GetSenderId() << "', "<< message->GetReveiverId() 
         << ", '"<< Escape(message->GetContent()) << "', '"<< Escape(message->GetType())
         << "', '"<< Escape(message->GetStatus()) << "', '"<< Escape(message->GetTime()) << "') ;";
-    std::cout << oss.str() << std::endl;
     return oss.str();
 }
 
@@ -308,6 +307,7 @@ void Service::UserLogin(const TcpConnectionPtr& conn, const json& js, Timestamp 
 
     auto emailtoid = usermanager_.GetEmailToId();
     auto it = emailtoid.find(email);
+    std::string username;
 
     if (it != emailtoid.end())
     {
@@ -317,12 +317,14 @@ void Service::UserLogin(const TcpConnectionPtr& conn, const json& js, Timestamp 
             end = true;
             usermanager_.SetOnline(userid);
             usermanager_.GetUser(userid)->SetConn(conn);
+            username = usermanager_.GetUser(userid)->GetName();
         }
     }
 
     json j = {
         {"end", end},
-        {"id", userid}
+        {"id", userid},
+        {"name", username}
     };
 
     conn->send(code_.encode(j, "LoginBack"));
@@ -523,7 +525,7 @@ void Service::ListFriends(const TcpConnectionPtr& conn, const json& js, Timestam
         j.push_back(fd);
     }
 
-    conn->send(code_.encode(js, "ListFriendBack"));
+    conn->send(code_.encode(j, "ListFriendBack"));
 }
 
 void Service::GetChatHistory(const TcpConnectionPtr& conn, const json& js, Timestamp time)

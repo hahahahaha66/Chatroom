@@ -92,6 +92,28 @@ std::string Gettime()
     return timestamp_str;
 }
 
+bool ReadNum(std::string input, int &result)
+{
+    int value;
+    std::stringstream ss(input);
+     
+    if (ss >> value && ss.eof())
+    {
+        result = value;
+        return true;
+    }
+    else  
+    {
+        std::cout << std::endl << "格式输入无效,请重试" << std::endl;
+        return false;
+    }
+}
+
+void ClearScreen() 
+{
+    std::cout << "\033[2J\033[H";
+}
+
 class Client  
 {
 public:
@@ -106,6 +128,11 @@ public:
         dispatcher_.registerHander("LoginBack", std::bind(&Client::LoginBack, this, _1, _2, _3));
         dispatcher_.registerHander("SendMessageBack", std::bind(&Client::SendMessageBack, this, _1, _2, _3));
         dispatcher_.registerHander("RecvMessage", std::bind(&Client::RecvMessageBack, this, _1, _2, _3));
+        dispatcher_.registerHander("SendApplyBack", std::bind(&Client::SendApplyBack, this, _1, _2, _3));
+        dispatcher_.registerHander("AllApplyBack", std::bind(&Client::ListAllApplyBack, this, _1, _2, _3));
+        dispatcher_.registerHander("AllSendApplyBack", std::bind(&Client::ListAllSendApplyBack, this, _1, _2, _3));
+        dispatcher_.registerHander("ProceApplyBack", std::bind(&Client::ProceApplyBack, this, _1, _2, _3));
+        dispatcher_.registerHander("ListFriendBack", std::bind(&Client::ListFriendBack, this, _1, _2, _3));
     }
 
     void ConnectionCallBack(const TcpConnectionPtr& conn)
@@ -172,13 +199,16 @@ public:
     {
         bool end = false;
         int id = 0;
+        std::string name;
         AssignIfPresent(js, "end", end);
         AssignIfPresent(js, "id", id);
+        AssignIfPresent(js, "name", name);
         if (end)
         {
             std::cout << "Login successful" << std::endl;
             currentState_ = "main_menu";
             userid_ = id;
+            name_ = name;
         }
         else
         {
@@ -267,8 +297,7 @@ public:
             AssignIfPresent(it, "fromname", fromname);
             AssignIfPresent(it, "status", status);
 
-            FriendApply fdapply(fromid, fromname, status);
-            newfriendapplylist_[fromid] = fdapply;
+            newfriendapplylist_.emplace(fromid, FriendApply(fromid, fromname, status));
         }
 
         friendapplylist_ = std::move(newfriendapplylist_);
@@ -294,7 +323,7 @@ public:
             AssignIfPresent(it, "status", status);
 
             FriendApply fdapply(targetid, targetname, status);
-            newfriendsendapplylist_[targetid] = fdapply;
+            newfriendsendapplylist_.emplace(targetid, FriendApply(targetid, targetname, status));
         }
 
         friendsendapplylist_ = std::move(newfriendsendapplylist_);
@@ -342,7 +371,7 @@ public:
             AssignIfPresent(it, "block", block);
 
             Friend fd(friendid, friendname, block);
-            newfriendlist_[friendid] = fd;
+            newfriendlist_.emplace(friendid, Friend(friendid, friendname, block));
         }
         friendlist_ = std::move(newfriendlist_);
         notifyInputReady();
@@ -363,6 +392,15 @@ public:
         });
     }
 
+    inline void waitInPutReady()
+    {
+        if (waitingback_)
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            cv_.wait(lock, [this] { return !waitingback_; });
+        }
+    }
+
     inline void notifyInputReady() 
     {
         {
@@ -376,97 +414,233 @@ public:
     {
         while (true)
         {
-            if (waitingback_)
-            {
-                std::unique_lock<std::mutex> lock(mutex_);
-                cv_.wait(lock, [this] { return !waitingback_; });
-            }
-
+            std::this_thread::sleep_for(std::chrono::seconds(1));
             if (currentState_ == "init_menu")
             {
-                std::this_thread::sleep_for(std::chrono::seconds(2));
-                json js;
-                std::cout << "email: ";
-                std::cin >> email_;
-                std::cout << "Password: ";
-                std::cin >> password_;
+                int order = 0;
+                std::string input;
+                std::cout << "1. 登陆" << std::endl;
+                std::cout << "2. 注册" << std::endl;
+                std::cout << "3. 退出" << std::endl;
+                getline(std::cin, input);
+                if (!ReadNum(input, order)) continue;
 
-                js["email"] = email_;
-                js["password"] = password_;
-
-                waitingback_ = true;
-
-                this->Login(js);
-            }
-            else if (currentState_ == "main_menu")
-            {
-                int order;
-                std::cout << "1. 添加好友" << std::endl;
-                std::cout << "2. 查看好友列表" << std::endl;
-                std::cout << "3. 查看好友申请列表" << std::endl;
-                std::cout << "4. 查看被申请好友列表" << std::endl;
-                std::cout << "5. 私聊" << std::endl;
-                std::cout << "6. 退出" << std::endl;
-                std::cin >> order;
                 if (order == 1)
                 {
-                    std::string email;
-                    std::cout << "输入要添加的好友email:";
-                    std::cin >> email;
+                    std::cout << "输入邮箱: ";
+                    getline(std::cin, email_);
+                    std::cout << "输入密码: ";
+                    getline(std::cin, password_);
+
                     json js = {
-                        {"fromid", userid_},
-                        {"targetemail", email}
+                        {"email", email_},
+                        {"password", password_}
                     };
 
                     waitingback_ = true;
+                    Login(js);
+
+                    waitInPutReady();
 
                 }
                 else if (order == 2)
                 {
+                    std::cout << "输入邮箱: ";
+                    getline(std::cin, email_);
+                    std::cout << "输入用户名: ";
+                    getline(std::cin, name_);
+                    std::cout << "输入密码: ";
+                    getline(std::cin, password_);
 
+                    json js = {
+                        {"username", name_},
+                        {"email", email_},
+                        {"password", password_}
+                    };
+
+                    waitingback_ = true;
+                    Register(js);
+
+                    waitInPutReady();
                 }
                 else if (order == 3)
                 {
+                    break;
+                }
+                else  
+                {
+                    std::cout << "输入错误" << std::endl;
+                }
+            }
+            else if (currentState_ == "main_menu")
+            {
+                int order;
+                std::string input;
+                std::cout << "1. 添加好友" << std::endl;
+                std::cout << "2. 查看好友列表" << std::endl;
+                std::cout << "3. 查看好友申请列表" << std::endl;
+                std::cout << "4. 查看待处理好友申请列表" << std::endl;
+                std::cout << "5. 查看被申请好友列表" << std::endl;
+                std::cout << "6. 私聊" << std::endl;
+                std::cout << "7. 退出" << std::endl;
+                getline(std::cin, input);
+                if (!ReadNum(input, order)) continue;
 
+                if (order == 1)
+                {
+                    std::string email;
+                    std::cout << "输入要添加的好友email:";
+                    getline(std::cin, email);
+                    json js = {
+                        {"fromid", userid_},
+                        {"targetemail", email}
+                    };
+                    waitingback_ = true;
+                    SendApply(js);
+
+                    waitInPutReady();
+                }
+                else if (order == 2)
+                {
+                    json js = {
+                        {"userid", userid_}
+                    };
+                    waitingback_ = true;
+                    ListFriend(js);
+
+                    waitInPutReady();
+                    for (auto it : friendlist_)
+                    {
+                        std::cout << "id: "<< it.first << " name: " << it.second.name_ << std::endl;
+                    }
+                }
+                else if (order == 3)
+                {
+                    json js = {
+                        {"targetid", userid_}
+                    };
+                    waitingback_ = true;
+                    ListAllApply(js);
+
+                    waitInPutReady();
+                    for (auto it : friendapplylist_)
+                    {
+                        std::cout << "id: " << it.first << " name: " << it.second.name_ << " status: " << it.second.status_ << std::endl;
+                    }
                 }
                 else if (order == 4)
                 {
+                    json js = {
+                        {"targetid", userid_}
+                    };
+                    waitingback_ = true;
+                    ListAllApply(js);
+
+                    waitInPutReady();
+                    for (auto it : friendsendapplylist_)
+                    {
+                        if (it.second.status_ == "Pending")
+                        {
+                            std::cout << "id: " << it.first << " name: " << it.second.name_ << std::endl;
+                        }
+                    }
+                    while (true)
+                    {
+                        int fromid;
+                        std::string result;
+                        std::string input;
+                        std::cout << "输入处理的申请用户id(输入0返回): ";
+                        getline(std::cin, input);
+                        if (!ReadNum(input, fromid)) continue;
+
+                        if (fromid == 0) break;
+                        std::cout << "输入选择(Agree或Reject): ";
+                        getline(std::cin, result);
+                        if (!(result == "Agree" || result == "Reject"))
+                        {
+                            std::cout << "输入错误,请重新操作" << std::endl;
+                            continue;
+                        }
+
+                        json js = {
+                            {"fromid", fromid},
+                            {"targetid", userid_},
+                            {"status", result}
+                        };
+                        waitingback_ = true;
+
+                        ProceApply(js);
+                        waitInPutReady();
+                    }
                     
                 }
                 else if (order == 5)
                 {
-                    
+                    json js = {
+                        {"fromid", userid_}
+                    };
+                    waitingback_ = true;
+                    ListAllSendApply(js);
+
+                    waitInPutReady();
+                    for (auto it : friendsendapplylist_)
+                    {
+                        std::cout << "id: " << it.first << " name: " << it.second.name_ << " status: " << it.second.status_ << std::endl;
+                    }
                 }
                 else if (order == 6)
                 {
-                    
+                    ClearScreen();
+                    currentState_ = "chat_menu";
+                    //进入聊天界面，获取历史聊天记录
+                }
+                else if (order == 7)
+                {
+                    break;
                 }
                 else
                 {
-                    
+                    std::cout << "错误指令,请重试" << std::endl;
                 }
             }
             else if (currentState_ == "chat_menu")
             {
-                int receiverid;
-                std::cout << "receiverid: ";
-                std::cin >> receiverid;
-                
-                std::string message;
-                std::cout << "Input Message: " ;
-                std::cin >> message;
+                int friendid;
+                std::string input;
+                std::cout << "输入聊天的好友id(输入0退出): ";
+                getline(std::cin, input);
+                if (!ReadNum(input, friendid)) continue;
 
-                json js {
-                    {"senderid", userid_},
-                    {"receiverid", receiverid},
-                    {"content", message},
-                    {"type", "Private"},
-                    {"status", "Unread"},
-                   {"timestamp", Gettime()}
-                };
+                if (friendlist_.find(friendid) == friendlist_.end())
+                {
+                    std::cout << "未知好友id" << std::endl;
+                    currentState_ = "main_menu";
+                    continue;
+                }
 
-                waitingback_ = true;
-                SendMessage(js);
+                while (true)
+                {
+                    std::string message;
+                    std::cout << "输入(输入q返回): " ;
+                    getline(std::cin, message);
+                    if (message == "q") break;
+
+                    json js {
+                        {"senderid", userid_},
+                        {"receiverid", friendid},
+                        {"content", message},
+                        {"type", "Private"},
+                        {"status", "Unread"},
+                       {"timestamp", Gettime()}
+                    };
+
+                    waitingback_ = true;
+                    SendMessage(js);
+
+                    waitInPutReady();
+                }
+
+                ClearScreen();
             }
             else  
             {
