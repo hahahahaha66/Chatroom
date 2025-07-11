@@ -24,5 +24,6 @@ private:
     int fromid_;
     int targetid_;
     std::string type_;
+    //Pending, Agree, Reject
     std::string status_;
 };

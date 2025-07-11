@@ -386,34 +386,144 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js, Timestam
     messagemanager_.AddMessage(message);
 }
 
-void Service::AddFriend(const TcpConnectionPtr& conn, const json& json, Timestamp)
+void Service::SendFriendApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
 {
+    bool end = true;
 
+    int fromid;
+    int targetid;
+    std::string targetemail;
+
+    AssignIfPresent(js, "fromid", fromid);
+    AssignIfPresent(js, "targetemail", targetemail);
+
+    auto it = usermanager_.GetEmailToId();
+    if (it.find(targetemail) == it.end())
+    {
+        end = false;
+    }
+    else 
+    {
+        targetid = it[targetemail];
+    }
+    if (end)
+    {
+        int id = gen_.GetNextFriendApplyId();
+        end &= friendapplymanager_.AddAplly(id, fromid, targetid);
+    }
+
+    json j = {
+        {"end", end}
+    };
+
+    conn->send(code_.encode(j, "SendApplyBack"));
 }
 
-void Service::ListFriendProceApplys(const TcpConnectionPtr& conn, const json& json, Timestamp)
+void Service::ListFriendAllApplys(const TcpConnectionPtr& conn, const json& js, Timestamp)
 {
+    int targetid;
 
+    AssignIfPresent(js, "targetid", targetid);
+
+    std::vector<std::shared_ptr<Apply>> result = friendapplymanager_.GetReceivedApplies(targetid);
+
+    json j = json::array();
+    for (auto it : result)
+    {
+        int fromid = it->GetFromId();
+        std::string fromname = usermanager_.GetUser(fromid)->GetName();
+        json apply = {
+            {"fromid", fromid},
+            {"fromname", fromname},
+            {"status", it->GetStatus()}
+        };
+        j.push_back(apply);
+    }
+
+    conn->send(code_.encode(j, "AllApplyBack"));
 }
 
-void Service::ListFriendUnproceApplys(const TcpConnectionPtr& conn, const json& json, Timestamp)
+void Service::ListFriendSendApplys(const TcpConnectionPtr& conn, const json& js, Timestamp)
 {
+    int fromid;
 
+    AssignIfPresent(js, "fromid", fromid);
+
+    std::vector<std::shared_ptr<Apply>> result = friendapplymanager_.GetSentApplies(fromid);
+
+    json j = json::array();
+    for (auto it : result)
+    {
+        int targetid = it->GetFromId();
+        std::string targetname = usermanager_.GetUser(targetid)->GetName();
+        json apply = {
+            {"targetid", targetid},
+            {"targetname", targetname},
+            {"status", it->GetStatus()}
+        };
+        j.push_back(apply);
+    }
+
+    conn->send(code_.encode(j, "AllSendApplyBack"));
 }
 
-void Service::ListFriendSentApplys(const TcpConnectionPtr& conn, const json& json, Timestamp)
+void Service::ProceFriendApplys(const TcpConnectionPtr& conn, const json& js, Timestamp)
 {
+    bool end = true;
+    int fromid;
+    int targetid;
+    std::string status;
 
+    AssignIfPresent(js, "fromid", fromid);
+    AssignIfPresent(js, "targetid", targetid);
+    AssignIfPresent(js, "status", status);
+
+    if (status == "Agree")
+    {
+        end &= friendapplymanager_.AcceptApply(fromid, targetid);
+        int id = gen_.GetNextFriendId();
+        friendmanager_.AddFriend(id, fromid, targetid);
+        id = gen_.GetNextFriendId();
+        friendmanager_.AddFriend(id, targetid, fromid);
+    }
+    else if (status == "Reject")
+    {
+        end &= friendapplymanager_.RejectApply(fromid, targetid);
+    }
+    else  
+    {
+        end = false;
+    }
+
+    json j = {
+        {"end", end}
+    };
+
+    conn->send(code_.encode(j, "ProceApplyBack"));
 }
 
-void Service::ProceFriendApplys(const TcpConnectionPtr& conn, const json& json, Timestamp)
+void Service::ListFriends(const TcpConnectionPtr& conn, const json& js, Timestamp)
 {
+    int userid;
 
-}
+    AssignIfPresent(js, "userid", userid);
 
-void Service::ListFriends(const TcpConnectionPtr& conn, const json& json, Timestamp)
-{
+    std::vector<std::shared_ptr<Friend>> result = friendmanager_.GetFriendList(userid);
 
+    json j = json::array();
+    for (auto it : result)
+    {
+        int friendid = it->GetFriendId();
+        std::string friendname = usermanager_.GetUser(friendid)->GetName();
+        json fd = {
+            {"friendid", friendid},
+            {"friendname", friendname},
+            {"block", friendmanager_.GetFriendBlock(userid, friendid)}
+        };
+        j.push_back(fd);
+    }
+
+    conn->send(code_.encode(js, "ListFriendBack"));
 }
 
 void Service::GetChatHistory(const TcpConnectionPtr& conn, const json& js, Timestamp time)

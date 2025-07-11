@@ -46,10 +46,9 @@ public:
     void GetChatHistory(const TcpConnectionPtr& conn, const json& json, Timestamp);
 
     //Friend
-    void AddFriend(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void ListFriendProceApplys(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void ListFriendUnproceApplys(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void ListFriendSentApplys(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void SendFriendApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void ListFriendAllApplys(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void ListFriendSendApplys(const TcpConnectionPtr& conn, const json& json, Timestamp);
     void ProceFriendApplys(const TcpConnectionPtr& conn, const json& json, Timestamp);
     void ListFriends(const TcpConnectionPtr& conn, const json& json, Timestamp);
 

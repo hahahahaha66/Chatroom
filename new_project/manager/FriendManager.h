@@ -16,8 +16,8 @@ public:
     bool GetFriendBlock(int userid, int friendid);
     bool IsFriend(int userid, int friendid);
 
-    std::vector<int> GetFriendList(int userid);
-    std::vector<int> GetUnblockedFriendList(int userid);
+    std::vector<std::shared_ptr<Friend>> GetFriendList(int userid);
+    std::vector<std::shared_ptr<Friend>> GetUnblockedFriendList(int userid);
     size_t GetFriendCount(int userid);
     std::unordered_map<int, std::unordered_map<int, std::shared_ptr<Friend>>> GetAllFriend();
 

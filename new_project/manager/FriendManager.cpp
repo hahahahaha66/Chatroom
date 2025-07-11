@@ -57,28 +57,28 @@ bool FriendManager::IsFriend(int userid, int friendid)
     return userit->second.find(friendid) != userit->second.end();
 }
 
-std::vector<int> FriendManager::GetFriendList(int userid)
+std::vector<std::shared_ptr<Friend>> FriendManager::GetFriendList(int userid)
 {
-    std::vector<int> friendlist;
+    std::vector<std::shared_ptr<Friend>> friendlist;
     
     auto userit = friends_.find(userid);
     if (userit != friends_.end()) {
         for (const auto& friendPair : userit->second) {
-            friendlist.push_back(friendPair.first);
+            friendlist.push_back(friendPair.second);
         }
     }
     
     return friendlist;
 }
 
-std::vector<int> FriendManager::GetUnblockedFriendList(int userid)
+std::vector<std::shared_ptr<Friend>> FriendManager::GetUnblockedFriendList(int userid)
 {
-    std::vector<int> friendlist;
+    std::vector<std::shared_ptr<Friend>> friendlist;
     auto userit = friends_.find(userid);
     if (userit != friends_.end()) {
         for (const auto& friendPair : userit->second) {
             if (!friendPair.second->GetBlock()) {
-                friendlist.push_back(friendPair.first);
+                friendlist.push_back(friendPair.second);
             }
         }
     }
