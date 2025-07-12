@@ -12,6 +12,7 @@ void MessageManager::AddMessage(Message& message)
 
 std::unordered_map<int, std::shared_ptr<Message>> MessageManager::GetAllMessage()
 {
+    std::lock_guard<std::mutex> lock(mutex_);
     return messages_;
 }
 

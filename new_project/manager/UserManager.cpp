@@ -69,15 +69,18 @@ bool UserManager::IsOnline(int userId)
 
 std::unordered_map<int, std::shared_ptr<User>> UserManager::GetAllUser()
 {
+    std::lock_guard<std::mutex> lock(mutex_);
     return users_;
 }
 
 std::unordered_map<std::string, int> UserManager::GetEmailToId()
 {
+    std::lock_guard<std::mutex> lock(mutex_);
     return emailtoidmap_;
 }
 
 std::unordered_map<int, std::string> UserManager::GetIdToEmail()
 {
+    std::lock_guard<std::mutex> lock(mutex_);
     return idtoemailmap_;
 }

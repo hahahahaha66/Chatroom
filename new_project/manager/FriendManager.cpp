@@ -4,6 +4,8 @@
 
 bool FriendManager::AddFriend(int id, int userid, int friendid, bool block)
 {
+    std::lock_guard<std::mutex> lock(mutex_);
+
     if (userid == friendid) {
         return false;
     }
@@ -20,6 +22,8 @@ bool FriendManager::AddFriend(int id, int userid, int friendid, bool block)
 
 bool FriendManager::RemoveFriend(int userid, int friendid)
 {
+    std::lock_guard<std::mutex> lock(mutex_);
+
     if (!IsFriend(userid, friendid)) {
         return false;
     }
@@ -31,6 +35,8 @@ bool FriendManager::RemoveFriend(int userid, int friendid)
 
 bool FriendManager::SetFriendBlock(int userid, int friendid, bool block)
 {
+    std::lock_guard<std::mutex> lock(mutex_);
+
     if (!IsFriend(userid, friendid)) {
         return false;
     }
@@ -41,6 +47,8 @@ bool FriendManager::SetFriendBlock(int userid, int friendid, bool block)
 
 bool FriendManager::GetFriendBlock(int userid, int friendid)
 {
+    std::lock_guard<std::mutex> lock(mutex_);
+
     if (!IsFriend(userid, friendid)) {
         return false;
     }
@@ -49,6 +57,8 @@ bool FriendManager::GetFriendBlock(int userid, int friendid)
 
 bool FriendManager::IsFriend(int userid, int friendid)
 {
+    std::lock_guard<std::mutex> lock(mutex_);
+
     auto userit = friends_.find(userid);
     if (userit == friends_.end()) {
         return false;
@@ -59,6 +69,8 @@ bool FriendManager::IsFriend(int userid, int friendid)
 
 std::vector<std::shared_ptr<Friend>> FriendManager::GetFriendList(int userid)
 {
+    std::lock_guard<std::mutex> lock(mutex_);
+
     std::vector<std::shared_ptr<Friend>> friendlist;
     
     auto userit = friends_.find(userid);
@@ -73,6 +85,8 @@ std::vector<std::shared_ptr<Friend>> FriendManager::GetFriendList(int userid)
 
 std::vector<std::shared_ptr<Friend>> FriendManager::GetUnblockedFriendList(int userid)
 {
+    std::lock_guard<std::mutex> lock(mutex_);
+
     std::vector<std::shared_ptr<Friend>> friendlist;
     auto userit = friends_.find(userid);
     if (userit != friends_.end()) {
@@ -88,5 +102,7 @@ std::vector<std::shared_ptr<Friend>> FriendManager::GetUnblockedFriendList(int u
 
 std::unordered_map<int, std::unordered_map<int, std::shared_ptr<Friend>>> FriendManager::GetAllFriend()
 {
+    std::lock_guard<std::mutex> lock(mutex_);
+
     return friends_;
 }

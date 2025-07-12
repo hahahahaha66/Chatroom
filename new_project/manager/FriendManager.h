@@ -5,6 +5,7 @@
 #include <vector>
 #include <unordered_map>
 #include <memory>
+#include <mutex>
 
 class FriendManager 
 {
@@ -23,4 +24,5 @@ public:
 
 private:
     std::unordered_map<int, std::unordered_map<int, std::shared_ptr<Friend>>> friends_;
+    std::mutex mutex_;
 };
