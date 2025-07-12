@@ -57,17 +57,22 @@ void MysqlConnectionPool::Init(const std::string& host, unsigned short port, con
 
 std::shared_ptr<MysqlConnection> MysqlConnectionPool::GetConnection()
 {
-    std::unique_lock<std::mutex> lock(mutex_);
-    while (connectionqueue_.empty()) 
-    {
-        if (cond_.wait_for(lock, std::chrono::seconds(1)) == std::cv_status::timeout) {
-        LOG_ERROR << "Timeout waiting for connection";
-        return nullptr;
-}
-    }
+    MysqlConnection* conn = nullptr;
 
-    auto conn = connectionqueue_.front();
-    connectionqueue_.pop();
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        while (connectionqueue_.empty()) 
+        {
+            if (cond_.wait_for(lock, std::chrono::seconds(1)) == std::cv_status::timeout) 
+            {
+                LOG_ERROR << "Timeout waiting for connection";
+                return nullptr;
+            }
+        }
+
+        conn = connectionqueue_.front();
+        connectionqueue_.pop();
+    }
 
     if (!conn->IsConnected() && !conn->Reconnect()) {
         delete conn;

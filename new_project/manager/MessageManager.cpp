@@ -3,22 +3,22 @@
 #include <mutex>
 #include <unordered_map>
 
-void MessageManager::AddMessage(Message& message)
+void MessageManager::AddMessage(int msgid, int senid, int recid, std::string content, const std::string type, const std::string status, std::string time)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::unique_lock<std::shared_mutex> lock(mutex_);
 
-    messages_[message.GetId()] = std::make_shared<Message>(message);
+    messages_[msgid] = std::make_shared<Message>(msgid, senid, recid, content, type, status, time);
 }
 
 std::unordered_map<int, std::shared_ptr<Message>> MessageManager::GetAllMessage()
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_mutex> lock(mutex_);
     return messages_;
 }
 
 std::vector<Message> MessageManager::GetSenderidAndReceiveridMessage(int senderid, int receiverid)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_mutex> lock(mutex_);
 
     std::vector<Message> messages;
     for (int messageid : senderidandreceiveridtomessage_[senderid][receiverid])
@@ -26,7 +26,7 @@ std::vector<Message> MessageManager::GetSenderidAndReceiveridMessage(int senderi
         auto it = messages_[messageid];
         Message msg(messageid, it->GetSenderId(), it->GetReveiverId(), it->GetContent(), it->GetType(), it->GetStatus(), it->GetTime());
 
-        messages.push_back(msg);
+        messages.push_back(std::move(msg));
     }
 
     return messages;

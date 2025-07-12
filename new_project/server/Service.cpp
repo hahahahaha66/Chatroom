@@ -63,6 +63,7 @@ std::string Escape(const std::string& input) {
 void Service::ReadFromDataBase(const std::string& query, std::function<void(MysqlRow&)> rowhander)
 {
     databasethreadpool_.EnqueueTask([this, query, rowhander](MysqlConnection& conn) {
+        LOG_DEBUG << query << "executing DB task";
         MYSQL_RES* res = conn.ExcuteQuery(query);
         if (!res) 
         {
@@ -120,7 +121,10 @@ void Service::ReadUserFromDB()
         std::string email = row.GetString("email");
         std::string username = row.GetString("name");
         std::string password = row.GetString("password");
-        usermanager_.AddUser(id, username, password, email);
+
+        InitTaskRunner::Instance().Post([=]() {
+            usermanager_.AddUser(id, username, password, email);
+        });
     });
 }
 
@@ -135,8 +139,10 @@ void Service::ReadMessageFromDB()
         std::string type = row.GetString("type");
         std::string status = row.GetString("status");
         std::string time = row.GetString("timestamp");
-        Message message(id, senderid, receiverid, content, type, status, time);
-        messagemanager_.AddMessage(message);
+
+        InitTaskRunner::Instance().Post([=]() {
+            messagemanager_.AddMessage(id, senderid, receiverid, content, type, status, time);
+        });
     });
 }
 
@@ -149,7 +155,9 @@ void Service::ReadFriendFromDB()
         int friendid = row.GetInt("friendid");
         bool block = row.GetBool("block");
 
-        friendmanager_.AddFriend(id, userid, friendid, block);
+        InitTaskRunner::Instance().Post([=]() {
+           friendmanager_.AddFriend(id, userid, friendid, block); 
+        });
     });
 }
 
@@ -162,14 +170,16 @@ void Service::ReadFriendApplyFromDB()
         int targetid = row.GetInt("targetid");
         std::string status = row.GetString("status");
 
-        friendapplymanager_.AddAplly(applyid, fromid, targetid, "Friend", status);
+        InitTaskRunner::Instance().Post([=]() {
+           friendapplymanager_.AddAplly(applyid, fromid, targetid, "Friend", status); 
+        });
     });
 }
 
 void Service::StartAutoFlushToDataBase(int seconds)
 {
     running_ = true;
-    flush_thread_ = std::thread([this, seconds]() {
+    InitTaskRunner::Instance().Post([=]() {
         while (running_)
         {
             std::this_thread::sleep_for(std::chrono::seconds(seconds));
@@ -254,11 +264,23 @@ void Service::StopAutoFlush()
 
 Service::Service()
 {
+    InitTaskRunner::Instance().Start();
+
     InitIdsFromMySQL();
     ReadUserFromDB();
     ReadMessageFromDB();
     ReadFriendFromDB();
     ReadFriendApplyFromDB();
+
+    for (auto it : usermanager_.GetAllUser())
+    {
+        std::cout << it.second->GetName() << std::endl;
+    }
+
+    for (auto it : friendmanager_.GetAllFriend())
+    {
+        std::cout << it.first << std::endl;
+    }
 
     StartAutoFlushToDataBase(10);
 }
@@ -266,8 +288,8 @@ Service::Service()
 Service::~Service()
 {
     FlushToDataBase();
-
     StopAutoFlush();
+    InitTaskRunner::Instance().Stop();
 }
 
 void Service::UserRegister(const TcpConnectionPtr& conn, const json& js, Timestamp time)
@@ -384,8 +406,7 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js, Timestam
     {
 
     }
-    Message message(msgid, sendid, receiverid, content, type, status, timestamp);
-    messagemanager_.AddMessage(message);
+    messagemanager_.AddMessage(msgid, sendid, receiverid, content, type, status, timestamp);
 }
 
 void Service::SendFriendApply(const TcpConnectionPtr& conn, const json& js, Timestamp)

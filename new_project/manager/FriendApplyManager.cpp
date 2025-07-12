@@ -2,22 +2,20 @@
 
 bool FriendApplyManager::AddAplly(int id, int fromid, int targetid, std::string type, std::string status)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
-
+    std::unique_lock<std::shared_mutex> lock(mutex_);
 
     if (HasApply(fromid, targetid))
     {
         return false;
     }
 
-    Apply apply(id, fromid, targetid, type, status);
-    applys[targetid][fromid] = std::make_shared<Apply>(apply);
+    applys[targetid][fromid] = std::make_shared<Apply>(id, fromid, targetid, type, status);
     return true;
 }
 
 bool FriendApplyManager::AcceptApply(int fromid, int targetid)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::unique_lock<std::shared_mutex> lock(mutex_);
 
     auto it = applys.find(targetid);
     if (it == applys.end())
@@ -37,7 +35,7 @@ bool FriendApplyManager::AcceptApply(int fromid, int targetid)
 
 bool FriendApplyManager::RejectApply(int fromid, int targetid)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::unique_lock<std::shared_mutex> lock(mutex_);
 
     auto it = applys.find(targetid);
     if (it == applys.end())
@@ -57,7 +55,7 @@ bool FriendApplyManager::RejectApply(int fromid, int targetid)
 
 bool FriendApplyManager::DeleteApply(int fromid, int targetid)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+   std::unique_lock<std::shared_mutex> lock(mutex_);
 
     auto it = applys.find(targetid);
     if (it == applys.end())
@@ -82,7 +80,7 @@ bool FriendApplyManager::DeleteApply(int fromid, int targetid)
 
 std::shared_ptr<Apply> FriendApplyManager::GetApply(int fromid, int targetid)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_mutex> lock(mutex_);
 
     auto it = applys.find(targetid);
     if (it == applys.end())
@@ -101,7 +99,7 @@ std::shared_ptr<Apply> FriendApplyManager::GetApply(int fromid, int targetid)
 
 std::vector<std::shared_ptr<Apply>> FriendApplyManager::GetReceivedApplies(int targetid)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_mutex> lock(mutex_);
 
     std::vector<std::shared_ptr<Apply>> result;
     
@@ -117,7 +115,7 @@ std::vector<std::shared_ptr<Apply>> FriendApplyManager::GetReceivedApplies(int t
 
 std::vector<std::shared_ptr<Apply>> FriendApplyManager::GetSentApplies(int fromid)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_mutex> lock(mutex_);
 
     std::vector<std::shared_ptr<Apply>> result;
     
@@ -134,7 +132,7 @@ std::vector<std::shared_ptr<Apply>> FriendApplyManager::GetSentApplies(int fromi
 
 std::vector<std::shared_ptr<Apply>> FriendApplyManager::GetPendingApplies(int targetid)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_mutex> lock(mutex_);
 
     std::vector<std::shared_ptr<Apply>> result;
     
@@ -152,7 +150,7 @@ std::vector<std::shared_ptr<Apply>> FriendApplyManager::GetPendingApplies(int ta
 
 bool FriendApplyManager::HasApply(int fromid, int targetid)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_mutex> lock(mutex_);
 
     auto it = applys.find(targetid);
     if (it == applys.end()) {
@@ -164,7 +162,7 @@ bool FriendApplyManager::HasApply(int fromid, int targetid)
 
 std::string FriendApplyManager::GetApplyStatus(int fromid, int targetid)
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_mutex> lock(mutex_);
 
     auto apply = GetApply(fromid, targetid);
     if (!apply) {
@@ -176,7 +174,7 @@ std::string FriendApplyManager::GetApplyStatus(int fromid, int targetid)
 
 std::unordered_map<int, std::unordered_map<int, std::shared_ptr<Apply>>> FriendApplyManager::GetAllApply()
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_mutex> lock(mutex_);
 
     return applys;
 }

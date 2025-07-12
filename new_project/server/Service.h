@@ -10,6 +10,7 @@
 #include "../database/MysqlResult.h"
 #include "../manager/FriendManager.h"
 #include "../manager/FriendApplyManager.h"
+#include "../tool/InitTaskRunner.h"
 
 #include <nlohmann/json.hpp>
 

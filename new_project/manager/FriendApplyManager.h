@@ -5,6 +5,7 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
+#include <shared_mutex>
 #include <mutex>
 
 class FriendApplyManager
@@ -32,5 +33,5 @@ public:
 private:
     //以被发送申请人作为索引,[target][from]->apply
     std::unordered_map<int, std::unordered_map<int, std::shared_ptr<Apply>>> applys;
-    std::mutex mutex_;
+    mutable std::shared_mutex mutex_;
 };

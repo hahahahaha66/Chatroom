@@ -1,5 +1,8 @@
 #include "DatabaseThreadPool.h"
+#include "MysqlConnection.h"
 #include <cstddef>
+#include <functional>
+#include <thread>
 
 DatabaseThreadPool::DatabaseThreadPool(size_t threadcount) : isrunning_(true)
 {
@@ -75,7 +78,7 @@ void DatabaseThreadPool::Worker()
             }
         }
 
-        MysqlConnPtr conn = MysqlConnectionPool::Instance().GetConnection();
+        MysqlConnPtr conn;
         for (int attempt = 0; attempt < 3; ++attempt) 
         {
             conn = MysqlConnectionPool::Instance().GetConnection();
@@ -87,6 +90,11 @@ void DatabaseThreadPool::Worker()
         if (!conn) {
             LOG_ERROR << "Giving up after 3 connection attempts";
             continue;
+        }
+        else
+        {
+            std::hash<std::thread::id> hash;
+            LOG_DEBUG << "Got connection, thread id: " << hash(std::this_thread::get_id());
         }
 
         try 

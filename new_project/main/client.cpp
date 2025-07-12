@@ -144,6 +144,7 @@ public:
         else
         {
             LOG_INFO << "Connection disconnected: " << conn->peerAddress().toIpPort();
+            client_.getLoop()->quit();
         }
     }
 
@@ -382,6 +383,12 @@ public:
         client_.connect();
     }
 
+    void stop()
+    {
+        std::cout << "-----------------" << std::endl;
+        client_.disconnect();
+    }
+
     void send(const std::string& msg)
     {
         client_.getLoop()->runInLoop([this, msg]() {
@@ -596,6 +603,8 @@ public:
                 }
                 else if (order == 7)
                 {
+                    std::cout << "正在退出..." << std::endl;
+                    stop();
                     break;
                 }
                 else

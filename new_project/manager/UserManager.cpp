@@ -1,11 +1,10 @@
 #include "UserManager.h"
-#include <iostream>
 #include <memory>
 #include <unordered_map>
 
 std::shared_ptr<User> UserManager::GetUser(int userId) 
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_mutex> lock(mutex_);
 
     auto it = users_.find(userId);
     return it != users_.end() ? it->second : nullptr;
@@ -13,14 +12,12 @@ std::shared_ptr<User> UserManager::GetUser(int userId)
 
 bool UserManager::AddUser(int id, const std::string& name, const std::string& password, const std::string& email) 
 {
+    if (id <= 0) return false;  // 插入失败
 
-    std::lock_guard<std::mutex> lock(mutex_);
-
+    std::unique_lock<std::shared_mutex> lock(mutex_);
     if (emailtoidmap_.count(email)) {
         return false;  // 重复注册
     }
-
-    if (id <= 0) return false;  // 插入失败
 
     auto user = std::make_shared<User>(id, name, password, email);
     users_[id] = user;
@@ -31,7 +28,7 @@ bool UserManager::AddUser(int id, const std::string& name, const std::string& pa
 
 void UserManager::RemoveUser(int id) 
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::unique_lock<std::shared_mutex> lock(mutex_);
 
     users_.erase(id);
     std::string email = idtoemailmap_[id];
@@ -41,7 +38,7 @@ void UserManager::RemoveUser(int id)
 
 void UserManager::SetOnline(int userId) 
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::unique_lock<std::shared_mutex> lock(mutex_);
 
     auto it = users_.find(userId);
     if (it != users_.end()) {
@@ -51,7 +48,7 @@ void UserManager::SetOnline(int userId)
 
 void UserManager::SetOffline(int userId) 
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::unique_lock<std::shared_mutex> lock(mutex_);
 
     auto it = users_.find(userId);
     if (it != users_.end()) {
@@ -61,7 +58,7 @@ void UserManager::SetOffline(int userId)
 
 bool UserManager::IsOnline(int userId) 
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_mutex> lock(mutex_);
 
     auto it = users_.find(userId);
     return (it != users_.end()) && it->second->IsOnline();
@@ -69,18 +66,18 @@ bool UserManager::IsOnline(int userId)
 
 std::unordered_map<int, std::shared_ptr<User>> UserManager::GetAllUser()
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_mutex> lock(mutex_);
     return users_;
 }
 
 std::unordered_map<std::string, int> UserManager::GetEmailToId()
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_mutex> lock(mutex_);
     return emailtoidmap_;
 }
 
 std::unordered_map<int, std::string> UserManager::GetIdToEmail()
 {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::shared_lock<std::shared_mutex> lock(mutex_);
     return idtoemailmap_;
 }

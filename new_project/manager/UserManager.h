@@ -1,12 +1,14 @@
 #pragma once
 
 #include "../model/User.h"
+#include "../muduo/logging/Logging.h"
 
 #include <unordered_map>
 #include <string>
 #include <mutex>
 #include <memory>
 #include <vector>
+#include <shared_mutex>
 
 
 class UserManager 
@@ -29,5 +31,5 @@ private:
     std::unordered_map<int, std::shared_ptr<User>> users_; // 所有用户
     std::unordered_map<std::string, int> emailtoidmap_;
     std::unordered_map<int, std::string> idtoemailmap_;
-    std::mutex mutex_;
+    mutable std::shared_mutex mutex_;
 };
