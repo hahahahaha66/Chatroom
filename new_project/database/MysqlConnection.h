@@ -14,7 +14,7 @@ public:
     bool Connect(const std::string& host, unsigned short port, const std::string& user,
                  const std::string& password, const std::string& name);
     
-    bool ExcuteUpdata(const std::string& mysqlorder);
+    bool ExcuteUpdate(const std::string& mysqlorder);
     MYSQL_RES* ExcuteQuery(const std::string& mysqlorder);
 
     MYSQL* GetRaw();

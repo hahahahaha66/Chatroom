@@ -10,7 +10,6 @@
 #include "../database/MysqlResult.h"
 #include "../manager/FriendManager.h"
 #include "../manager/FriendApplyManager.h"
-#include "../tool/InitTaskRunner.h"
 
 #include <nlohmann/json.hpp>
 
@@ -57,14 +56,11 @@ public:
     
 private:
     std::atomic<bool> running_ = false;
-    std::thread flush_thread_;
 
     IdGenerator gen_;
     Codec code_;
     DatabaseThreadPool databasethreadpool_;
 
-    UserManager usermanager_;
-    MessageManager messagemanager_;
-    FriendManager friendmanager_;
-    FriendApplyManager friendapplymanager_;
+    UserManager onlineuser_;
+
 };

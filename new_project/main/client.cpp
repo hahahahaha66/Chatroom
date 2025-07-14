@@ -620,12 +620,12 @@ public:
                 getline(std::cin, input);
                 if (!ReadNum(input, friendid)) continue;
 
-                if (friendlist_.find(friendid) == friendlist_.end())
-                {
-                    std::cout << "未知好友id" << std::endl;
-                    currentState_ = "main_menu";
-                    continue;
-                }
+                // if (friendlist_.find(friendid) == friendlist_.end())
+                // {
+                //     std::cout << "未知好友id" << std::endl;
+                //     currentState_ = "main_menu";
+                //     continue;
+                // }
 
                 while (true)
                 {
@@ -640,7 +640,6 @@ public:
                         {"content", message},
                         {"type", "Private"},
                         {"status", "Unread"},
-                       {"timestamp", Gettime()}
                     };
 
                     waitingback_ = true;

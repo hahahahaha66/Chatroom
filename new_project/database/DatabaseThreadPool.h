@@ -13,21 +13,25 @@
 #include <thread>
 #include <vector>
 
-struct DatabaseTask 
-{
-    std::function<void(MysqlConnection&)> task;
-    DatabaseTask(std::function<void(MysqlConnection&)> fn) : task(std::move(fn)) {}
-};
-
+using DBCallback = std::function<void(bool)>;
 using MysqlConnPtr = std::shared_ptr<MysqlConnection>;
+
+struct DatabaseTask {
+    std::function<void(MysqlConnection&, DBCallback)> task;
+    DBCallback callback;
+    
+    DatabaseTask() : task(nullptr), callback(nullptr) {}
+    DatabaseTask(std::function<void(MysqlConnection&, DBCallback)> t, DBCallback cb) 
+        : task(std::move(t)), callback(std::move(cb)) {}
+};
 
 class DatabaseThreadPool  
 {
 public:
-    DatabaseThreadPool(size_t threadcount = 3);
+    DatabaseThreadPool(size_t threadcount = 10);
     ~DatabaseThreadPool();
 
-    void EnqueueTask(std::function<void(MysqlConnection&)> fn);
+    void EnqueueTask(std::function<void(MysqlConnection&, DBCallback)> task, DBCallback done);
     void Stop();
 
 private:

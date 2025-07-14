@@ -31,6 +31,7 @@ void MysqlConnectionPool::Init(const std::string& host, unsigned short port, con
                                const std::string& password, const std::string& name, int maxsize)
 {
     host_ = host;
+    port_ = port;
     user_ = user;
     password_ = password;
     name_ = name;
@@ -39,7 +40,7 @@ void MysqlConnectionPool::Init(const std::string& host, unsigned short port, con
     for (int i = 0; i < maxsize_ / 2; i++)
     {
         auto conn = new MysqlConnection;
-        if(conn->Connect(host_, port, user_, password_, name))
+        if(conn->Connect(host_, port_, user_, password_, name))
         {
             conn->RefrushAliveTime();
             connectionqueue_.push(conn);

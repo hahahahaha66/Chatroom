@@ -22,6 +22,9 @@ MysqlConnection::~MysqlConnection()
 bool MysqlConnection::Connect(const std::string& host, unsigned short port, const std::string& user,
                  const std::string& password, const std::string& name)
 {
+    LOG_INFO << "Attempting to connect to MySQL at " << host << ": " << port 
+             << " with database: " << name;
+
     MYSQL* res = mysql_real_connect(conn_, host.c_str(), user.c_str(), password.c_str(), name.c_str(), port, nullptr, 0);
 
     host_ = host; 
@@ -45,7 +48,7 @@ bool MysqlConnection::Connect(const std::string& host, unsigned short port, cons
     }
 }
 
-bool MysqlConnection::ExcuteUpdata(const std::string& mysqlorder)
+bool MysqlConnection::ExcuteUpdate(const std::string& mysqlorder)
 {
     if (mysql_query(conn_, mysqlorder.c_str()))
     {

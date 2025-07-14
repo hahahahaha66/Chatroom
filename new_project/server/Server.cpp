@@ -6,7 +6,7 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, std::string name)
     : server_(loop, listenAddr, name), 
       dispatcher_() 
 {
-    MysqlConnectionPool::Instance().Init("localhost", 3306, "hahaha", "123456", "chatroom", 10);
+    MysqlConnectionPool::Instance().Init("localhost", 3306, "hahaha", "123456", "chatroom", 20);
 
     server_.setConnectionCallback(std::bind(&Server::OnConnection, this, _1));
     server_.setMessageCallback(std::bind(&Server::OnMessage, this, _1, _2, _3));
@@ -16,12 +16,12 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, std::string name)
     dispatcher_.registerHander("Register", std::bind(&Service::UserRegister, &service_, _1, _2, _3));
     dispatcher_.registerHander("Login", std::bind(&Service::UserLogin, &service_, _1, _2, _3));
     dispatcher_.registerHander("SendMessage", std::bind(&Service::MessageSend, &service_, _1, _2, _3));
-    dispatcher_.registerHander("ChatHistory", std::bind(&Service::GetChatHistory, &service_, _1, _2, _3));
-    dispatcher_.registerHander("SendApply", std::bind(&Service::SendFriendApply, &service_, _1, _2, _3));
-    dispatcher_.registerHander("AllApply", std::bind(&Service::ListFriendAllApplys, &service_, _1, _2, _3));
-    dispatcher_.registerHander("AllSendApply", std::bind(&Service::ListFriendSendApplys, &service_, _1, _2, _3));
-    dispatcher_.registerHander("ProceApply", std::bind(&Service::ProceFriendApplys, &service_, _1, _2, _3));
-    dispatcher_.registerHander("ListFriend", std::bind(&Service::ListFriends, &service_, _1, _2, _3));
+    // dispatcher_.registerHander("ChatHistory", std::bind(&Service::GetChatHistory, &service_, _1, _2, _3));
+    // dispatcher_.registerHander("SendApply", std::bind(&Service::SendFriendApply, &service_, _1, _2, _3));
+    // dispatcher_.registerHander("AllApply", std::bind(&Service::ListFriendAllApplys, &service_, _1, _2, _3));
+    // dispatcher_.registerHander("AllSendApply", std::bind(&Service::ListFriendSendApplys, &service_, _1, _2, _3));
+    // dispatcher_.registerHander("ProceApply", std::bind(&Service::ProceFriendApplys, &service_, _1, _2, _3));
+    // dispatcher_.registerHander("ListFriend", std::bind(&Service::ListFriends, &service_, _1, _2, _3));
 }
 
 void Server::start()
