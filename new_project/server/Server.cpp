@@ -16,12 +16,12 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, std::string name)
     dispatcher_.registerHander("Register", std::bind(&Service::UserRegister, &service_, _1, _2, _3));
     dispatcher_.registerHander("Login", std::bind(&Service::UserLogin, &service_, _1, _2, _3));
     dispatcher_.registerHander("SendMessage", std::bind(&Service::MessageSend, &service_, _1, _2, _3));
-    // dispatcher_.registerHander("ChatHistory", std::bind(&Service::GetChatHistory, &service_, _1, _2, _3));
-    // dispatcher_.registerHander("SendApply", std::bind(&Service::SendFriendApply, &service_, _1, _2, _3));
-    // dispatcher_.registerHander("AllApply", std::bind(&Service::ListFriendAllApplys, &service_, _1, _2, _3));
-    // dispatcher_.registerHander("AllSendApply", std::bind(&Service::ListFriendSendApplys, &service_, _1, _2, _3));
-    // dispatcher_.registerHander("ProceApply", std::bind(&Service::ProceFriendApplys, &service_, _1, _2, _3));
-    // dispatcher_.registerHander("ListFriend", std::bind(&Service::ListFriends, &service_, _1, _2, _3));
+    dispatcher_.registerHander("ChatHistory", std::bind(&Service::GetChatHistory, &service_, _1, _2, _3));
+    dispatcher_.registerHander("SendApply", std::bind(&Service::SendFriendApply, &service_, _1, _2, _3));
+    dispatcher_.registerHander("AllApply", std::bind(&Service::ListFriendAllApplys, &service_, _1, _2, _3));
+    dispatcher_.registerHander("AllSendApply", std::bind(&Service::ListFriendSendApplys, &service_, _1, _2, _3));
+    dispatcher_.registerHander("ProceApply", std::bind(&Service::ProceFriendApplys, &service_, _1, _2, _3));
+    dispatcher_.registerHander("ListFriend", std::bind(&Service::ListFriends, &service_, _1, _2, _3));
 }
 
 void Server::start()

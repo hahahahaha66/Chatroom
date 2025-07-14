@@ -3,6 +3,10 @@
 #include <exception>
 #include <memory>
 #include <mysql/mariadb_com.h>
+#include <mysql/mysql.h>
+#include <ostream>
+#include <sstream>
+#include <string>
 #include <sw/redis++/shards.h>
 #include <unistd.h>
 
@@ -194,13 +198,9 @@ void Service::UserRegister(const TcpConnectionPtr& conn, const json& js, Timesta
     [this, query](MysqlConnection& conn, DBCallback done) 
     {
         if (!conn.ExcuteUpdate(query))
-        {
             done(true);
-        }
         else 
-        {
             done(false);
-        }
     }, 
     [this, conn](bool succsee)mutable { 
             if (succsee) {
@@ -297,7 +297,6 @@ void Service::UserLogin(const TcpConnectionPtr& conn, const json& js, Timestamp 
                 {"end", false},
                 {"id", -1},
                 {"name", ""},
-                {"error", "Invalid email or password"}
                 };
                 conn->send(code_.encode(failure_response, "LoginBack"));
             }
@@ -349,7 +348,7 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js, Timestam
     int msgid = gen_.GetNextMsgId();
 
     databasethreadpool_.EnqueueTask(
-    [this, msgid, conn, senderid, receiverid, content, type, status, timestamp](MysqlConnection& mysqlconn, DBCallback done)mutable 
+    [this, msgid, senderid, receiverid, content, type, status, timestamp](MysqlConnection& mysqlconn, DBCallback done)mutable 
     {
         try 
         {
@@ -424,148 +423,294 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js, Timestam
     });
 }
 
-// void Service::SendFriendApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
-// {
-//     bool end = true;
+void Service::SendFriendApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
+{
+    bool end = true;
 
-//     int fromid;
-//     int targetid;
-//     std::string targetemail;
+    int fromid;
+    std::string targetemail;
 
-//     AssignIfPresent(js, "fromid", fromid);
-//     AssignIfPresent(js, "targetemail", targetemail);
+    AssignIfPresent(js, "fromid", fromid);
+    AssignIfPresent(js, "targetemail", targetemail);
 
-//     auto it = usermanager_.GetEmailToId();
-//     if (it.find(targetemail) == it.end())
-//     {
-//         end = false;
-//     }
-//     else 
-//     {
-//         targetid = it[targetemail];
-//     }
-//     if (end)
-//     {
-//         int id = gen_.GetNextFriendApplyId();
-//         end &= friendapplymanager_.AddAplly(id, fromid, targetid);
-//     }
+    databasethreadpool_.EnqueueTask([this, fromid,targetemail](MysqlConnection& mysqlconn, DBCallback done) {
+        std::string query = "select id from users where email = '" + targetemail + "';";
+        MYSQL_RES* res = mysqlconn.ExcuteQuery(query);
+        if (!res) 
+        {
+            LOG_ERROR << "Sendfriendapply query failed for email: " << targetemail;
+            done(false);
+            return;
+        }
+        
+        MysqlResult result(res);
+        MysqlRow row = result.GetRow();
+        int targetid = row.GetInt("id");
+        int applyid = gen_.GetNextFriendApplyId();
 
-//     json j = {
-//         {"end", end}
-//     };
+        std::ostringstream oss;
+        oss << "insert into friendapplys (id, fromid, targetid, status) values ("
+            << applyid << ", " << fromid << ", " << targetid << ",'" << "Pending"
+            << "'); ";
+        
+        if (!mysqlconn.ExcuteUpdate(oss.str()))
+            done(true);
+        else 
+            done(false);
+        
+    }, [this, conn](bool success) {
+        if (success){
+        }    LOG_DEBUG << "Sendapply success";
+        else {
+            LOG_ERROR << "Sendapply failed";
+        }
 
-//     conn->send(code_.encode(j, "SendApplyBack"));
-// }
+        json j = {
+            {"end", success}
+        };
+        conn->send(code_.encode(j, "SendApplyBack"));
+    });
+}
 
-// void Service::ListFriendAllApplys(const TcpConnectionPtr& conn, const json& js, Timestamp)
-// {
-//     int targetid;
+void Service::ListFriendAllApplys(const TcpConnectionPtr& conn, const json& js, Timestamp)
+{
+    int targetid;
+    AssignIfPresent(js, "targetid", targetid);
 
-//     AssignIfPresent(js, "targetid", targetid);
+    databasethreadpool_.EnqueueTask([this, conn, targetid](MysqlConnection& mysqlconn, DBCallback done) {
+        std::ostringstream oss;
+        oss << "select fromid , status from friendapplys where targetid = " << targetid;
+        MYSQL_RES* res = mysqlconn.ExcuteQuery(oss.str());
+        if (!res) 
+        {
+            LOG_ERROR << "Listfriendapply query failed ";
+            done(false);
+            return;
+        }
 
-//     std::vector<std::shared_ptr<Apply>> result = friendapplymanager_.GetReceivedApplies(targetid);
+        MysqlResult result(res);
+        json j = json::array();
+        int fromid;
+        std::string fromname;
+        std::string status;
 
-//     json j = json::array();
-//     for (auto it : result)
-//     {
-//         int fromid = it->GetFromId();
-//         std::string fromname = usermanager_.GetUser(fromid)->GetName();
-//         json apply = {
-//             {"fromid", fromid},
-//             {"fromname", fromname},
-//             {"status", it->GetStatus()}
-//         };
-//         j.push_back(apply);
-//     }
+        while (result.Next())
+        {
+            MysqlRow row = result.GetRow();
+            fromid = row.GetInt("fromid");
+            status = row.GetString("status");
 
-//     conn->send(code_.encode(j, "AllApplyBack"));
-// }
+            std::string qu = "select name from users where id = " + std::to_string(fromid);
+            MYSQL_RES* re = mysqlconn.ExcuteQuery(qu);
+            if (!res) {
+                LOG_ERROR << "Listfriendapply from name query failed ";
+                done(false);
+                return;
+            }
+            MysqlResult resul(re);
+            fromname = resul.GetRow().GetString("name");
 
-// void Service::ListFriendSendApplys(const TcpConnectionPtr& conn, const json& js, Timestamp)
-// {
-//     int fromid;
+            json apply = {
+                {"fromid", fromid},
+                {"fromname", fromname},
+                {"status", status}
+            };
+            j.push_back(apply);
+        }
+        j["end"] = true;
+        conn->send(code_.encode(j, "AllApplyBack"));
 
-//     AssignIfPresent(js, "fromid", fromid);
+    }, [this, conn](bool success) {
+        if (success) {
+            LOG_DEBUG << "Listfriendapply success";
+        }
+        else {
+            LOG_ERROR << "Listfriendapply failed";
+            json j = json::array();
+            j["end"] = false;
+            conn->send(code_.encode(j, "AllApplyBack"));
+        }
+    });
+}
 
-//     std::vector<std::shared_ptr<Apply>> result = friendapplymanager_.GetSentApplies(fromid);
+void Service::ListFriendSendApplys(const TcpConnectionPtr& conn, const json& js, Timestamp)
+{
+    int fromid;
+    AssignIfPresent(js, "fromid", fromid);
 
-//     json j = json::array();
-//     for (auto it : result)
-//     {
-//         int targetid = it->GetFromId();
-//         std::string targetname = usermanager_.GetUser(targetid)->GetName();
-//         json apply = {
-//             {"targetid", targetid},
-//             {"targetname", targetname},
-//             {"status", it->GetStatus()}
-//         };
-//         j.push_back(apply);
-//     }
+    databasethreadpool_.EnqueueTask([this, conn, fromid](MysqlConnection& mysqlconn, DBCallback done) {
+        std::ostringstream oss;
+        oss << "select targetid, status from friendapplys where fromid = " << fromid;
+        MYSQL_RES* res = mysqlconn.ExcuteQuery(oss.str());
+        if (!res) {
+            LOG_ERROR << "Listsendfriendapply query failed ";
+            done(false);
+            return;
+        }
 
-//     conn->send(code_.encode(j, "AllSendApplyBack"));
-// }
+        MysqlResult result(res);
+        json j = json::array();
+        int targetid;
+        std::string targetname;
+        std::string status;
 
-// void Service::ProceFriendApplys(const TcpConnectionPtr& conn, const json& js, Timestamp)
-// {
-//     bool end = true;
-//     int fromid;
-//     int targetid;
-//     std::string status;
+        while (result.Next())
+        {
+            MysqlRow row = result.GetRow();
+            targetid = row.GetInt("targetid");
+            status = row.GetString("status");
 
-//     AssignIfPresent(js, "fromid", fromid);
-//     AssignIfPresent(js, "targetid", targetid);
-//     AssignIfPresent(js, "status", status);
+            std::string qu = "select name from users where id = " + std::to_string(targetid);
+            MYSQL_RES* re = mysqlconn.ExcuteQuery(qu);
+            if (!res) {
+                LOG_ERROR << "Listsendfriendapply fromname query failed ";
+                done(false);
+                return;
+            }
+            MysqlResult resul(re);
+            targetname = resul.GetRow().GetString("name");
 
-//     if (status == "Agree")
-//     {
-//         end &= friendapplymanager_.AcceptApply(fromid, targetid);
-//         int id = gen_.GetNextFriendId();
-//         friendmanager_.AddFriend(id, fromid, targetid);
-//         id = gen_.GetNextFriendId();
-//         friendmanager_.AddFriend(id, targetid, fromid);
-//     }
-//     else if (status == "Reject")
-//     {
-//         end &= friendapplymanager_.RejectApply(fromid, targetid);
-//     }
-//     else  
-//     {
-//         end = false;
-//     }
+            json apply = {
+                {"fromid", targetid},
+                {"fromname", targetname},
+                {"status", status}
+            };
+            j.push_back(apply);
+        }
+        j["end"] = true;
+        conn->send(code_.encode(j, "AllSendApplyBack"));
 
-//     json j = {
-//         {"end", end}
-//     };
+    }, [this, conn](bool success) {
+        if (success) {
+            LOG_DEBUG << "Listsendfriendapply success";
+        }
+        else {
+            LOG_ERROR << "Listsendfriendapply failed";
+            json j = json::array();
+            j["end"] = false;
+            conn->send(code_.encode(j, "AllSendApplyBack"));
+        }
+    });
+}
 
-//     conn->send(code_.encode(j, "ProceApplyBack"));
-// }
+void Service::ProceFriendApplys(const TcpConnectionPtr& conn, const json& js, Timestamp)
+{
+    bool end = true;
+    int fromid;
+    int targetid;
+    std::string status;
 
-// void Service::ListFriends(const TcpConnectionPtr& conn, const json& js, Timestamp)
-// {
-//     int userid;
+    AssignIfPresent(js, "fromid", fromid);
+    AssignIfPresent(js, "targetid", targetid);
+    AssignIfPresent(js, "status", status);
 
-//     AssignIfPresent(js, "userid", userid);
+    databasethreadpool_.EnqueueTask([this, conn, targetid, fromid, status](MysqlConnection& mysqlconn, DBCallback done) {
+        std::ostringstream oss;
+        oss << "update friendapplys set status = '" << status << "'"
+            << "where targetid = " << targetid << "and fromid = "
+            << fromid << ";";
+        if (mysqlconn.ExcuteUpdate(oss.str()))
+            done(false);
 
-//     std::vector<std::shared_ptr<Friend>> result = friendmanager_.GetFriendList(userid);
+        if (status == "Agree")
+        {
+            int fd = gen_.GetNextFriendId();
+            std::ostringstream os;
+            oss << "insert into friends (id, userid, friendid, block) values ("
+                << fd << ", " << fromid << ", " << targetid << ", " << false << "); ";
+            if (mysqlconn.ExcuteUpdate(os.str()))
+                done(false);
 
-//     json j = json::array();
-//     for (auto it : result)
-//     {
-//         int friendid = it->GetFriendId();
-//         std::string friendname = usermanager_.GetUser(friendid)->GetName();
-//         json fd = {
-//             {"friendid", friendid},
-//             {"friendname", friendname},
-//             {"block", friendmanager_.GetFriendBlock(userid, friendid)}
-//         };
-//         j.push_back(fd);
-//     }
+            fd = gen_.GetNextFriendId();
+            std::ostringstream o;
+            oss << "insert into friends (id, userid, friendid, block) values ("
+                << fd << ", " << targetid << ", " << fromid << ", " << false << "); ";
+            if (mysqlconn.ExcuteUpdate(o.str()))
+                done(false);
+        }
+        else if (status == "Reject")
+        {
+        }
+        else
+        {
+            done(false);
+        }
 
-//     conn->send(code_.encode(j, "ListFriendBack"));
-// }
+    }, [this, conn](bool success) {
+        if (success) {
+            LOG_DEBUG << "Processfriendapply success";
+        }
+        else {
+            LOG_ERROR << "Processfriendapply failed";
+        }
+        json j = {
+            {"end", success}
+        };
+        conn->send(code_.encode(j, "ProceApplyBack"));
+    });
+}
 
-// void Service::GetChatHistory(const TcpConnectionPtr& conn, const json& js, Timestamp time)
-// {
+void Service::ListFriends(const TcpConnectionPtr& conn, const json& js, Timestamp)
+{
+    int userid;
+    AssignIfPresent(js, "userid", userid);
 
-// }
+    databasethreadpool_.EnqueueTask([this, conn, userid](MysqlConnection& mysqlconn, DBCallback done) {
+        std::string query = "select friendid, block from friends where userid = " + std::to_string(userid);
+        MYSQL_RES* res = mysqlconn.ExcuteQuery(query);
+        if (!res) 
+        {
+            LOG_ERROR << "listfriend query failed for userid: " << userid;
+            done(false);
+            return;
+        }
+
+        MysqlResult result(res);
+        json j = json::array();
+        int friendid;
+        std::string friendname;
+        bool block;
+
+        while (result.Next())
+        {
+            MysqlRow row = result.GetRow();
+            friendid = row.GetInt("id");
+            block = row.GetBool("block");
+
+            std::string qu = "select name from users where id = " + std::to_string(friendid);
+            MYSQL_RES* re = mysqlconn.ExcuteQuery(qu);
+            if (!res) {
+                LOG_ERROR << "Listfriend from name query failed ";
+                done(false);
+                return;
+            }
+            MysqlResult resul(re);
+            friendname = resul.GetRow().GetString("name");
+
+            json fri = {
+                {"friendid", friendid},
+                {"friendname", friendname},
+                {"block", block}
+            };
+            j.push_back(fri);
+        }
+        j["end"] = true;
+        conn->send(code_.encode(j, "ListFriendBack"));
+
+    }, [this, conn](bool success) {
+        if (success){
+        }    LOG_DEBUG << "Listfriends success";
+        else {
+            LOG_ERROR << "Listfriends failed";
+            json j;
+            j["end"] = false;
+            conn->send(code_.encode(j, "ListFriendBack"));
+        }
+    });
+}
+
+void Service::GetChatHistory(const TcpConnectionPtr& conn, const json& js, Timestamp time)
+{
+
+}
 

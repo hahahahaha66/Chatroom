@@ -287,24 +287,32 @@ public:
 
     void ListAllApplyBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
     {
-        int fromid;
-        std::string fromname;
-        std::string status;
-        std::unordered_map<int, FriendApply> newfriendapplylist_;
+        bool end = false;
+        AssignIfPresent(js, "end", end);
 
-        for (auto it : js)
+        if (end)
         {
-            AssignIfPresent(it, "fromid", fromid);
-            AssignIfPresent(it, "fromname", fromname);
-            AssignIfPresent(it, "status", status);
-
-            newfriendapplylist_.emplace(fromid, FriendApply(fromid, fromname, status));
+            int fromid;
+            std::string fromname;
+            std::string status;
+            std::unordered_map<int, FriendApply> newfriendapplylist_;
+            for (auto it : js)
+            {
+                AssignIfPresent(it, "fromid", fromid);
+                AssignIfPresent(it, "fromname", fromname);
+                AssignIfPresent(it, "status", status);
+                newfriendapplylist_.emplace(fromid, FriendApply(fromid, fromname, status));
+            }
+            friendapplylist_ = std::move(newfriendapplylist_);
         }
-
-        friendapplylist_ = std::move(newfriendapplylist_);
+        else  
+        {
+            std::cout << "获取好友申请列表失败" << std::endl;
+        }
+        
         notifyInputReady();
     }
-
+            
     void ListAllSendApply(const json& js)
     {
         this->send(codec_.encode(js, "AllSendApply"));
@@ -312,22 +320,30 @@ public:
 
     void ListAllSendApplyBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
     {
-        int targetid;
-        std::string targetname;
-        std::string status;
-        std::unordered_map<int, FriendApply> newfriendsendapplylist_;
+        bool end = false;
+        AssignIfPresent(js, "end", end);
 
-        for (auto it : js)
+        if (end)
         {
-            AssignIfPresent(it, "target", targetid);
-            AssignIfPresent(it, "targetname", targetname);
-            AssignIfPresent(it, "status", status);
-
-            FriendApply fdapply(targetid, targetname, status);
-            newfriendsendapplylist_.emplace(targetid, FriendApply(targetid, targetname, status));
+            int targetid;
+            std::string targetname;
+            std::string status;
+            std::unordered_map<int, FriendApply> newfriendsendapplylist_;
+            for (auto it : js)
+            {
+                AssignIfPresent(it, "target", targetid);
+                AssignIfPresent(it, "targetname", targetname);
+                AssignIfPresent(it, "status", status);
+                FriendApply fdapply(targetid, targetname, status);
+                newfriendsendapplylist_.emplace(targetid, FriendApply(targetid, targetname, status));
+            }
+            friendsendapplylist_ = std::move(newfriendsendapplylist_);
         }
-
-        friendsendapplylist_ = std::move(newfriendsendapplylist_);
+        else  
+        {
+            std::cout << "获取发送好友申请列表失败" << std::endl;
+        }
+        
         notifyInputReady();
     }
 
@@ -360,21 +376,32 @@ public:
 
     void ListFriendBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
     {
-        int friendid;
-        std::string friendname;
-        bool block;
-        std::unordered_map<int, Friend> newfriendlist_;
+        bool end = false;
+        AssignIfPresent(js, "end", end);
 
-        for (auto it : js)
+        if (end)
         {
-            AssignIfPresent(it, "friendid", friendid);
-            AssignIfPresent(it, "friendname", friendname);
-            AssignIfPresent(it, "block", block);
+            int friendid;
+            std::string friendname;
+            bool block;
+            std::unordered_map<int, Friend> newfriendlist_;
 
-            Friend fd(friendid, friendname, block);
-            newfriendlist_.emplace(friendid, Friend(friendid, friendname, block));
+            for (auto it : js)
+            {
+                AssignIfPresent(it, "friendid", friendid);
+                AssignIfPresent(it, "friendname", friendname);
+                AssignIfPresent(it, "block", block);
+
+                Friend fd(friendid, friendname, block);
+                newfriendlist_.emplace(friendid, Friend(friendid, friendname, block));
+            }
+            friendlist_ = std::move(newfriendlist_);
         }
-        friendlist_ = std::move(newfriendlist_);
+        else  
+        {
+            std::cout << "获取好友列表失败" << std::endl;
+        }
+        
         notifyInputReady();
     }
 
