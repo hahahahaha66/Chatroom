@@ -130,10 +130,10 @@ public:
         dispatcher_.registerHander("LoginBack", std::bind(&Client::LoginBack, this, _1, _2, _3));
         dispatcher_.registerHander("SendMessageBack", std::bind(&Client::SendMessageBack, this, _1, _2, _3));
         dispatcher_.registerHander("RecvMessage", std::bind(&Client::RecvMessageBack, this, _1, _2, _3));
-        dispatcher_.registerHander("SendApplyBack", std::bind(&Client::SendApplyBack, this, _1, _2, _3));
-        dispatcher_.registerHander("AllApplyBack", std::bind(&Client::ListAllApplyBack, this, _1, _2, _3));
-        dispatcher_.registerHander("AllSendApplyBack", std::bind(&Client::ListAllSendApplyBack, this, _1, _2, _3));
-        dispatcher_.registerHander("ProceApplyBack", std::bind(&Client::ProceApplyBack, this, _1, _2, _3));
+        dispatcher_.registerHander("SendFriendApplyBack", std::bind(&Client::SendApplyBack, this, _1, _2, _3));
+        dispatcher_.registerHander("FriendApplyBack", std::bind(&Client::ListAllApplyBack, this, _1, _2, _3));
+        dispatcher_.registerHander("SendFriendApplyBack", std::bind(&Client::ListAllSendApplyBack, this, _1, _2, _3));
+        dispatcher_.registerHander("ProceFirendApplyBack", std::bind(&Client::ProceApplyBack, this, _1, _2, _3));
         dispatcher_.registerHander("ListFriendBack", std::bind(&Client::ListFriendBack, this, _1, _2, _3));
         dispatcher_.registerHander("GetChatHistoryBack", std::bind(&Client::GetChatHistoryBack, this, _1, _2, _3));
     }
@@ -262,7 +262,7 @@ public:
 
     void SendApply(const json& js)
     {
-        this->send(codec_.encode(js, "SendApply"));
+        this->send(codec_.encode(js, "SendFriendApply"));
     }
 
     void SendApplyBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
@@ -285,7 +285,7 @@ public:
 
     void ListAllApply(const json& js)
     {
-        this->send(codec_.encode(js, "AllApply"));
+        this->send(codec_.encode(js, "FriendApply"));
     }
 
     void ListAllApplyBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
@@ -318,7 +318,7 @@ public:
             
     void ListAllSendApply(const json& js)
     {
-        this->send(codec_.encode(js, "AllSendApply"));
+        this->send(codec_.encode(js, "SendFriendApply"));
     }
 
     void ListAllSendApplyBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
@@ -352,7 +352,7 @@ public:
 
     void ProceApply(const json& js)
     {
-        this->send(codec_.encode(js, "ProceApply"));
+        this->send(codec_.encode(js, "ProceFriendApply"));
     }
 
     void ProceApplyBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)

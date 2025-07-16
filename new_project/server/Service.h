@@ -48,7 +48,7 @@ public:
     void ListGroupMember(const TcpConnectionPtr& conn, const json& json, Timestamp);
     void ListGroup(const TcpConnectionPtr& conn, const json& json, Timestamp);
     void QuitGroup(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void ChangePermission(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void ChangeUserRole(const TcpConnectionPtr& conn, const json& json, Timestamp);
     
 private:
     std::atomic<bool> running_ = false;

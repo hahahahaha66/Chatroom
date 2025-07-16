@@ -37,10 +37,28 @@ public:
         return redis_->incr("global:friendid");
     }
 
+    int GetNextGroupId()
+    {
+        std::shared_lock<std::shared_mutex> lock(mutex_);
+        return redis_->incr("global:groupid");
+    }
+
+    int GetNextGroupUserId()
+    {
+        std::shared_lock<std::shared_mutex> lock(mutex_);
+        return redis_->incr("global:groupuserid");
+    }
+
     int GetNextFriendApplyId()
     {
         std::shared_lock<std::shared_mutex> lock(mutex_);
-        return redis_->incr("global:applyid");
+        return redis_->incr("global:friendapplyid");
+    }
+
+    int GetNextGroupApplyId()
+    {
+        std::shared_lock<std::shared_mutex> lock(mutex_);
+        return redis_->incr("global:groupapplyid");
     }
 
     void InitUserId(int startid)
@@ -61,10 +79,28 @@ public:
         redis_->set("global:friendid", std::to_string(startid));
     }
 
-    void InitFriendAppltId(int startid)
+    void InitGroupId(int startid)
     {
         std::unique_lock<std::shared_mutex> lock(mutex_);
-        redis_->set("global:applyid", std::to_string(startid));
+        redis_->set("global:groupid", std::to_string(startid));
+    }
+
+    void InitGroupUserId(int startid)
+    {
+        std::unique_lock<std::shared_mutex> lock(mutex_);
+        redis_->set("global:groupuserid", std::to_string(startid));
+    }
+
+    void InitFriendApplyId(int startid)
+    {
+        std::unique_lock<std::shared_mutex> lock(mutex_);
+        redis_->set("global:friendapplyid", std::to_string(startid));
+    }
+
+    void InitGroupApplyId(int startid)
+    {
+        std::unique_lock<std::shared_mutex> lock(mutex_);
+        redis_->set("global:groupapplyid", std::to_string(startid));
     }
 
     std::shared_ptr<sw::redis::Redis> GetRedis()

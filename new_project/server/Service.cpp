@@ -154,12 +154,36 @@ void Service::InitIdsFromMySQL() {
         LOG_INFO << "已从 MySQL 初始化 Redis ID:friend=" << maxfriendid;
     });
 
+    ReadFromDataBase("select max(id) as id from groups;", [this](MysqlRow& msgRow) 
+    {
+        int maxgroupid = msgRow.GetInt("id");
+        gen_.InitGroupId(maxgroupid);
+
+        LOG_INFO << "已从 MySQL 初始化 Redis ID:group=" << maxgroupid;
+    });
+
+    ReadFromDataBase("select max(id) as id from groupusers;", [this](MysqlRow& msgRow) 
+    {
+        int maxgroupuserid = msgRow.GetInt("id");
+        gen_.InitGroupId(maxgroupuserid);
+
+        LOG_INFO << "已从 MySQL 初始化 Redis ID:groupuser=" << maxgroupuserid;
+    });
+
     ReadFromDataBase("select max(id) as id from friendapplys;", [this](MysqlRow& msgRow) 
     {
         int maxfriendapplyid = msgRow.GetInt("id");
-        gen_.InitFriendAppltId(maxfriendapplyid);
+        gen_.InitFriendApplyId(maxfriendapplyid);
 
-        LOG_INFO << "已从 MySQL 初始化 Redis ID:friendapplys=" << maxfriendapplyid;
+        LOG_INFO << "已从 MySQL 初始化 Redis ID:friendapply=" << maxfriendapplyid;
+    });
+
+    ReadFromDataBase("select max(id) as id from groupapplys;", [this](MysqlRow& msgRow) 
+    {
+        int maxgroupapplyid = msgRow.GetInt("id");
+        gen_.InitFriendApplyId(maxgroupapplyid);
+
+        LOG_INFO << "已从 MySQL 初始化 Redis ID:groupapply=" << maxgroupapplyid;
     });
 
 }
@@ -222,10 +246,10 @@ void Service::UserRegister(const TcpConnectionPtr& conn, const json& js, Timesta
     }, 
     [this, conn](bool success)mutable { 
             if (success) {
-                LOG_DEBUG << "Register success";
+                LOG_DEBUG << "Register Success";
             }
             else {
-                LOG_ERROR << "Register failed";
+                LOG_ERROR << "Register Failed";
             }
 
             json j = {
@@ -429,10 +453,10 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js, Timestam
 
     }, [this, conn](bool success)mutable { 
         if (success) {
-            LOG_DEBUG << "Message send database operation completed";
+            LOG_DEBUG << "Message Send Database Operation Success";
         }
         else { 
-            LOG_ERROR << "Message send database operation failed";
+            LOG_ERROR << "Message Send Database Operation Success";
         }
         json j = {
             {"end", success}
@@ -484,15 +508,16 @@ void Service::SendFriendApply(const TcpConnectionPtr& conn, const json& js, Time
         
     }, [this, conn](bool success) {
         if (success){
-        }    LOG_DEBUG << "Sendapply success";
+            LOG_DEBUG << "SendFriendApply Success";
+        }
         else {
-            LOG_ERROR << "Sendapply failed";
+            LOG_ERROR << "SendFriendApply Failed";
         }
 
         json j = {
             {"end", success}
         };
-        conn->send(code_.encode(j, "SendApplyBack"));
+        conn->send(code_.encode(j, "SendFriendApplyBack"));
     });
 }
 
@@ -549,17 +574,17 @@ void Service::ListFriendAllApplys(const TcpConnectionPtr& conn, const json& js, 
         }
         j["friendapplys"] = arr;
         j["end"] = true;
-        conn->send(code_.encode(j, "AllApplyBack"));
+        conn->send(code_.encode(j, "FriendApplyBack"));
 
     }, [this, conn](bool success) {
         if (success) {
-            LOG_DEBUG << "Listfriendapply success";
+            LOG_DEBUG << "ListFriendAllApplys Success";
         }
         else {
-            LOG_ERROR << "Listfriendapply failed";
+            LOG_ERROR << "ListFriendAllApplys Failed";
             json j = json::array();
             j["end"] = false;
-            conn->send(code_.encode(j, "AllApplyBack"));
+            conn->send(code_.encode(j, "FriendApplyBack"));
         }
     });
 }
@@ -616,17 +641,17 @@ void Service::ListFriendSendApplys(const TcpConnectionPtr& conn, const json& js,
         }
         j["friendsendapplys"] = arr;
         j["end"] = true;
-        conn->send(code_.encode(j, "AllSendApplyBack"));
+        conn->send(code_.encode(j, "SendFriendApplyBack"));
 
     }, [this, conn](bool success) {
         if (success) {
-            LOG_DEBUG << "Listsendfriendapply success";
+            LOG_DEBUG << "ListFriendSendApplys Success";
         }
         else {
-            LOG_ERROR << "Listsendfriendapply failed";
+            LOG_ERROR << "ListFriendSendApplys Failed";
             json j = json::array();
             j["end"] = false;
-            conn->send(code_.encode(j, "AllSendApplyBack"));
+            conn->send(code_.encode(j, "SendFriendApplyBack"));
         }
     });
 }
@@ -648,7 +673,7 @@ void Service::ProceFriendApplys(const TcpConnectionPtr& conn, const json& js, Ti
         json j = {
             {"end", false},
         };
-        conn->send(code_.encode(j, "ProcessApplyBack"));
+        conn->send(code_.encode(j, "ProceFriendApplyBack"));
         return;
     }
     
@@ -658,7 +683,7 @@ void Service::ProceFriendApplys(const TcpConnectionPtr& conn, const json& js, Ti
         json j = {
             {"end", false},
         };
-        conn->send(code_.encode(j, "ProcessApplyBack"));
+        conn->send(code_.encode(j, "ProceFriendApplyBack"));
         return;
     }
 
@@ -708,10 +733,10 @@ void Service::ProceFriendApplys(const TcpConnectionPtr& conn, const json& js, Ti
 
     }, [this, conn](bool success) {
         if (success) {
-            LOG_DEBUG << "Processfriendapply success";
+            LOG_DEBUG << "ProceFriendApplys Success";
         }
         else {
-            LOG_ERROR << "Processfriendapply failed";
+            LOG_ERROR << "ProceFriendApplys Failed";
         }
         json j = {
             {"end", success}
@@ -776,9 +801,9 @@ void Service::ListFriends(const TcpConnectionPtr& conn, const json& js, Timestam
 
     }, [this, conn](bool success) {
         if (success){
-        }    LOG_DEBUG << "Listfriends success";
+        }    LOG_DEBUG << "ListFriends Success";
         else {
-            LOG_ERROR << "Listfriends failed";
+            LOG_ERROR << "ListFriends Failed";
             json j;
             j["end"] = false;
             conn->send(code_.encode(j, "ListFriendBack"));
@@ -853,9 +878,9 @@ void Service::GetChatHistory(const TcpConnectionPtr& conn, const json& js, Times
 
     }, [this, conn](bool success) {
         if (success){
-        }    LOG_DEBUG << "Getchathistory success";
+        }    LOG_DEBUG << "GetChatHistory Success";
         else {
-            LOG_ERROR << "Getchathistory failed";
+            LOG_ERROR << "GetChatHistory Failed";
             json j;
             j["end"] = false;
             conn->send(code_.encode(j, "GetChatHistoryBack"));
@@ -863,42 +888,404 @@ void Service::GetChatHistory(const TcpConnectionPtr& conn, const json& js, Times
     });
 }
 
-void Service::CreateGroup(const TcpConnectionPtr& conn, const json& json, Timestamp)
+void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js, Timestamp)
 {
+    bool end = true;
+    std::string groupname;
+    int ownerid = 0;
+    end &= AssignIfPresent(js, "groupname", groupname);
+    end &= AssignIfPresent(js, "ownerid", ownerid);
 
+    databasethreadpool_.EnqueueTask([this, groupname, ownerid](MysqlConnection& mysqlconn, DBCallback done) {
+        int groupid = gen_.GetNextGroupId();
+
+        std::ostringstream oss;
+        oss << "insert into groups (id, name, owner) values ( " << groupid << ", '"
+            << groupname << "', " << ownerid << "); ";
+
+        if (mysqlconn.ExcuteUpdate(oss.str()))
+            done(true);
+        else  
+            done(false);
+    }, [this, conn](bool success) {
+        if (success) {
+            LOG_DEBUG << "CreateGroup Success";
+        }
+        else {
+            LOG_ERROR << "CreateGroup Failed";
+        }
+        json j = {
+            {"end", success}
+        };
+        conn->send(code_.encode(j, "CreateGroupBack"));
+    });
 }
 
-void Service::SendGroupApply(const TcpConnectionPtr& conn, const json& json, Timestamp)
+void Service::SendGroupApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
 {
+    bool end = true;
+    int groupid;
+    int userid;
+    end &= AssignIfPresent(js, "groupid", groupid);
+    end &= AssignIfPresent(js, "userid", userid);
 
+    databasethreadpool_.EnqueueTask([this, groupid, userid](MysqlConnection& mysqlconn, DBCallback done) {
+        int groupapplyid = gen_.GetNextGroupApplyId();
+        std::ostringstream oss;
+        oss << "insert into groupapply (id, groupid, userid) values ( " << groupapplyid << ", "
+            << groupid << ", " << userid << "); ";
+        
+        if (mysqlconn.ExcuteUpdate(oss.str()))
+            done(true);
+        else  
+            done(false);
+    }, [this, conn](bool success) {
+        if (success) {
+            LOG_DEBUG << "SendGroupApply Success";
+        }
+        else {
+            LOG_ERROR << "SendGroupApply Failed";
+        }
+        json j = {
+            {"end", success}
+        };
+        conn->send(code_.encode(j, "SendGroupApplyBack"));
+    });
 }
 
-void Service::ListGroupApply(const TcpConnectionPtr& conn, const json& json, Timestamp)
+void Service::ListGroupApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
 {
+    bool end = true;
+    int groupid;
+    AssignIfPresent(js, "groupid", groupid);
 
+    databasethreadpool_.EnqueueTask([this, conn, groupid](MysqlConnection& mysqlconn, DBCallback done) {
+        std::ostringstream oss;
+        oss << "select usesid, status from groupapplys where groupid = " << groupid << "; ";
+        MYSQL_RES* res = mysqlconn.ExcuteQuery(oss.str());
+        if (!res) {
+            LOG_ERROR << "ListGroupapply from groupapply query failed ";
+            done(false);
+            return;
+        }
+
+        MysqlResult result(res);
+        json j;
+        json arr = json::array();
+        int userid;
+        std::string username;
+        std::string status;
+
+        while (result.Next())
+        {
+            MysqlRow row = result.GetRow();
+            userid = row.GetInt("userid");
+            status = row.GetString("status");
+            std::string query = "select name from users where id = " + std::to_string(userid) + "; ";
+            MYSQL_RES* re = mysqlconn.ExcuteQuery(query);
+            if (!re) {
+                LOG_ERROR << "Listsendfriendapply from name query failed ";
+                done(false);
+                return;
+            }
+            MysqlResult resul(re);
+            if (resul.Next())
+            {
+                MysqlRow ro = resul.GetRow();
+                username = ro.GetString("name");
+            }
+
+            json apply = {
+                {"userid", userid},
+                {"username", username},
+                {"status", status}
+            };
+            arr.push_back(apply);
+        }
+        j["groupapplys"] = arr;
+        j["end"] = true;
+
+        conn->send(code_.encode(j, "ListGroupApplyBack"));
+    }, [this, conn](bool success) {
+        if (success) {
+            LOG_DEBUG << "ListGroupApply Success";
+        }
+        else {
+            LOG_ERROR << "ListGroupApply Failed";
+        }
+        json j = {
+            {"end", success}
+        };
+        conn->send(code_.encode(j, "ListGroupApplyBack"));
+    });
 }
 
-void Service::ListGroupSendApply(const TcpConnectionPtr& conn, const json& json, Timestamp)
+void Service::ListGroupSendApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
 {
+    bool end = true;
+    int userid;
+    AssignIfPresent(js, "userid", userid);
 
+    databasethreadpool_.EnqueueTask([this, conn, userid](MysqlConnection& mysqlconn, DBCallback done) {
+        std::ostringstream oss;
+        oss << "select groupid, status from groupapplys where userid = " << userid << "; ";
+        MYSQL_RES* res = mysqlconn.ExcuteQuery(oss.str());
+        if (!res) {
+            LOG_ERROR << "ListGroupsendapply from groupapply query failed ";
+            done(false);
+            return;
+        }
+
+        MysqlResult result(res);
+        json j;
+        json arr = json::array();
+        int groupid;
+        std::string groupname;
+        std::string status;
+
+        while (result.Next())
+        {
+            MysqlRow row = result.GetRow();
+            groupid = row.GetInt("groupid");
+            status = row.GetString("status");
+            std::string query = "select name from groups where id = " + std::to_string(groupid) + "; ";
+            MYSQL_RES* re = mysqlconn.ExcuteQuery(query);
+            if (!re) {
+                LOG_ERROR << "Listsendfriendapply from name query failed ";
+                done(false);
+                return;
+            }
+            MysqlResult resul(re);
+            if (resul.Next())
+            {
+                MysqlRow ro = resul.GetRow();
+                groupname = ro.GetString("name");
+            }
+
+            json apply = {
+                {"groupid", groupid},
+                {"groupname", groupname},
+                {"status", status}
+            };
+            arr.push_back(apply);
+        }
+        j["groupsendapplys"] = arr;
+        j["end"] = true;
+
+        conn->send(code_.encode(j, "ListGroupSendApplyBack"));
+    }, [this, conn](bool success) {
+        if (success) {
+            LOG_DEBUG << "ListGroupSendApply Success";
+        }
+        else {
+            LOG_ERROR << "ListGroupSendApply Failed";
+        }
+        json j = {
+            {"end", success}
+        };
+        conn->send(code_.encode(j, "ListGroupSendApplyBack"));
+    });
 }
 
-void Service::ListGroupMember(const TcpConnectionPtr& conn, const json& json, Timestamp)
+void Service::ListGroupMember(const TcpConnectionPtr& conn, const json& js, Timestamp)
 {
+    bool end = true;
+    int groupid;
+    end &= AssignIfPresent(js, "groupid", groupid);
 
+    databasethreadpool_.EnqueueTask([this, conn, groupid](MysqlConnection& mysqlconn, DBCallback done) {
+        std::string query = "select * from groupusers where groupid = " + std::to_string(groupid) + "; ";
+        MYSQL_RES* res = mysqlconn.ExcuteQuery(query);
+        if (!res) {
+            LOG_ERROR << "ListGroupmember from groupusers query failed ";
+            done(false);
+            return;
+        }
+
+        MysqlResult result(res);
+        json j;
+        json arr = json::array();
+        int userid;
+        std::string role;
+        std::string username;
+        bool mute;
+
+        while (result.Next())
+        {
+            MysqlRow row = result.GetRow();
+            userid = row.GetInt("userid");
+            role = row.GetString("role");
+            mute = row.GetBool("mute");
+            std::string query = "select name from users where id = " + std::to_string(userid) + "; ";
+            MYSQL_RES* re = mysqlconn.ExcuteQuery(query);
+            if (!re) {
+                LOG_ERROR << "ListGroupmamber from name query failed ";
+                done(false);
+                return;
+            }
+            MysqlResult resul(re);
+            if (resul.Next())
+            {
+                MysqlRow ro = resul.GetRow();
+                username = ro.GetString("name");
+            }
+
+            json member = {
+                {"userid", userid},
+                {"username", username},
+                {"role", role},
+                {"mute", mute}
+            };
+            arr.push_back(member);
+        }
+        j["groupmembers"] = arr;
+        j["end"] = true;
+
+        conn->send(code_.encode(j, "ListGroupMemberBack"));
+    }, [this, conn](bool success) {
+        if (success) {
+            LOG_DEBUG << "ListGroupMember Success";
+        }
+        else {
+            LOG_ERROR << "ListGroupMember Failed";
+        }
+        json j = {
+            {"end", success}
+        };
+        conn->send(code_.encode(j, "ListGroupMemberBack"));
+    });
 }
 
-void Service::ListGroup(const TcpConnectionPtr& conn, const json& json, Timestamp)
+void Service::ListGroup(const TcpConnectionPtr& conn, const json& js, Timestamp)
 {
+    bool end = true;
+    int groupid;
+    end &= AssignIfPresent(js, "groupid", groupid);
 
+    databasethreadpool_.EnqueueTask([this, conn, groupid](MysqlConnection& mysqlconn, DBCallback done) {
+        std::string query = "select * from groupusers where groupid = " + std::to_string(groupid) + "; ";
+        MYSQL_RES* res = mysqlconn.ExcuteQuery(query);
+        if (!res) {
+            LOG_ERROR << "ListGroupmember from groupusers query failed ";
+            done(false);
+            return;
+        }
+
+        MysqlResult result(res);
+        json j;
+        json arr = json::array();
+        int userid;
+        std::string role;
+        std::string username;
+        bool mute;
+
+        while (result.Next())
+        {
+            MysqlRow row = result.GetRow();
+            userid = row.GetInt("userid");
+            role = row.GetString("role");
+            mute = row.GetBool("mute");
+            std::string query = "select name from users where id = " + std::to_string(userid) + "; ";
+            MYSQL_RES* re = mysqlconn.ExcuteQuery(query);
+            if (!re) {
+                LOG_ERROR << "ListGroupmamber from name query failed ";
+                done(false);
+                return;
+            }
+            MysqlResult resul(re);
+            if (resul.Next())
+            {
+                MysqlRow ro = resul.GetRow();
+                username = ro.GetString("name");
+            }
+
+            json member = {
+                {"userid", userid},
+                {"username", username},
+                {"role", role},
+                {"mute", mute}
+            };
+            arr.push_back(member);
+        }
+        j["groupmembers"] = arr;
+        j["end"] = true;
+
+        conn->send(code_.encode(j, "ListGroupMemberBack"));
+    }, [this, conn](bool success) {
+        if (success) {
+            LOG_DEBUG << "ListGroup Success";
+        }
+        else {
+            LOG_ERROR << "ListGroup Failed";
+        }
+        json j = {
+            {"end", success}
+        };
+        conn->send(code_.encode(j, "ListGroupMemberBack"));
+    });
 }
 
-void Service::QuitGroup(const TcpConnectionPtr& conn, const json& json, Timestamp)
+void Service::QuitGroup(const TcpConnectionPtr& conn, const json& js, Timestamp)
 {
+    bool end = true;
+    int groupid;
+    int userid;
+    end &= AssignIfPresent(js, "gorupid", groupid);
+    end &= AssignIfPresent(js, "userid", userid);
 
+    databasethreadpool_.EnqueueTask([this, groupid, userid](MysqlConnection& mysqlconn, DBCallback done) {
+        std::ostringstream oss;
+        oss << "delete from groupusers where groupid = " << groupid << " and userid = "
+            << userid << "; ";
+        if (mysqlconn.ExcuteUpdate(oss.str()))
+            done(true);
+        else 
+            done(false);
+
+    }, [this, conn](bool success) {
+        if (success) {
+            LOG_DEBUG << "QuitGroup Success";
+        }
+        else {
+            LOG_ERROR << "QuitGroup Failed";
+        }
+        json j = {
+            {"end", success}
+        };
+        conn->send(code_.encode(j, "QuitGrouprBack"));
+    });
 }
 
-void Service::ChangePermission(const TcpConnectionPtr& conn, const json& json, Timestamp)
+// Member Administrator Owner
+void Service::ChangeUserRole(const TcpConnectionPtr& conn, const json& js, Timestamp)
 {
+    bool end = true;
+    int groupid;
+    int userid;
+    std::string role;
+    end &= AssignIfPresent(js, "groupid", groupid);
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "role", role);
 
+    databasethreadpool_.EnqueueTask([this, groupid, userid, role](MysqlConnection& mysqlconn, DBCallback done) {
+        std::ostringstream oss;
+        oss << "update groupusers set role = '" << role << "' where groupid = " << groupid
+            << " and userid = " << userid << "; ";
+        if (mysqlconn.ExcuteUpdate(oss.str()))
+            done(true);
+        else 
+            done(false);
+
+    }, [this, conn](bool success) {
+        if (success) {
+            LOG_DEBUG << "ChangeUserRole Success";
+        }
+        else {
+            LOG_ERROR << "ChangeUserRole Failed";
+        }
+        json j = {
+            {"end", success}
+        };
+        conn->send(code_.encode(j, "QuitGrouprBack"));
+    });
 }
