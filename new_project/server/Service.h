@@ -23,19 +23,6 @@ public:
     //Database
     void ReadFromDataBase(const std::string& query, std::function<void(MysqlRow&)> rowhander);
     void InitIdsFromMySQL();
-    void ReadUserFromDB();
-    void ReadMessageFromDB();
-    void ReadFriendFromDB();
-    void ReadFriendApplyFromDB();
-
-    //flush
-    void StartAutoFlushToDataBase(int seconds);
-    void FlushToDataBase();
-    void StopAutoFlush();
-    std::string FormatUpdateUser(std::shared_ptr<User> user);
-    std::string FormatUpdateMessage(std::shared_ptr<Message> message);
-    std::string FormatUpdataFriend(std::shared_ptr<Friend> frienda);
-    std::string FormatUpdataFriendApply(std::shared_ptr<Apply> friendapply);
 
     //User
     void UserRegister(const TcpConnectionPtr& conn, const json& json, Timestamp);
@@ -44,6 +31,7 @@ public:
     //Message
     void MessageSend(const TcpConnectionPtr& conn, const json& json, Timestamp);
     void GetChatHistory(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void GetGroupHistory(const TcpConnectionPtr& conn, const json& json, Timestamp);
 
     //Friend
     void SendFriendApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
@@ -53,6 +41,14 @@ public:
     void ListFriends(const TcpConnectionPtr& conn, const json& json, Timestamp);
 
     //Group
+    void CreateGroup(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void SendGroupApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void ListGroupApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void ListGroupSendApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void ListGroupMember(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void ListGroup(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void QuitGroup(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void ChangePermission(const TcpConnectionPtr& conn, const json& json, Timestamp);
     
 private:
     std::atomic<bool> running_ = false;

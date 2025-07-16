@@ -18,9 +18,11 @@ using std::placeholders::_3;
 using std::placeholders::_4;
 
 Timestamp timestamp;
+
 struct Friend {
     Friend(int id, std::string name, bool block)
         : id_(id), name_(name), block_(block) {}
+    Friend() : id_(0), name_(""), block_(false) {}
     int id_;
     std::string name_;
     bool block_;
@@ -133,6 +135,7 @@ public:
         dispatcher_.registerHander("AllSendApplyBack", std::bind(&Client::ListAllSendApplyBack, this, _1, _2, _3));
         dispatcher_.registerHander("ProceApplyBack", std::bind(&Client::ProceApplyBack, this, _1, _2, _3));
         dispatcher_.registerHander("ListFriendBack", std::bind(&Client::ListFriendBack, this, _1, _2, _3));
+        dispatcher_.registerHander("GetChatHistoryBack", std::bind(&Client::GetChatHistoryBack, this, _1, _2, _3));
     }
 
     void ConnectionCallBack(const TcpConnectionPtr& conn)
@@ -296,7 +299,7 @@ public:
             std::string fromname;
             std::string status;
             std::unordered_map<int, FriendApply> newfriendapplylist_;
-            for (auto it : js)
+            for (auto it : js["friendapplys"])
             {
                 AssignIfPresent(it, "fromid", fromid);
                 AssignIfPresent(it, "fromname", fromname);
@@ -329,7 +332,7 @@ public:
             std::string targetname;
             std::string status;
             std::unordered_map<int, FriendApply> newfriendsendapplylist_;
-            for (auto it : js)
+            for (auto it : js["friendsendapplys"])
             {
                 AssignIfPresent(it, "target", targetid);
                 AssignIfPresent(it, "targetname", targetname);
@@ -386,7 +389,7 @@ public:
             bool block;
             std::unordered_map<int, Friend> newfriendlist_;
 
-            for (auto it : js)
+            for (auto it : js["friends"])
             {
                 AssignIfPresent(it, "friendid", friendid);
                 AssignIfPresent(it, "friendname", friendname);
@@ -400,6 +403,57 @@ public:
         else  
         {
             std::cout << "获取好友列表失败" << std::endl;
+        }
+        
+        notifyInputReady();
+    }
+
+    void GetChatHistory(const json& js)
+    {
+        this->send(codec_.encode(js, "ChatHistory"));
+    }
+
+    void GetChatHistoryBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
+    {
+        bool end = false;
+        AssignIfPresent(js, "end", end);
+
+        if (end)
+        {
+            bool news = true;
+            int senderid;
+            int receiverid;
+            std::string content;
+            std::string status;
+            std::string timestamp;
+
+            for (auto it : js["messages"])
+            {
+                AssignIfPresent(it, "senderid", senderid);
+                AssignIfPresent(it, "receiverid", receiverid);
+                AssignIfPresent(it, "content", content);
+                AssignIfPresent(it, "status", status);
+                AssignIfPresent(it, "timestamp", timestamp);
+
+                if (senderid == userid_)
+                {
+                    std::cout << "用户: " << content << "时间: "<< timestamp << std::endl;
+                }
+                else  
+                {
+                    if (news && status == "Unread")
+                    {
+                        std::cout << "以下为新消息" << std::endl;
+                        news = false;
+                    }
+                    std::string friendname = friendlist_[senderid].name_;
+                    std::cout << friendname << ": " << content << "     "<< timestamp << std::endl;
+                }
+            }
+        }
+        else  
+        {
+            std::cout << "获取历史消息失败" << std::endl;
         }
         
         notifyInputReady();
@@ -654,6 +708,15 @@ public:
                 //     continue;
                 // }
 
+                json js = {
+                    {"userid", userid_},
+                    {"friendid", friendid},
+                };
+                waitingback_ = true;
+                GetChatHistory(js);
+
+                waitInPutReady();
+
                 while (true)
                 {
                     std::string message;
@@ -661,7 +724,7 @@ public:
                     getline(std::cin, message);
                     if (message == "q") break;
 
-                    json js {
+                    json js = {
                         {"senderid", userid_},
                         {"receiverid", friendid},
                         {"content", message},

@@ -57,7 +57,7 @@ std::optional<std::tuple<std::string, json>> Codec::tryDecode(Buffer* buf)
 
     try {
         json js = json::parse(body);
-        LOG_INFO << "Decode message : type = " << type << ", json = " << js.dump();
+        // LOG_INFO << "Decode message : type = " << type << ", json = " << js.dump();
         return std::make_tuple(type, js);
     } catch (...) {
         LOG_ERROR << "JSON parse failed";
