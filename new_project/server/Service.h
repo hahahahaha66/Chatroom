@@ -35,15 +35,16 @@ public:
 
     //Friend
     void SendFriendApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void ListFriendAllApplys(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void ListFriendSendApplys(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void ProceFriendApplys(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void ListFriendAllApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void ListFriendSendApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void ProceFriendApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
     void ListFriends(const TcpConnectionPtr& conn, const json& json, Timestamp);
 
     //Group
     void CreateGroup(const TcpConnectionPtr& conn, const json& json, Timestamp);
     void SendGroupApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
     void ListGroupApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void ProceGroupApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
     void ListGroupSendApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
     void ListGroupMember(const TcpConnectionPtr& conn, const json& json, Timestamp);
     void ListGroup(const TcpConnectionPtr& conn, const json& json, Timestamp);

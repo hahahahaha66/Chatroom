@@ -165,7 +165,7 @@ void Service::InitIdsFromMySQL() {
     ReadFromDataBase("select max(id) as id from groupusers;", [this](MysqlRow& msgRow) 
     {
         int maxgroupuserid = msgRow.GetInt("id");
-        gen_.InitGroupId(maxgroupuserid);
+        gen_.InitGroupUserId(maxgroupuserid);
 
         LOG_INFO << "已从 MySQL 初始化 Redis ID:groupuser=" << maxgroupuserid;
     });
@@ -266,6 +266,8 @@ void Service::UserLogin(const TcpConnectionPtr& conn, const json& js, Timestamp 
     std::string email;
     AssignIfPresent(js, "password", password);
     AssignIfPresent(js, "email", email);
+
+    std::cout << "----------" << std::endl;
 
     // 输入验证
     if (email.empty() || password.empty()) {
@@ -475,6 +477,8 @@ void Service::SendFriendApply(const TcpConnectionPtr& conn, const json& js, Time
     AssignIfPresent(js, "fromid", fromid);
     AssignIfPresent(js, "targetemail", targetemail);
 
+    std::cout << "--------------" << std::endl;
+
     databasethreadpool_.EnqueueTask([this, fromid,targetemail](MysqlConnection& mysqlconn, DBCallback done) {
         std::string query = "select id from users where email = '" + targetemail + "';";
         MYSQL_RES* res = mysqlconn.ExcuteQuery(query);
@@ -485,22 +489,27 @@ void Service::SendFriendApply(const TcpConnectionPtr& conn, const json& js, Time
             return;
         }
         
+        std::cout << "--------------" << std::endl;
         MysqlResult result(res);
         if (!result.Next()) {
             LOG_ERROR << "No such user with email: " << targetemail;
             done(false);
             return;
         }
+        std::cout << "--------------" << std::endl;
 
         MysqlRow row = result.GetRow();
         int targetid = row.GetInt("id");
         int applyid = gen_.GetNextFriendApplyId();
+
+        std::cout << "--------------" << std::endl;
 
         std::ostringstream oss;
         oss << "insert into friendapplys (id, fromid, targetid, status) values ("
             << applyid << ", " << fromid << ", " << targetid << ",'" << "Pending"
             << "'); ";
         
+        std::cout << "--------------" << std::endl;
         if (mysqlconn.ExcuteUpdate(oss.str()))
             done(true);
         else 
@@ -521,7 +530,7 @@ void Service::SendFriendApply(const TcpConnectionPtr& conn, const json& js, Time
     });
 }
 
-void Service::ListFriendAllApplys(const TcpConnectionPtr& conn, const json& js, Timestamp)
+void Service::ListFriendAllApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
 {
     int targetid;
     AssignIfPresent(js, "targetid", targetid);
@@ -589,7 +598,7 @@ void Service::ListFriendAllApplys(const TcpConnectionPtr& conn, const json& js, 
     });
 }
 
-void Service::ListFriendSendApplys(const TcpConnectionPtr& conn, const json& js, Timestamp)
+void Service::ListFriendSendApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
 {
     int fromid;
     AssignIfPresent(js, "fromid", fromid);
@@ -656,7 +665,7 @@ void Service::ListFriendSendApplys(const TcpConnectionPtr& conn, const json& js,
     });
 }
 
-void Service::ProceFriendApplys(const TcpConnectionPtr& conn, const json& js, Timestamp)
+void Service::ProceFriendApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
 {
     bool end = true;
     int fromid;
@@ -903,7 +912,15 @@ void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js, Timestam
         oss << "insert into groups (id, name, owner) values ( " << groupid << ", '"
             << groupname << "', " << ownerid << "); ";
 
-        if (mysqlconn.ExcuteUpdate(oss.str()))
+        if (!mysqlconn.ExcuteUpdate(oss.str()))
+            done(false);
+
+        int groupuserid = gen_.GetNextGroupUserId();
+        std::ostringstream os;
+        os << "insert into groupusers (id, groupid, userid, role) values (" <<groupuserid
+           << ", " << groupid <<  ", " << ownerid << ", '" << "Owner" << "'); ";
+
+        if (mysqlconn.ExcuteUpdate(os.str()))
             done(true);
         else  
             done(false);
@@ -933,7 +950,7 @@ void Service::SendGroupApply(const TcpConnectionPtr& conn, const json& js, Times
         int groupid;
         int groupapplyid = gen_.GetNextGroupApplyId();
 
-        std::string query = "select id from groups where name = " + groupname + "; ";
+        std::string query = "select id from groups where name = '" + groupname + "'; ";
         MYSQL_RES* re = mysqlconn.ExcuteQuery(query);
         if (!re) {
             LOG_ERROR << "Listsendfriendapply from name query failed ";
@@ -948,7 +965,7 @@ void Service::SendGroupApply(const TcpConnectionPtr& conn, const json& js, Times
         }
 
         std::ostringstream oss;
-        oss << "insert into groupapply (id, groupid, userid) values ( " << groupapplyid << ", "
+        oss << "insert into groupapplys (id, groupid, userid) values ( " << groupapplyid << ", "
             << groupid << ", " << userid << "); ";
         
         if (mysqlconn.ExcuteUpdate(oss.str()))
@@ -977,7 +994,7 @@ void Service::ListGroupApply(const TcpConnectionPtr& conn, const json& js, Times
 
     databasethreadpool_.EnqueueTask([this, conn, groupid](MysqlConnection& mysqlconn, DBCallback done) {
         std::ostringstream oss;
-        oss << "select usesid, status from groupapplys where groupid = " << groupid << "; ";
+        oss << "select userid, status from groupapplys where groupid = " << groupid << "; ";
         MYSQL_RES* res = mysqlconn.ExcuteQuery(oss.str());
         if (!res) {
             LOG_ERROR << "ListGroupapply from groupapply query failed ";
@@ -1033,6 +1050,65 @@ void Service::ListGroupApply(const TcpConnectionPtr& conn, const json& js, Times
             {"end", success}
         };
         conn->send(code_.encode(j, "ListGroupApplyBack"));
+    });
+}
+
+void Service::ProceGroupApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
+{
+    bool end = true;
+    int groupid;
+    int applyid;
+    std::string status;
+
+    end &= AssignIfPresent(js, "groupid", groupid);
+    end &= AssignIfPresent(js, "applyid", status);
+    end &= AssignIfPresent(js, "status", status);
+
+    databasethreadpool_.EnqueueTask([this, conn, groupid, applyid, status](MysqlConnection& mysqlconn, DBCallback done) {
+        std::ostringstream oss;
+        oss << "update groupapplys set status = '" << status << "' "
+            << "where groupid = " << groupid << " and userid = "
+            << applyid << ";";
+
+        if (!mysqlconn.ExcuteUpdate(oss.str()))
+        {
+            done(false);
+            return;
+        }
+           
+        if (status == "Agree")
+        {
+            int fd = gen_.GetNextGroupUserId();
+            std::ostringstream os;
+            os << "insert into groupusers (id, groupid, userid) values ("
+                << fd << ", " << groupid << ", " << applyid << "); ";
+            if (!mysqlconn.ExcuteUpdate(os.str()))
+            {
+                done(false);
+                return;
+            }
+            done(true);
+        }
+        else if (status == "Reject")
+        {
+            done(true);
+        }
+        else
+        {
+            done(false);
+        }
+
+    }, [this, conn](bool success) {
+        if (success) {
+            LOG_DEBUG << "ProceGroupApplys Success";
+        }
+        else {
+            LOG_ERROR << "ProceGroupApplys Failed";
+        }
+        json j = {
+            {"end", success}
+        };
+        conn->send(code_.encode(j, "ProceGroupApplyBack"));
     });
 }
 

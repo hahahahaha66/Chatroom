@@ -43,9 +43,11 @@ public:
         {
             std::lock_guard<std::mutex> lock(mutex_);
             auto it = handers_.find(type);
+            LOG_DEBUG << type;
             if (it != handers_.end())
             {
                 cb = it->second;
+                LOG_DEBUG << "hander size: " << sizeof(cb);
             }
             else 
             {
@@ -56,6 +58,8 @@ public:
         if (cb)
         {
             threadpool_.SubmitTask([=]() {
+                LOG_DEBUG << "threadpool push task";
+                LOG_DEBUG << "Decode message : type = " << type << ", json = " << js.dump();
                 cb(conn, js, time);
             });
         }

@@ -1,5 +1,4 @@
 #include "Codec.h"
-#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <tuple>
