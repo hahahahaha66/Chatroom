@@ -47,6 +47,8 @@ target_link_libraries(chatcore
     mysqlclient
     hiredis
     redis++ 
+    profiler
+    pthread
 )
 
 # 可执行文件：server

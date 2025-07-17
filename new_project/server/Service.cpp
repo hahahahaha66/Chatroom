@@ -924,13 +924,29 @@ void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js, Timestam
 void Service::SendGroupApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
 {
     bool end = true;
-    int groupid;
+    std::string groupname;
     int userid;
-    end &= AssignIfPresent(js, "groupid", groupid);
+    end &= AssignIfPresent(js, "groupname", groupname);
     end &= AssignIfPresent(js, "userid", userid);
 
-    databasethreadpool_.EnqueueTask([this, groupid, userid](MysqlConnection& mysqlconn, DBCallback done) {
+    databasethreadpool_.EnqueueTask([this, groupname, userid](MysqlConnection& mysqlconn, DBCallback done) {
+        int groupid;
         int groupapplyid = gen_.GetNextGroupApplyId();
+
+        std::string query = "select id from groups where name = " + groupname + "; ";
+        MYSQL_RES* re = mysqlconn.ExcuteQuery(query);
+        if (!re) {
+            LOG_ERROR << "Listsendfriendapply from name query failed ";
+            done(false);
+            return;
+        }
+        MysqlResult resul(re);
+        if (resul.Next())
+        {
+            MysqlRow ro = resul.GetRow();
+            groupid = ro.GetInt("id");
+        }
+
         std::ostringstream oss;
         oss << "insert into groupapply (id, groupid, userid) values ( " << groupapplyid << ", "
             << groupid << ", " << userid << "); ";
@@ -1159,14 +1175,14 @@ void Service::ListGroupMember(const TcpConnectionPtr& conn, const json& js, Time
 void Service::ListGroup(const TcpConnectionPtr& conn, const json& js, Timestamp)
 {
     bool end = true;
-    int groupid;
-    end &= AssignIfPresent(js, "groupid", groupid);
+    int userid;
+    end &= AssignIfPresent(js, "userid", userid);
 
-    databasethreadpool_.EnqueueTask([this, conn, groupid](MysqlConnection& mysqlconn, DBCallback done) {
-        std::string query = "select * from groupusers where groupid = " + std::to_string(groupid) + "; ";
+    databasethreadpool_.EnqueueTask([this, conn, userid](MysqlConnection& mysqlconn, DBCallback done) {
+        std::string query = "select groupid, role from groupusers where userid = " + std::to_string(userid) + "; ";
         MYSQL_RES* res = mysqlconn.ExcuteQuery(query);
         if (!res) {
-            LOG_ERROR << "ListGroupmember from groupusers query failed ";
+            LOG_ERROR << "ListGroup from groupusers query failed ";
             done(false);
             return;
         }
@@ -1174,21 +1190,19 @@ void Service::ListGroup(const TcpConnectionPtr& conn, const json& js, Timestamp)
         MysqlResult result(res);
         json j;
         json arr = json::array();
-        int userid;
+        int groupid;
+        std::string groupname;
         std::string role;
-        std::string username;
-        bool mute;
 
         while (result.Next())
         {
             MysqlRow row = result.GetRow();
-            userid = row.GetInt("userid");
+            groupid = row.GetInt("groupid");
             role = row.GetString("role");
-            mute = row.GetBool("mute");
-            std::string query = "select name from users where id = " + std::to_string(userid) + "; ";
+            std::string query = "select name from groups where id = " + std::to_string(groupid) + "; ";
             MYSQL_RES* re = mysqlconn.ExcuteQuery(query);
             if (!re) {
-                LOG_ERROR << "ListGroupmamber from name query failed ";
+                LOG_ERROR << "ListGroup from name query failed ";
                 done(false);
                 return;
             }
@@ -1196,21 +1210,20 @@ void Service::ListGroup(const TcpConnectionPtr& conn, const json& js, Timestamp)
             if (resul.Next())
             {
                 MysqlRow ro = resul.GetRow();
-                username = ro.GetString("name");
+                groupname = ro.GetString("name");
             }
 
             json member = {
-                {"userid", userid},
-                {"username", username},
-                {"role", role},
-                {"mute", mute}
+                {"groupid", groupid},
+                {"groupname", groupname},
+                {"role", role}
             };
             arr.push_back(member);
         }
-        j["groupmembers"] = arr;
+        j["groups"] = arr;
         j["end"] = true;
 
-        conn->send(code_.encode(j, "ListGroupMemberBack"));
+        conn->send(code_.encode(j, "ListGroupBack"));
     }, [this, conn](bool success) {
         if (success) {
             LOG_DEBUG << "ListGroup Success";
@@ -1221,7 +1234,7 @@ void Service::ListGroup(const TcpConnectionPtr& conn, const json& js, Timestamp)
         json j = {
             {"end", success}
         };
-        conn->send(code_.encode(j, "ListGroupMemberBack"));
+        conn->send(code_.encode(j, "ListGroupBack"));
     });
 }
 

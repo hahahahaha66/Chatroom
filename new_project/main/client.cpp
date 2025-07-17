@@ -6,11 +6,14 @@
 #include <algorithm>
 #include <atomic>
 #include <condition_variable>
+#include <cstdio>
 #include <iostream>
+#include <ostream>
 #include <sys/types.h>
 #include <thread>
 #include <unistd.h>
 #include <unordered_map>
+#include <gperftools/profiler.h>
 
 using std::placeholders::_1;
 using std::placeholders::_2;
@@ -36,6 +39,13 @@ struct FriendApply {
     std::string status_;
 };
 
+struct Group {
+    Group(int id, std::string name, std::string role)
+        : id_(id), name_(name), role_(role) {}
+    int id_;
+    std::string name_;
+    std::string role_;
+};
 
 //提取json变量
 template<typename  T>
@@ -459,6 +469,228 @@ public:
         notifyInputReady();
     }
 
+    void CreateGroup(const json& js)
+    {
+        this->send(codec_.encode(js, "CreateGroup"));
+    }
+
+    void CreateGroupBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
+    {
+        bool end = false;
+        AssignIfPresent(js, "end", end);
+
+        if (end)
+        {
+            std::cout << "创建群聊成功" << std::endl;
+        }
+        else  
+        {
+            std::cout << "创建群聊失败" << std::endl;
+        }
+
+        notifyInputReady();
+    }
+
+    void SendGroupApply(const json& js)
+    {
+        this->send(codec_.encode(js, "SendGroupApply"));
+    }
+
+    void SendGroupApplyBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
+    {
+        bool end = false;
+        AssignIfPresent(js, "end", end);
+
+        if (end)
+        {
+            std::cout << "发送群聊申请成功" << std::endl;
+        }
+        else  
+        {
+            std::cout << "发送群聊申请失败" << std::endl;
+        }
+
+        notifyInputReady();
+    }
+
+    void GroupApply(const json& js)
+    {
+        this->send(codec_.encode(js, "GroupApply"));
+    }
+
+    void GroupApplyBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
+    {
+        bool end = false;
+        AssignIfPresent(js, "end", end);
+
+        if (end)
+        {
+            int applyid;
+            std::string applyname;
+            std::string status;
+            for (auto it : js["groupapplys"])
+            {
+                AssignIfPresent(it, "userid", applyid);
+                AssignIfPresent(it, "username", applyname);
+                AssignIfPresent(it, "status", status);
+                std::cout << "申请人id" << "  申请人名字   " << "  状态" << std::endl;
+                std::cout << applyid << "  " << applyname << "  " << status << std::endl;
+            }
+        }   
+        else  
+        {
+            std::cout << "获取群聊申请列表失败" << std::endl;
+        }
+
+        notifyInputReady();
+    }
+
+    void GroupSendApply(const json& js)
+    {
+        this->send(codec_.encode(js, "GroupSendApply"));
+    }
+
+    void GroupSendApplyBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
+    {
+        bool end = false;
+        AssignIfPresent(js, "end", end);
+
+        if (end)
+        {
+            int groupid;
+            std::string groupname;
+            std::string status;
+            for (auto it : js["groupsendapplys"])
+            {
+                AssignIfPresent(it, "groupid", groupid);
+                AssignIfPresent(it, "groupname", groupname);
+                AssignIfPresent(it, "status", status);
+                std::cout << "申请群聊id" << "  申请群聊名字   " << "  状态" << std::endl;
+                std::cout << groupid << "  " << groupname << "  " << status << std::endl;
+            }
+        }
+        else  
+        {
+            std::cout << "获取申请的群聊列表失败" << std::endl;
+        }
+
+        notifyInputReady();
+    }
+
+    void GroupMember(const json& js)
+    {
+        this->send(codec_.encode(js, "ListGroupMember"));
+    }
+
+    void GroupMemberBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
+    {
+        bool end = false;
+        AssignIfPresent(js, "end", end);
+
+        if (end)
+        {
+            int userid;
+            std::string username;
+            std::string role;
+            bool mute;
+            for (auto it : js["groupmembers"])
+            {
+                AssignIfPresent(it, "userid", userid);
+                AssignIfPresent(it, "username", username);
+                AssignIfPresent(it, "role", role);
+                AssignIfPresent(it, "mute", mute);
+                std::cout << "成员id" << "  成员名字   " << "  身份  " << " 是否禁言 "<< std::endl;
+                std::cout << userid << "  " << username << "  " << role << "  " << mute << std::endl;
+            }
+        }
+        else  
+        {
+            std::cout << "获取群聊成员失败" << std::endl;
+        }
+
+        notifyInputReady();
+    }
+
+    void ListGroup(const json& js)
+    {
+        this->send(codec_.encode(js, "ListGroup"));
+    }
+
+    void ListGroupBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
+    {
+        bool end = false;
+        AssignIfPresent(js, "end", end);
+
+        if (end)
+        {
+            int groupid;
+            std::string groupname;
+            std::string role;
+            std::unordered_map<int, Group> newgrouplist;
+            for (auto it : js["groups"])
+            {
+                AssignIfPresent(it, "groupid", groupid);
+                AssignIfPresent(it, "groupname", groupname);
+                AssignIfPresent(it, "role", role);
+                std::cout << "群聊id" << "  群聊名字   " << "  角色  "<< std::endl;
+                std::cout << groupid << "  " << groupname << "  " << role << std::endl;
+                newgrouplist.emplace(groupid, Group(groupid, groupname, role));
+            }
+            grouplist_ = std::move(newgrouplist);
+        }
+        else  
+        {
+            std::cout << "获取群聊列表失败" << std::endl;
+        }
+
+        notifyInputReady();
+    }
+
+    void QuitGroup(const json& js)
+    {
+        this->send(codec_.encode(js, "QuitGroup"));
+    }
+
+    void QuitGroupBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
+    {
+        bool end = false;
+        AssignIfPresent(js, "end", end);
+
+        if (end)
+        {
+            std::cout << "退出群聊成功" << std::endl;
+        }
+        else  
+        {
+            std::cout << "退出群聊失败" << std::endl;
+        }
+
+        notifyInputReady();
+    }
+
+    void ChangeUserRole(const json& js)
+    {
+        this->send(codec_.encode(js, "ChangeUserRole"));
+    }
+
+    void ChangeUserRoleBack(const TcpConnectionPtr& conn, const json& js, Timestamp time)
+    {
+        bool end = false;
+        AssignIfPresent(js, "end", end);
+
+        if (end)
+        {
+            std::cout << "改变用户角色成功" << std::endl;
+        }
+        else  
+        {
+            std::cout << "改变用户角色失败" << std::endl;
+        }
+
+        notifyInputReady();
+    }
+
+
     void start()
     {
         client_.connect();
@@ -466,9 +698,10 @@ public:
 
     void stop()
     {
-        std::cout << "-----------------" << std::endl;
         client_.disconnect();
+        client_.getLoop()->quit();
     }
+
 
     void send(const std::string& msg)
     {
@@ -502,7 +735,6 @@ public:
     {
         while (true)
         {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
             if (currentState_ == "init_menu")
             {
                 int order = 0;
@@ -553,6 +785,8 @@ public:
                 }
                 else if (order == 3)
                 {
+                    std::cout << "正在退出..." << std::endl;
+                    stop();
                     break;
                 }
                 else  
@@ -570,7 +804,8 @@ public:
                 std::cout << "4. 查看待处理好友申请列表" << std::endl;
                 std::cout << "5. 查看被申请好友列表" << std::endl;
                 std::cout << "6. 私聊" << std::endl;
-                std::cout << "7. 退出" << std::endl;
+                std::cout << "7. 群聊" << std::endl;
+                std::cout << "8. 退出" << std::endl;
                 getline(std::cin, input);
                 if (!ReadNum(input, order)) continue;
 
@@ -679,10 +914,14 @@ public:
                 else if (order == 6)
                 {
                     ClearScreen();
-                    currentState_ = "chat_menu";
-                    //进入聊天界面，获取历史聊天记录
+                    currentState_ = "friendchat_menu";
                 }
                 else if (order == 7)
+                {
+                    ClearScreen();
+                    currentState_ = "group_menu";
+                }
+                else if (order == 8)
                 {
                     std::cout << "正在退出..." << std::endl;
                     stop();
@@ -693,13 +932,14 @@ public:
                     std::cout << "错误指令,请重试" << std::endl;
                 }
             }
-            else if (currentState_ == "chat_menu")
+            else if (currentState_ == "friendchat_menu")
             {
                 int friendid;
                 std::string input;
                 std::cout << "输入聊天的好友id(输入0退出): ";
                 getline(std::cin, input);
                 if (!ReadNum(input, friendid)) continue;
+                if (friendid == 0) currentState_ = "main_menu";
 
                 // if (friendlist_.find(friendid) == friendlist_.end())
                 // {
@@ -720,9 +960,9 @@ public:
                 while (true)
                 {
                     std::string message;
-                    std::cout << "输入(输入q返回): " ;
+                    std::cout << "输入(输入0返回): " ;
                     getline(std::cin, message);
-                    if (message == "q") break;
+                    if (message == "0") break;
 
                     json js = {
                         {"senderid", userid_},
@@ -739,6 +979,174 @@ public:
                 }
 
                 ClearScreen();
+            }
+            else if (currentState_ == "group_menu")
+            {
+                int order = 0;
+                std::string input;
+                std::cout << "1. 创建群聊" << std::endl;
+                std::cout << "2. 加入群聊" << std::endl;
+                std::cout << "3. 查看群聊列表" << std::endl;
+                std::cout << "4. 查看发送的群聊申请" << std::endl;
+                std::cout << "5. 进入群聊" << std::endl;
+                std::cout << "6. 返回上一界面" << std::endl;
+
+                getline(std::cin, input);
+                if (!ReadNum(input, order)) continue;
+
+                if (order == 1)
+                {
+                    std::string groupname;
+                    std::cout << "输入创建的群聊名称(输入0返回): ";
+                    getline(std::cin, groupname);
+                    if (groupname == "0") continue;
+
+                    json js = {
+                        {"groupname", groupname},
+                        {"ownerid", userid_}
+                    };
+
+                    waitingback_ = true;
+                    CreateGroup(js);
+
+                    waitInPutReady();
+                }
+                else if (order == 2)
+                {
+                    std::string groupname;
+                    std::cout << "输入要加入的群聊名称(输入0返回): ";
+                    getline(std::cin, groupname);
+                    if (groupname == "0") continue;
+
+                    json js = {
+                        {"groupname", groupname},
+                        {"userid", userid_}
+                    };
+
+                    waitingback_ = true;
+                    SendGroupApply(js);
+
+                    waitInPutReady();
+                }
+                else if (order == 3)
+                {
+                    json js = {
+                        {"userid", userid_}
+                    };
+
+                    waitingback_ = true;
+                    ListGroup(js);
+
+                    waitInPutReady();
+                }
+                else if (order == 4)
+                {
+                    currentState_ = "groupchat_menu";
+                    continue;;
+                }
+                else  
+                {
+                    currentState_ = "main_menu";
+                    continue;;
+                }
+            }
+            else if (currentState_ == "groupchat_menu")
+            {
+                std::string input;
+                int order;
+                int groupid;
+                std::cout << "输入要进入的群聊id" << std::endl;
+                getline(std::cin, input);
+                if (!ReadNum(input, groupid)) continue;
+                 
+                ClearScreen();
+                while (true) 
+                {
+                    std::cout << "1. 聊天" << std::endl;
+                    std::cout << "2. 查看群聊成员" << std::endl;
+                    std::cout << "3. 查看群聊申请" << std::endl;
+                    std::cout << "4. 更改群聊成员权限" << std::endl;
+                    std::cout << "5. 退出群聊" << std::endl;
+                    std::cout << "6. 返回上一界面" << std::endl;
+
+                    getline(std::cin, input);
+                    if (!ReadNum(input, order)) continue;
+
+                    if (order == 1)
+                    {
+
+                    }
+                    else if (order == 2)
+                    {
+                        json js = {
+                            {"groupid", groupid}
+                        };
+
+                        waitingback_ = true;
+                        GroupMember(js);
+
+                        waitInPutReady();
+
+                    }
+                    else if (order == 3)
+                    {
+                        json js = {
+                            {"groupid", groupid}
+                        };
+
+                        waitingback_ = true;
+                        GroupApply(js);
+
+                        waitInPutReady();
+                    }
+                    else if (order == 4)
+                    {
+                        int userid;
+                        std::string role;
+                        std::cout << "输入要改变的成员id: " << std::endl;
+                        getline(std::cin, input);
+                        if (!ReadNum(input, userid)) continue;
+                        std::cout << "输入改变后的角色(Member或Administrator): " << std::endl;
+                        getline(std::cin, role);
+                        if (!(role == "Member" || role == "Administrator"))
+                        {
+                            std::cout << "输入错误" << std::endl;
+                            continue;
+                        }
+
+                        json js = {
+                            {"groupid", groupid},
+                            {"userid", userid},
+                            {"role", role}
+                        };
+
+                        waitingback_ = true;
+                        ChangeUserRole(js);
+
+                        waitInPutReady();
+                    }
+                    else if (order == 5)
+                    {
+                        json js = {
+                            {"groupid", groupid},
+                            {"userid", userid_}
+                        };
+
+                        waitingback_ = true;
+                        QuitGroup(js);
+
+                        waitInPutReady();
+                    }
+                    else if (order == 6)
+                    {
+                        currentState_ = "group_menu";
+                        break;
+                    }
+                    else  
+                    {
+                        std::cout << "错误指令,请重试" << std::endl;
+                    }
+                }
             }
             else  
             {
@@ -765,10 +1173,12 @@ private:
     std::unordered_map<int, Friend> friendlist_;
     std::unordered_map<int, FriendApply> friendapplylist_;
     std::unordered_map<int, FriendApply> friendsendapplylist_;
+    std::unordered_map<int, Group> grouplist_;
 };
 
 int main ()
 {
+    ProfilerStart("cpu_profile.prof");
     EventLoop loop;
     InetAddress addr(8080, "127.0.0.1");
 
@@ -781,4 +1191,10 @@ int main ()
     });
 
     loop.loop();
+    
+    if (th.joinable())
+        th.join();
+
+    ProfilerStop();
+    return 0;
 }

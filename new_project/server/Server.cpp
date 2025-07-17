@@ -26,11 +26,11 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, std::string name)
     dispatcher_.registerHander("SendGroupApply", std::bind(&Service::SendGroupApply, &service_, _1, _2, _3));
     dispatcher_.registerHander("GroupApply", std::bind(&Service::ListGroupApply, &service_, _1, _2, _3));
     dispatcher_.registerHander("GroupSendApply", std::bind(&Service::ListGroupSendApply, &service_, _1, _2, _3));
-    dispatcher_.registerHander("GroupMember", std::bind(&Service::ListGroupMember, &service_, _1, _2, _3));
+    dispatcher_.registerHander("ListGroupMember", std::bind(&Service::ListGroupMember, &service_, _1, _2, _3));
     dispatcher_.registerHander("ListGroup", std::bind(&Service::ListGroup, &service_, _1, _2, _3));
     dispatcher_.registerHander("QuitGroup", std::bind(&Service::QuitGroup, &service_, _1, _2, _3));
     dispatcher_.registerHander("ChangeUserRole", std::bind(&Service::ChangeUserRole, &service_, _1, _2, _3));
-    
+
 }
 
 void Server::start()
