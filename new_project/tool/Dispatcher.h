@@ -13,7 +13,7 @@
 //服务端使用
 
 using json = nlohmann::json;
-using MessageHander = std::function<void(const TcpConnectionPtr&, const json&, Timestamp)>;
+using MessageHander = std::function<void(const TcpConnectionPtr&, const json&)>;
 
 class Dispatcher
 {
@@ -60,7 +60,7 @@ public:
             threadpool_.SubmitTask([=]() {
                 LOG_DEBUG << "threadpool push task";
                 LOG_DEBUG << "Decode message : type = " << type << ", json = " << js.dump();
-                cb(conn, js, time);
+                cb(conn, js);
             });
         }
     }

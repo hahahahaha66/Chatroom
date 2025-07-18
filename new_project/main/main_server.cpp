@@ -5,7 +5,7 @@
 int main ()
 {
     EventLoop loop;
-    InetAddress addr(8080, "127.0.0.1");
+    InetAddress addr(10101, "0.0.0.0");
 
     Server server_(&loop, addr, "Chatroom");
 

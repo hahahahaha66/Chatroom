@@ -1,4 +1,4 @@
-#pragma one
+#pragma once
 
 #include <memory>
 #include <sw/redis++/redis.h>
@@ -16,100 +16,144 @@ public:
         opts.host = "127.0.0.1";
         opts.port = 6379;
 
-        redis_ = std::make_shared<sw::redis::Redis>(opts);
+        try {
+            redis_ = std::make_shared<sw::redis::Redis>(opts);
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Failed to connect to Redis: " + std::string(e.what()));
+        }
     }
 
     int GetNextUserId()
     {
-        std::shared_lock<std::shared_mutex> lock(mutex_);
-        return redis_->incr("global:userid");
+        try {
+            return redis_->incr("global:userid");
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Failed to increment userid: " + std::string(e.what()));
+        }
     }
 
     int GetNextMsgId()
     {
-        std::shared_lock<std::shared_mutex> lock(mutex_);
-        return redis_->incr("global:msgid");
+        try {
+            return redis_->incr("global:msgid");
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Failed to increment msgid: " + std::string(e.what()));
+        }
     }
 
     int GetNextFriendId()
     {
-        std::shared_lock<std::shared_mutex> lock(mutex_);
-        return redis_->incr("global:friendid");
+        try {
+            return redis_->incr("global:friendid");
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Failed to increment friendid: " + std::string(e.what()));
+        }
     }
 
     int GetNextGroupId()
     {
-        std::shared_lock<std::shared_mutex> lock(mutex_);
-        return redis_->incr("global:groupid");
+        try {
+            return redis_->incr("global:groupid");
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Failed to increment groupid: " + std::string(e.what()));
+        }
     }
 
     int GetNextGroupUserId()
     {
-        std::shared_lock<std::shared_mutex> lock(mutex_);
-        return redis_->incr("global:groupuserid");
+        try {
+            return redis_->incr("global:groupuserid");
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Failed to increment groupuserid: " + std::string(e.what()));
+        }
     }
 
     int GetNextFriendApplyId()
     {
-        std::shared_lock<std::shared_mutex> lock(mutex_);
-        return redis_->incr("global:friendapplyid");
+        try {
+            return redis_->incr("global:friendapplyid");
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Failed to increment friendapplyid: " + std::string(e.what()));
+        }
     }
 
     int GetNextGroupApplyId()
     {
-        std::shared_lock<std::shared_mutex> lock(mutex_);
-        return redis_->incr("global:groupapplyid");
+        try {
+            return redis_->incr("global:groupapplyid");
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Failed to increment groupapplyid: " + std::string(e.what()));
+        }
     }
 
     void InitUserId(int startid)
     {
-        std::unique_lock<std::shared_mutex> lock(mutex_);
-        redis_->set("global:userid", std::to_string(startid));
+        try {
+            redis_->set("global:userid", std::to_string(startid));
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Failed to init userid: " + std::string(e.what()));
+        }
     }
 
     void InitMsgId(int startid)
     {
-        std::unique_lock<std::shared_mutex> lock(mutex_);
-        redis_->set("global:msgid", std::to_string(startid));
+        try {
+            redis_->set("global:msgid", std::to_string(startid));
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Failed to init msgid: " + std::string(e.what()));
+        }
     }
 
     void InitFriendId(int startid)
     {
-        std::unique_lock<std::shared_mutex> lock(mutex_);
-        redis_->set("global:friendid", std::to_string(startid));
+        try {
+            redis_->set("global:friendid", std::to_string(startid));
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Failed to init friendid: " + std::string(e.what()));
+        }
     }
 
     void InitGroupId(int startid)
     {
-        std::unique_lock<std::shared_mutex> lock(mutex_);
-        redis_->set("global:groupid", std::to_string(startid));
+        try {
+            redis_->set("global:groupid", std::to_string(startid));
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Failed to init groupid: " + std::string(e.what()));
+        }
     }
 
     void InitGroupUserId(int startid)
     {
-        std::unique_lock<std::shared_mutex> lock(mutex_);
-        redis_->set("global:groupuserid", std::to_string(startid));
+        try {
+            redis_->set("global:groupuserid", std::to_string(startid));
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Failed to init groupuserid: " + std::string(e.what()));
+        }
     }
 
     void InitFriendApplyId(int startid)
     {
-        std::unique_lock<std::shared_mutex> lock(mutex_);
-        redis_->set("global:friendapplyid", std::to_string(startid));
+        try {
+            redis_->set("global:friendapplyid", std::to_string(startid));
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Failed to init friendapplyid: " + std::string(e.what()));
+        }
     }
 
     void InitGroupApplyId(int startid)
     {
-        std::unique_lock<std::shared_mutex> lock(mutex_);
-        redis_->set("global:groupapplyid", std::to_string(startid));
+        try {
+            redis_->set("global:groupapplyid", std::to_string(startid));
+        } catch (const std::exception& e) {
+            throw std::runtime_error("Failed to init groupapplyid: " + std::string(e.what()));
+        }
     }
 
     std::shared_ptr<sw::redis::Redis> GetRedis()
     {
-        std::shared_lock<std::shared_mutex> lock(mutex_);
         return redis_;
     }
 
 private:
     std::shared_ptr<sw::redis::Redis> redis_;
-    mutable std::shared_mutex mutex_;  
 };

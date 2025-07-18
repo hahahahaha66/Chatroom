@@ -1,5 +1,6 @@
 #include "Service.h"
 #include "../muduo/logging/Logging.h"
+
 #include <exception>
 #include <memory>
 #include <mysql/mariadb_com.h>
@@ -198,7 +199,7 @@ Service::~Service()
 {
 }
 
-void Service::UserRegister(const TcpConnectionPtr& conn, const json& js, Timestamp time)
+void Service::UserRegister(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
 
@@ -260,7 +261,7 @@ void Service::UserRegister(const TcpConnectionPtr& conn, const json& js, Timesta
     );
 }
 
-void Service::UserLogin(const TcpConnectionPtr& conn, const json& js, Timestamp time)
+void Service::UserLogin(const TcpConnectionPtr& conn, const json& js)
 {
     std::string password;
     std::string email;
@@ -372,10 +373,11 @@ void Service::UserLogin(const TcpConnectionPtr& conn, const json& js, Timestamp 
     );
 }
 
-void Service::MessageSend(const TcpConnectionPtr& conn, const json& js, Timestamp time)
+void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
 {
 
     int senderid = 0;
+    std::string sendername;
     int receiverid = 0;
     std::string content;
     std::string type;
@@ -383,6 +385,7 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js, Timestam
     std::string timestamp = GetCurrentTimestamp();
 
     AssignIfPresent(js, "senderid", senderid);
+    AssignIfPresent(js, "sendername", sendername);
     AssignIfPresent(js, "receiverid", receiverid);
     AssignIfPresent(js, "content", content);
     AssignIfPresent(js, "type", type);
@@ -392,13 +395,48 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js, Timestam
     int msgid = gen_.GetNextMsgId();
 
     databasethreadpool_.EnqueueTask(
-    [this, msgid, senderid, receiverid, content, type, status, timestamp](MysqlConnection& mysqlconn, DBCallback done)mutable 
+    [this, msgid, senderid, sendername, receiverid, content, type, status, timestamp](MysqlConnection& mysqlconn, DBCallback done)mutable 
     {
         try 
         {
             if (type == "Group")
             {
+                std::string query = "select userid from groupusers where groupid = " + std::to_string(receiverid) + "; ";
+                MYSQL_RES* res = mysqlconn.ExcuteQuery(query);
+                if (!res) 
+                {
+                    LOG_ERROR << "Listfriendapply query failed ";
+                    done(false);
+                    return;
+                }
 
+                MysqlResult result(res);
+                int userid;
+
+                while (result.Next())
+                {
+                    MysqlRow row = result.GetRow();
+                    userid = row.GetInt("userid");
+                    if (userid == senderid) continue;
+                    if (onlineuser_.IsOnline(userid))
+                    {
+                        status = "Read";
+                        auto receiver = onlineuser_.GetUser(userid);
+                        if (receiver)
+                        {
+                            auto reconn = receiver->GetConn();
+                            if (reconn)
+                            {   
+                                json j = {
+                                {"sendername", sendername},
+                                {"content", content},
+                                {"timestamp", timestamp}
+                                };
+                                reconn->send(code_.encode(j, "RecvMessage"));
+                            }
+                        }
+                    }
+                }
             }
             else if (type == "Private")
             {
@@ -412,25 +450,20 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js, Timestam
                         if (reconn)
                         {
                             json j = {
-                            {"senderid", senderid},
-                            {"receiverid", receiverid},
+                            {"sendername", sendername},
                             {"content", content},
-                            {"type", type},
-                            {"status", status},
                             {"timestamp", timestamp}
                             };
                             reconn->send(code_.encode(j, "RecvMessage"));
                         }
                     }
                 }
-                else  
-                {
-
-                }
             }
             else
             {
                 LOG_ERROR << "Message type wrong";
+                done(false);
+                return;
             }
 
             std::ostringstream oss;
@@ -445,7 +478,6 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js, Timestam
                 return;  // 添加 return
             }
             
-            std::cout << "---------" << std::endl;
             done(true);
         } catch(const std::exception& e)
         {
@@ -467,7 +499,7 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js, Timestam
     });
 }
 
-void Service::SendFriendApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
+void Service::SendFriendApply(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
 
@@ -476,8 +508,6 @@ void Service::SendFriendApply(const TcpConnectionPtr& conn, const json& js, Time
 
     AssignIfPresent(js, "fromid", fromid);
     AssignIfPresent(js, "targetemail", targetemail);
-
-    std::cout << "--------------" << std::endl;
 
     databasethreadpool_.EnqueueTask([this, fromid,targetemail](MysqlConnection& mysqlconn, DBCallback done) {
         std::string query = "select id from users where email = '" + targetemail + "';";
@@ -489,27 +519,22 @@ void Service::SendFriendApply(const TcpConnectionPtr& conn, const json& js, Time
             return;
         }
         
-        std::cout << "--------------" << std::endl;
         MysqlResult result(res);
         if (!result.Next()) {
             LOG_ERROR << "No such user with email: " << targetemail;
             done(false);
             return;
         }
-        std::cout << "--------------" << std::endl;
 
         MysqlRow row = result.GetRow();
         int targetid = row.GetInt("id");
         int applyid = gen_.GetNextFriendApplyId();
-
-        std::cout << "--------------" << std::endl;
 
         std::ostringstream oss;
         oss << "insert into friendapplys (id, fromid, targetid, status) values ("
             << applyid << ", " << fromid << ", " << targetid << ",'" << "Pending"
             << "'); ";
         
-        std::cout << "--------------" << std::endl;
         if (mysqlconn.ExcuteUpdate(oss.str()))
             done(true);
         else 
@@ -530,7 +555,7 @@ void Service::SendFriendApply(const TcpConnectionPtr& conn, const json& js, Time
     });
 }
 
-void Service::ListFriendAllApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
+void Service::ListFriendApply(const TcpConnectionPtr& conn, const json& js)
 {
     int targetid;
     AssignIfPresent(js, "targetid", targetid);
@@ -583,7 +608,7 @@ void Service::ListFriendAllApply(const TcpConnectionPtr& conn, const json& js, T
         }
         j["friendapplys"] = arr;
         j["end"] = true;
-        conn->send(code_.encode(j, "FriendApplyBack"));
+        conn->send(code_.encode(j, "ListFriendApplyBack"));
 
     }, [this, conn](bool success) {
         if (success) {
@@ -593,12 +618,12 @@ void Service::ListFriendAllApply(const TcpConnectionPtr& conn, const json& js, T
             LOG_ERROR << "ListFriendAllApplys Failed";
             json j = json::array();
             j["end"] = false;
-            conn->send(code_.encode(j, "FriendApplyBack"));
+            conn->send(code_.encode(j, "ListFriendApplyBack"));
         }
     });
 }
 
-void Service::ListFriendSendApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
+void Service::ListSendFriendApply(const TcpConnectionPtr& conn, const json& js)
 {
     int fromid;
     AssignIfPresent(js, "fromid", fromid);
@@ -650,22 +675,22 @@ void Service::ListFriendSendApply(const TcpConnectionPtr& conn, const json& js, 
         }
         j["friendsendapplys"] = arr;
         j["end"] = true;
-        conn->send(code_.encode(j, "SendFriendApplyBack"));
+        conn->send(code_.encode(j, "ListSendFriendApplyBack"));
 
     }, [this, conn](bool success) {
         if (success) {
-            LOG_DEBUG << "ListFriendSendApplys Success";
+            LOG_DEBUG << "ListSendFriendApplys Success";
         }
         else {
-            LOG_ERROR << "ListFriendSendApplys Failed";
+            LOG_ERROR << "ListSendFriendApplys Failed";
             json j = json::array();
             j["end"] = false;
-            conn->send(code_.encode(j, "SendFriendApplyBack"));
+            conn->send(code_.encode(j, "ListSendFriendApplyBack"));
         }
     });
 }
 
-void Service::ProceFriendApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
+void Service::ProceFriendApply(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
     int fromid;
@@ -729,6 +754,14 @@ void Service::ProceFriendApply(const TcpConnectionPtr& conn, const json& js, Tim
                 done(false);
                 return;
             }
+
+            std::string query = "delete from friendapplys where targetid = " + std::to_string(targetid)
+                                + " and fromid = " + std::to_string(fromid) + "; ";
+            if (!mysqlconn.ExcuteUpdate(query))
+            {
+                done(false);
+                return;
+            }
             done(true);
         }
         else if (status == "Reject")
@@ -750,11 +783,11 @@ void Service::ProceFriendApply(const TcpConnectionPtr& conn, const json& js, Tim
         json j = {
             {"end", success}
         };
-        conn->send(code_.encode(j, "ProceApplyBack"));
+        conn->send(code_.encode(j, "ProceFriendApplyBack"));
     });
 }
 
-void Service::ListFriends(const TcpConnectionPtr& conn, const json& js, Timestamp)
+void Service::ListFriend(const TcpConnectionPtr& conn, const json& js)
 {
     int userid;
     AssignIfPresent(js, "userid", userid);
@@ -820,7 +853,7 @@ void Service::ListFriends(const TcpConnectionPtr& conn, const json& js, Timestam
     });
 }
 
-void Service::GetChatHistory(const TcpConnectionPtr& conn, const json& js, Timestamp time)
+void Service::GetChatHistory(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
 
@@ -897,7 +930,12 @@ void Service::GetChatHistory(const TcpConnectionPtr& conn, const json& js, Times
     });
 }
 
-void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js, Timestamp)
+void Service::GetGroupHistory(const TcpConnectionPtr& conn, const json& json)
+{
+    
+}
+
+void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
     std::string groupname;
@@ -938,7 +976,7 @@ void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js, Timestam
     });
 }
 
-void Service::SendGroupApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
+void Service::SendGroupApply(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
     std::string groupname;
@@ -986,7 +1024,7 @@ void Service::SendGroupApply(const TcpConnectionPtr& conn, const json& js, Times
     });
 }
 
-void Service::ListGroupApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
+void Service::ListGroupApply(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
     int groupid;
@@ -1053,7 +1091,7 @@ void Service::ListGroupApply(const TcpConnectionPtr& conn, const json& js, Times
     });
 }
 
-void Service::ProceGroupApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
+void Service::ProceGroupApply(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
     int groupid;
@@ -1061,7 +1099,7 @@ void Service::ProceGroupApply(const TcpConnectionPtr& conn, const json& js, Time
     std::string status;
 
     end &= AssignIfPresent(js, "groupid", groupid);
-    end &= AssignIfPresent(js, "applyid", status);
+    end &= AssignIfPresent(js, "applyid", applyid);
     end &= AssignIfPresent(js, "status", status);
 
     databasethreadpool_.EnqueueTask([this, conn, groupid, applyid, status](MysqlConnection& mysqlconn, DBCallback done) {
@@ -1112,7 +1150,7 @@ void Service::ProceGroupApply(const TcpConnectionPtr& conn, const json& js, Time
     });
 }
 
-void Service::ListGroupSendApply(const TcpConnectionPtr& conn, const json& js, Timestamp)
+void Service::ListSendGroupApply(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
     int userid;
@@ -1164,7 +1202,7 @@ void Service::ListGroupSendApply(const TcpConnectionPtr& conn, const json& js, T
         j["groupsendapplys"] = arr;
         j["end"] = true;
 
-        conn->send(code_.encode(j, "ListGroupSendApplyBack"));
+        conn->send(code_.encode(j, "ListSendGroupApplyBack"));
     }, [this, conn](bool success) {
         if (success) {
             LOG_DEBUG << "ListGroupSendApply Success";
@@ -1175,11 +1213,11 @@ void Service::ListGroupSendApply(const TcpConnectionPtr& conn, const json& js, T
         json j = {
             {"end", success}
         };
-        conn->send(code_.encode(j, "ListGroupSendApplyBack"));
+        conn->send(code_.encode(j, "ListSendGroupApplyBack"));
     });
 }
 
-void Service::ListGroupMember(const TcpConnectionPtr& conn, const json& js, Timestamp)
+void Service::ListGroupMember(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
     int groupid;
@@ -1248,7 +1286,7 @@ void Service::ListGroupMember(const TcpConnectionPtr& conn, const json& js, Time
     });
 }
 
-void Service::ListGroup(const TcpConnectionPtr& conn, const json& js, Timestamp)
+void Service::ListGroup(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
     int userid;
@@ -1314,12 +1352,12 @@ void Service::ListGroup(const TcpConnectionPtr& conn, const json& js, Timestamp)
     });
 }
 
-void Service::QuitGroup(const TcpConnectionPtr& conn, const json& js, Timestamp)
+void Service::QuitGroup(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
     int groupid;
     int userid;
-    end &= AssignIfPresent(js, "gorupid", groupid);
+    end &= AssignIfPresent(js, "groupid", groupid);
     end &= AssignIfPresent(js, "userid", userid);
 
     databasethreadpool_.EnqueueTask([this, groupid, userid](MysqlConnection& mysqlconn, DBCallback done) {
@@ -1346,7 +1384,7 @@ void Service::QuitGroup(const TcpConnectionPtr& conn, const json& js, Timestamp)
 }
 
 // Member Administrator Owner
-void Service::ChangeUserRole(const TcpConnectionPtr& conn, const json& js, Timestamp)
+void Service::ChangeUserRole(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
     int groupid;

@@ -13,24 +13,25 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, std::string name)
     server_.setWriteCompleteCallback(std::bind(&Server::MessageCompleteCallback, this, _1));
     server_.setThreadInitCallback(std::bind(&Server::ThreadInitCallback, this, _1));
 
-    dispatcher_.registerHander("Register", std::bind(&Service::UserRegister, &service_, _1, _2, _3));
-    dispatcher_.registerHander("Login", std::bind(&Service::UserLogin, &service_, _1, _2, _3));
-    dispatcher_.registerHander("SendMessage", std::bind(&Service::MessageSend, &service_, _1, _2, _3));
-    dispatcher_.registerHander("ChatHistory", std::bind(&Service::GetChatHistory, &service_, _1, _2, _3));
-    dispatcher_.registerHander("SendFriendApply", std::bind(&Service::SendFriendApply, &service_, _1, _2, _3));
-    dispatcher_.registerHander("FriendApply", std::bind(&Service::ListFriendAllApply, &service_, _1, _2, _3));
-    dispatcher_.registerHander("SendFriendApply", std::bind(&Service::ListFriendSendApply, &service_, _1, _2, _3));
-    dispatcher_.registerHander("ProceFriendApply", std::bind(&Service::ProceFriendApply, &service_, _1, _2, _3));
-    dispatcher_.registerHander("ListFriend", std::bind(&Service::ListFriends, &service_, _1, _2, _3));
-    dispatcher_.registerHander("CreateGroup", std::bind(&Service::CreateGroup, &service_, _1, _2, _3));
-    dispatcher_.registerHander("SendGroupApply", std::bind(&Service::SendGroupApply, &service_, _1, _2, _3));
-    dispatcher_.registerHander("GroupApply", std::bind(&Service::ListGroupApply, &service_, _1, _2, _3));
-    dispatcher_.registerHander("GroupSendApply", std::bind(&Service::ListGroupSendApply, &service_, _1, _2, _3));
-    dispatcher_.registerHander("ListGroupMember", std::bind(&Service::ListGroupMember, &service_, _1, _2, _3));
-    dispatcher_.registerHander("ListGroup", std::bind(&Service::ListGroup, &service_, _1, _2, _3));
-    dispatcher_.registerHander("QuitGroup", std::bind(&Service::QuitGroup, &service_, _1, _2, _3));
-    dispatcher_.registerHander("ChangeUserRole", std::bind(&Service::ChangeUserRole, &service_, _1, _2, _3));
-    dispatcher_.registerHander("ProceGroupApply", std::bind(&Service::ProceGroupApply, &service_, _1, _2, _3));
+    dispatcher_.registerHander("Register", std::bind(&Service::UserRegister, &service_, _1, _2));
+    dispatcher_.registerHander("Login", std::bind(&Service::UserLogin, &service_, _1, _2));
+    dispatcher_.registerHander("SendMessage", std::bind(&Service::MessageSend, &service_, _1, _2));
+    dispatcher_.registerHander("ChatHistory", std::bind(&Service::GetChatHistory, &service_, _1, _2));
+    dispatcher_.registerHander("GroupHistory", std::bind(&Service::GetGroupHistory, &service_, _1, _2));
+    dispatcher_.registerHander("SendFriendApply", std::bind(&Service::SendFriendApply, &service_, _1, _2));
+    dispatcher_.registerHander("ListFriendApply", std::bind(&Service::ListFriendApply, &service_, _1, _2));
+    dispatcher_.registerHander("ListSendFriendApply", std::bind(&Service::ListSendFriendApply, &service_, _1, _2));
+    dispatcher_.registerHander("ProceFriendApply", std::bind(&Service::ProceFriendApply, &service_, _1, _2));
+    dispatcher_.registerHander("ListFriend", std::bind(&Service::ListFriend, &service_, _1, _2));
+    dispatcher_.registerHander("CreateGroup", std::bind(&Service::CreateGroup, &service_, _1, _2));
+    dispatcher_.registerHander("SendGroupApply", std::bind(&Service::SendGroupApply, &service_, _1, _2));
+    dispatcher_.registerHander("ListGroupApply", std::bind(&Service::ListGroupApply, &service_, _1, _2));
+    dispatcher_.registerHander("ListSendGroupApply", std::bind(&Service::ListSendGroupApply, &service_, _1, _2));
+    dispatcher_.registerHander("ListGroupMember", std::bind(&Service::ListGroupMember, &service_, _1, _2));
+    dispatcher_.registerHander("ListGroup", std::bind(&Service::ListGroup, &service_, _1, _2));
+    dispatcher_.registerHander("QuitGroup", std::bind(&Service::QuitGroup, &service_, _1, _2));
+    dispatcher_.registerHander("ChangeUserRole", std::bind(&Service::ChangeUserRole, &service_, _1, _2));
+    dispatcher_.registerHander("ProceGroupApply", std::bind(&Service::ProceGroupApply, &service_, _1, _2));
 }
 
 void Server::start()

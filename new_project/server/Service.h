@@ -1,16 +1,13 @@
-#include <memory>
-#pragma one
+#pragma once
 
 #include "../muduo/net/tcp/TcpConnection.h"
 #include "../manager/UserManager.h"
-#include "../manager/MessageManager.h"
 #include "../manager/IdGenerator.h"
 #include "../tool/Codec.h"
 #include "../database/DatabaseThreadPool.h"
 #include "../database/MysqlResult.h"
-#include "../manager/FriendManager.h"
-#include "../manager/FriendApplyManager.h"
 
+#include <memory>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -25,31 +22,31 @@ public:
     void InitIdsFromMySQL();
 
     //User
-    void UserRegister(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void UserLogin(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void UserRegister(const TcpConnectionPtr& conn, const json& json);
+    void UserLogin(const TcpConnectionPtr& conn, const json& json);
 
     //Message
-    void MessageSend(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void GetChatHistory(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void GetGroupHistory(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void MessageSend(const TcpConnectionPtr& conn, const json& json);
+    void GetChatHistory(const TcpConnectionPtr& conn, const json& json);
+    void GetGroupHistory(const TcpConnectionPtr& conn, const json& json);
 
     //Friend
-    void SendFriendApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void ListFriendAllApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void ListFriendSendApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void ProceFriendApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void ListFriends(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void SendFriendApply(const TcpConnectionPtr& conn, const json& json);
+    void ListFriendApply(const TcpConnectionPtr& conn, const json& json);
+    void ListSendFriendApply(const TcpConnectionPtr& conn, const json& json);
+    void ProceFriendApply(const TcpConnectionPtr& conn, const json& json);
+    void ListFriend(const TcpConnectionPtr& conn, const json& json);
 
     //Group
-    void CreateGroup(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void SendGroupApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void ListGroupApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void ProceGroupApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void ListGroupSendApply(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void ListGroupMember(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void ListGroup(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void QuitGroup(const TcpConnectionPtr& conn, const json& json, Timestamp);
-    void ChangeUserRole(const TcpConnectionPtr& conn, const json& json, Timestamp);
+    void CreateGroup(const TcpConnectionPtr& conn, const json& json);
+    void SendGroupApply(const TcpConnectionPtr& conn, const json& json);
+    void ListGroupApply(const TcpConnectionPtr& conn, const json& json);
+    void ProceGroupApply(const TcpConnectionPtr& conn, const json& json);
+    void ListSendGroupApply(const TcpConnectionPtr& conn, const json& json);
+    void ListGroupMember(const TcpConnectionPtr& conn, const json& json);
+    void ListGroup(const TcpConnectionPtr& conn, const json& json);
+    void QuitGroup(const TcpConnectionPtr& conn, const json& json);
+    void ChangeUserRole(const TcpConnectionPtr& conn, const json& json);
     
 private:
     std::atomic<bool> running_ = false;
