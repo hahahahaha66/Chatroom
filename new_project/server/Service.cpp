@@ -13,7 +13,7 @@
 
 //提取json变量
 template<typename  T>
-std::optional<T> ExtractCommonField(const json& j, const std::string& key)
+std::optional<T> Service::ExtractCommonField(const json& j, const std::string& key)
 {
     try 
     {
@@ -33,7 +33,7 @@ std::optional<T> ExtractCommonField(const json& j, const std::string& key)
 
 //更完备的提取json变量
 template<typename T>
-bool AssignIfPresent(const json& j, const std::string& key, T& out)
+bool Service::AssignIfPresent(const json& j, const std::string& key, T& out)
 {
     if (j.is_string())
     {
@@ -57,7 +57,7 @@ bool AssignIfPresent(const json& j, const std::string& key, T& out)
     return false;
 }
 
-std::string Escape(const std::string& input) {
+std::string Service::Escape(const std::string& input) {
     std::string output;
     for (char c : input) {
         if (c == '\'' || c == '\"' || c == '\\') output += '\\';
@@ -66,7 +66,7 @@ std::string Escape(const std::string& input) {
     return output;
 }
 
-std::string GetCurrentTimestamp() {
+std::string Service::GetCurrentTimestamp() {
     auto now = std::chrono::system_clock::now();
     std::time_t t_now = std::chrono::system_clock::to_time_t(now);
     std::tm tm_now;
@@ -314,9 +314,9 @@ void Service::UserLogin(const TcpConnectionPtr& conn, const json& js)
                     LOG_INFO << "Login successful for user: " << username << " (ID: " << userid << ")";
                         
                     // 设置用户在线状态和连接
-                    onlineuser_.AddUser(userid, username, password, email);
-                    onlineuser_.SetOnline(userid);
-                    onlineuser_.GetUser(userid)->SetConn(conn);
+                    onlineuser_.emplace(userid, User(userid, username, password, email));
+                    onlineuser_[userid].SetOnline(userid);
+                    onlineuser_[userid].SetConn(conn);
 
                     json success_response = {
                         {"end", true},
@@ -373,6 +373,18 @@ void Service::UserLogin(const TcpConnectionPtr& conn, const json& js)
     );
 }
 
+void Service::RemoveUserConnect(const TcpConnectionPtr& conn)
+{
+    for (auto it : onlineuser_)
+    {
+        if (it.second.GetConn() == conn)
+        {
+            onlineuser_.erase(it.first);
+            break;
+        }
+    }
+}
+
 void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
 {
 
@@ -418,37 +430,12 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
                     MysqlRow row = result.GetRow();
                     userid = row.GetInt("userid");
                     if (userid == senderid) continue;
-                    if (onlineuser_.IsOnline(userid))
+                    if (onlineuser_.find(userid) != onlineuser_.end())
                     {
                         status = "Read";
-                        auto receiver = onlineuser_.GetUser(userid);
-                        if (receiver)
-                        {
-                            auto reconn = receiver->GetConn();
-                            if (reconn)
-                            {   
-                                json j = {
-                                {"sendername", sendername},
-                                {"content", content},
-                                {"timestamp", timestamp}
-                                };
-                                reconn->send(code_.encode(j, "RecvMessage"));
-                            }
-                        }
-                    }
-                }
-            }
-            else if (type == "Private")
-            {
-                if (onlineuser_.IsOnline(receiverid))
-                {
-                    status = "Read";
-                    auto receiver = onlineuser_.GetUser(receiverid);
-                    if (receiver)
-                    {
-                        auto reconn = receiver->GetConn();
+                        auto reconn = onlineuser_[userid].GetConn();
                         if (reconn)
-                        {
+                        {   
                             json j = {
                             {"sendername", sendername},
                             {"content", content},
@@ -456,6 +443,23 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
                             };
                             reconn->send(code_.encode(j, "RecvMessage"));
                         }
+                    }
+                }
+            }
+            else if (type == "Private")
+            {
+                if (onlineuser_.find(receiverid) != onlineuser_.end())
+                {
+                    status = "Read";
+                    auto reconn = onlineuser_[receiverid].GetConn();
+                    if (reconn)
+                    {
+                        json j = {
+                        {"sendername", sendername},
+                        {"content", content},
+                        {"timestamp", timestamp}
+                        };
+                        reconn->send(code_.encode(j, "RecvMessage"));
                     }
                 }
             }
@@ -496,6 +500,167 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
             {"end", success}
         };
         conn->send(code_.encode(j, "SendMessageBack"));
+    });
+}
+
+void Service::GetChatHistory(const TcpConnectionPtr& conn, const json& js)
+{
+    bool end = true;
+    int userid;
+    int friendid;
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "friendid", friendid);
+
+    databasethreadpool_.EnqueueTask([this, conn, userid, friendid](MysqlConnection& mysqlconn, DBCallback done) {
+        std::ostringstream oss;
+        oss << "select * from messages where ( senderid = " << userid << " and receiverid = "
+            << friendid << " ) or ( senderid = " << friendid << " and receiverid = " << userid
+            << " ) order by timestamp asc; ";
+        MYSQL_RES* res = mysqlconn.ExcuteQuery(oss.str());
+        if (!res)
+        {
+            LOG_ERROR << "getchathistory query failed for userid: " << userid;
+            done(false);
+            return;
+        }
+
+        MysqlResult result(res);
+        json j;
+        json arr = json::array();
+        int messageid;
+        int senderid;
+        std::string content;
+        std::string status;
+        std::string timestamp;
+
+        while (result.Next())
+        {
+            MysqlRow row = result.GetRow();
+            messageid = row.GetInt("id");
+            senderid = row.GetInt("senderid");
+            content = row.GetString("content");
+            status = row.GetString("status");
+            timestamp = row.GetString("timestamp");
+
+            if (status == "Unread")
+            {
+                std::string query = "update messages set status = 'Read' where id = " + std::to_string(messageid) + "; ";
+                if (mysqlconn.ExcuteUpdate(query))
+                    done(true);
+                else 
+                    done(false);
+            }
+
+            json message = {
+                {"senderid", senderid},
+                {"content", content},
+                {"status", status},
+                {"timestamp", timestamp}
+            };
+            arr.push_back(message);
+        }
+        j["messages"] = arr;
+        j["end"] = true;
+        conn->send(code_.encode(j, "GetChatHistoryBack"));
+
+    }, [this, conn](bool success) {
+        if (success) {
+            LOG_DEBUG << "GetChatHistory Success";
+        }
+        else {
+            LOG_ERROR << "GetChatHistory Failed";
+            json j;
+            j["end"] = false;
+            conn->send(code_.encode(j, "GetChatHistoryBack"));
+        }
+    });
+}
+
+void Service::GetGroupHistory(const TcpConnectionPtr& conn, const json& js)
+{
+    bool end = true;
+
+    int userid;
+    int groupid;
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "groupid", groupid);
+
+    databasethreadpool_.EnqueueTask([this, conn, userid, groupid](MysqlConnection& mysqlconn, DBCallback done) {
+        std::ostringstream oss;
+        oss << "select * from messages where receiverid = " << groupid << " order by timestamp asc; ";
+        MYSQL_RES* res = mysqlconn.ExcuteQuery(oss.str());
+        if (!res)
+        {
+            LOG_ERROR << "getgrouphistory query failed for userid: " << userid;
+            done(false);
+            return;
+        }
+
+        MysqlResult result(res);
+        json j;
+        json arr = json::array();
+        int messageid;
+        int senderid;
+        std::string sendername;
+        std::string content;
+        std::string status;
+        std::string timestamp;
+
+        while (result.Next())
+        {
+            MysqlRow row = result.GetRow();
+
+            senderid = row.GetInt("senderid");
+            content = row.GetString("content");
+            status = row.GetString("status");
+            timestamp = row.GetString("timestamp");
+
+            if (status == "Unread")
+            {
+                std::string query = "update messages set status = 'Read' where id = " + std::to_string(messageid) + "; ";
+                if (mysqlconn.ExcuteUpdate(query))
+                    done(true);
+                else 
+                    done(false);
+            }
+
+            std::string query = "select name from users where id = " + std::to_string(senderid);
+            MYSQL_RES* re = mysqlconn.ExcuteQuery(query);
+            if (!re) {
+                LOG_ERROR << "Getgrouphistory from name query failed ";
+                done(false);
+                return;
+            }
+            MysqlResult resul(re);
+            if (!resul.Next()) {
+                LOG_ERROR << "No user found with id: " << senderid;
+                done(false);
+                return;
+            }
+            sendername = resul.GetRow().GetString("name");
+
+            json message = {
+                {"sendername", sendername},
+                {"content", content},
+                {"status", status},
+                {"timestamp", timestamp}
+            };
+            arr.push_back(message);
+        }
+        j["messages"] = arr;
+        j["end"] = true;
+        conn->send(code_.encode(j, "GetGroupHistoryBack"));
+
+    }, [this, conn](bool success) {
+        if (success) {
+            LOG_DEBUG << "GetGroupHistory Success";
+        }
+        else {
+            LOG_ERROR << "GetGroupHistory Failed";
+            json j;
+            j["end"] = false;
+            conn->send(code_.encode(j, "GetGroupHistoryBack"));
+        }
     });
 }
 
@@ -807,12 +972,14 @@ void Service::ListFriend(const TcpConnectionPtr& conn, const json& js)
         json arr = json::array();
         int friendid;
         std::string friendname;
+        bool online;
         bool block;
 
         while (result.Next())
         {
             MysqlRow row = result.GetRow();
             friendid = row.GetInt("friendid");
+            online = false;
             block = row.GetBool("block");
 
             std::string qu = "select name from users where id = " + std::to_string(friendid);
@@ -829,10 +996,13 @@ void Service::ListFriend(const TcpConnectionPtr& conn, const json& js)
                 return;
             }
             friendname = resul.GetRow().GetString("name");
+            if (onlineuser_.find(friendid) != onlineuser_.end())
+                online = true;
 
             json fri = {
                 {"friendid", friendid},
                 {"friendname", friendname},
+                {"online", online},
                 {"block", block}
             };
             arr.push_back(fri);
@@ -853,86 +1023,32 @@ void Service::ListFriend(const TcpConnectionPtr& conn, const json& js)
     });
 }
 
-void Service::GetChatHistory(const TcpConnectionPtr& conn, const json& js)
+void Service::BlockFriend(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
-
     int userid;
     int friendid;
-
     end &= AssignIfPresent(js, "userid", userid);
     end &= AssignIfPresent(js, "friendid", friendid);
 
-    databasethreadpool_.EnqueueTask([this, conn, userid, friendid](MysqlConnection& mysqlconn, DBCallback done) {
-        std::ostringstream oss;
-        oss << "select * from messages where ( senderid = " << userid << " and receiverid = "
-            << friendid << " ) or ( senderid = " << friendid << " and receiverid = " << userid
-            << " ) order by timestamp asc; ";
-        MYSQL_RES* res = mysqlconn.ExcuteQuery(oss.str());
-        if (!res)
-        {
-            LOG_ERROR << "getchathistory query failed for userid: " << userid;
+    databasethreadpool_.EnqueueTask([this, userid, friendid](MysqlConnection& mysqlconn, DBCallback done) {
+        std::string query = "update friends set block where userid = " + std::to_string(userid)
+                            + " and friendid = " + std::to_string(friendid) + "; ";
+        if (mysqlconn.ExcuteUpdate(query))
+            done(true);
+        else 
             done(false);
-            return;
-        }
 
-        MysqlResult result(res);
-        json j;
-        json arr = json::array();
-        int messageid;
-        int senderid;
-        int receiverid;
-        std::string content;
-        std::string status;
-        std::string timestamp;
-
-        while (result.Next())
-        {
-            MysqlRow row = result.GetRow();
-            messageid = row.GetInt("id");
-            senderid = row.GetInt("senderid");
-            receiverid = row.GetInt("receiverid");
-            content = row.GetString("content");
-            status = row.GetString("status");
-            timestamp = row.GetString("timestamp");
-
-            if (receiverid == userid && status == "Unread")
-            {
-                std::string query = "update messages set status = 'Read' where id = " + std::to_string(messageid) + "; ";
-                if (mysqlconn.ExcuteUpdate(query))
-                    done(true);
-                else 
-                    done(false);
-            }
-
-            json message = {
-                {"senderid", senderid},
-                {"receiverid", receiverid},
-                {"content", content},
-                {"status", status},
-                {"timestamp", timestamp}
-            };
-            arr.push_back(message);
-        }
-        j["messages"] = arr;
-        j["end"] = true;
-        conn->send(code_.encode(j, "GetChatHistoryBack"));
-
-    }, [this, conn](bool success) {
+    } ,[this, conn](bool success) {
         if (success){
-        }    LOG_DEBUG << "GetChatHistory Success";
+        }    LOG_DEBUG << "BlockFriends Success";
         else {
-            LOG_ERROR << "GetChatHistory Failed";
+            LOG_ERROR << "BlockFriends Failed";
             json j;
             j["end"] = false;
-            conn->send(code_.encode(j, "GetChatHistoryBack"));
+            conn->send(code_.encode(j, "BlockFriendBack"));
         }
     });
-}
-
-void Service::GetGroupHistory(const TcpConnectionPtr& conn, const json& json)
-{
-    
 }
 
 void Service::CreateGroup(const TcpConnectionPtr& conn, const json& js)

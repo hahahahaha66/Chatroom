@@ -23,6 +23,7 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, std::string name)
     dispatcher_.registerHander("ListSendFriendApply", std::bind(&Service::ListSendFriendApply, &service_, _1, _2));
     dispatcher_.registerHander("ProceFriendApply", std::bind(&Service::ProceFriendApply, &service_, _1, _2));
     dispatcher_.registerHander("ListFriend", std::bind(&Service::ListFriend, &service_, _1, _2));
+    dispatcher_.registerHander("BlockFriend", std::bind(&Service::BlockFriend, &service_, _1, _2));
     dispatcher_.registerHander("CreateGroup", std::bind(&Service::CreateGroup, &service_, _1, _2));
     dispatcher_.registerHander("SendGroupApply", std::bind(&Service::SendGroupApply, &service_, _1, _2));
     dispatcher_.registerHander("ListGroupApply", std::bind(&Service::ListGroupApply, &service_, _1, _2));
@@ -61,6 +62,7 @@ void Server::OnConnection(const TcpConnectionPtr& conn)
     else
     {
         LOG_INFO << "Connection disconnected: " << conn->peerAddress().toIpPort();
+        service_.RemoveUserConnect(conn);
     }
 }
 

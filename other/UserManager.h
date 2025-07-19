@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../model/User.h"
-#include "../muduo/logging/Logging.h"
+#include "../new_project/model/User.h"
+#include "../new_project/muduo/logging/Logging.h"
 
 #include <unordered_map>
 #include <string>

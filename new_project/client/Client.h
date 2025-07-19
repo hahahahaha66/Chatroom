@@ -23,11 +23,12 @@ using std::placeholders::_3;
 using std::placeholders::_4;
 
 struct Friend {
-    Friend(int id, std::string name, bool block)
-        : id_(id), name_(name), block_(block) {}
-    Friend() : id_(0), name_(""), block_(false) {}
+    Friend(int id, std::string name, bool online, bool block)
+        : id_(id), name_(name), block_(block), online_(online) {}
+    Friend() : id_(0), name_(""), block_(false), online_(false){}
     int id_;
     std::string name_;
+    bool online_;
     bool block_;
 };
 
@@ -76,12 +77,14 @@ public:
     void ListAllSendApply(const json& js);
     void ProceFriendApply(const json& js);
     void ListFriend(const json& js);
+    void BlockFriend(const json& js);
 
     void SendFriendApplyBack(const TcpConnectionPtr& conn, const json& js);
     void ListFriendApplyBack(const TcpConnectionPtr& conn, const json& js);
     void ListSendFriendApplyBack(const TcpConnectionPtr& conn, const json& js);
     void ProceFriendApplyBack(const TcpConnectionPtr& conn, const json& js);
     void ListFriendBack(const TcpConnectionPtr& conn, const json& js);
+    void BlockFriendBack(const TcpConnectionPtr& conn, const json& js);
 
     // 群聊
     void CreateGroup(const json& js);

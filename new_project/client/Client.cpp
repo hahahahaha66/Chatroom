@@ -97,6 +97,7 @@ Client::Client(EventLoop& loop, InetAddress addr, std::string name)
     dispatcher_.registerHander("ListSendFriendApplyBack", std::bind(&Client::ListSendFriendApplyBack, this, _1, _2));
     dispatcher_.registerHander("ProceFriendApplyBack", std::bind(&Client::ProceFriendApplyBack, this, _1, _2));
     dispatcher_.registerHander("ListFriendBack", std::bind(&Client::ListFriendBack, this, _1, _2));
+    dispatcher_.registerHander("BlockFriendBack", std::bind(&Client::BlockFriendBack, this, _1, _2));
     dispatcher_.registerHander("CreateGroupBack", std::bind(&Client::CreateGroupBack, this, _1, _2));
     dispatcher_.registerHander("SendGroupApplyBack", std::bind(&Client::SendGroupApplyBack, this, _1, _2));
     dispatcher_.registerHander("ListGroupApplyBack", std::bind(&Client::ListGroupApplyBack, this, _1, _2));
@@ -247,7 +248,6 @@ void Client::GetChatHistoryBack(const TcpConnectionPtr& conn, const json& js)
         for (auto it : js["messages"])
         {
             AssignIfPresent(it, "senderid", senderid);
-            AssignIfPresent(it, "receiverid", receiverid);
             AssignIfPresent(it, "content", content);
             AssignIfPresent(it, "status", status);
             AssignIfPresent(it, "timestamp", timestamp);
@@ -270,7 +270,7 @@ void Client::GetChatHistoryBack(const TcpConnectionPtr& conn, const json& js)
     }
     else  
     {
-        std::cout << "获取历史消息失败" << std::endl;
+        std::cout << "获取好友历史消息失败" << std::endl;
     }
     
     notifyInputReady();
@@ -283,7 +283,45 @@ void Client::GetGroupHistory(const json& js)
 
 void Client::GetGroupHistoryBack(const TcpConnectionPtr& conn, const json& js)
 {
+    bool end = false;
+    AssignIfPresent(js, "end", end);
 
+    if (end)
+    {
+        bool news = true;
+        std::string sendername;
+        std::string content;
+        std::string status;
+        std::string timestamp;
+
+        for (auto it : js["messages"])
+        {
+            AssignIfPresent(it, "sendername", sendername);
+            AssignIfPresent(it, "content", content);
+            AssignIfPresent(it, "status", status);
+            AssignIfPresent(it, "timestamp", timestamp);
+
+            if (sendername == name_)
+            {
+                std::cout << "用户: " << content << "时间: "<< timestamp << std::endl;
+            }
+            else  
+            {
+                if (news && status == "Unread")
+                {
+                    std::cout << "以下为新消息" << std::endl;
+                    news = false;
+                }
+                std::cout << sendername << ": " << content << "     "<< timestamp << std::endl;
+            }
+        }
+    }
+    else  
+    {
+        std::cout << "获取群聊历史消息失败" << std::endl;
+    }
+    
+    notifyInputReady();
 }
 
 void Client::SendApply(const json& js)
@@ -413,16 +451,17 @@ void Client::ListFriendBack(const TcpConnectionPtr& conn, const json& js)
         int friendid;
         std::string friendname;
         bool block;
+        bool online;
         std::unordered_map<int, Friend> newfriendlist_;
 
         for (auto it : js["friends"])
         {
             AssignIfPresent(it, "friendid", friendid);
             AssignIfPresent(it, "friendname", friendname);
+            AssignIfPresent(it, "online", online);
             AssignIfPresent(it, "block", block);
 
-            Friend fd(friendid, friendname, block);
-            newfriendlist_.emplace(friendid, Friend(friendid, friendname, block));
+            newfriendlist_.emplace(friendid, Friend(friendid, friendname, online, block));
         }
         friendlist_ = std::move(newfriendlist_);
     }
@@ -432,6 +471,16 @@ void Client::ListFriendBack(const TcpConnectionPtr& conn, const json& js)
     }
     
     notifyInputReady();
+}
+
+void Client::BlockFriend(const json& js)
+{
+    this->send(codec_.encode(js, "BlockFriend"));
+}
+
+void Client::BlockFriendBack(const TcpConnectionPtr& conn, const json& js)
+{
+
 }
 
 void Client::CreateGroup(const json& js)
@@ -784,14 +833,11 @@ void Client::InputLoop()
         {
             int order;
             std::string input;
-            std::cout << "1. 添加好友" << std::endl;
-            std::cout << "2. 查看好友列表" << std::endl;
-            std::cout << "3. 查看好友申请列表" << std::endl;
-            std::cout << "4. 处理好友申请" << std::endl;
-            std::cout << "5. 查看被申请好友列表" << std::endl;
-            std::cout << "6. 私聊" << std::endl;
-            std::cout << "7. 群聊" << std::endl;
-            std::cout << "8. 退出" << std::endl;
+            std::cout << "1. 添加好友          " << "6. 屏蔽好友" << std::endl;
+            std::cout << "2. 查看好友列表      " << "7. 删除好友" << std::endl;
+            std::cout << "3. 查看好友申请列表  " << "8. 私聊" << std::endl;
+            std::cout << "4. 处理好友申请      " << "9. 群聊" << std::endl;
+            std::cout << "5. 查看被申请好友列表" << "10. 退出"<< std::endl;
             getline(std::cin, input);
             if (!ReadNum(input, order)) continue;
 
@@ -820,7 +866,8 @@ void Client::InputLoop()
                 waitInPutReady();
                 for (auto it : friendlist_)
                 {
-                    std::cout << "id: "<< it.first << " name: " << it.second.name_ << std::endl;
+                    std::cout << "id: "<< it.first << "名字: " << it.second.name_
+                              << "在线: " << it.second.online_ << "屏蔽" << it.second.block_ << std::endl;
                 }
             }
             else if (order == 3)
@@ -899,15 +946,34 @@ void Client::InputLoop()
             }
             else if (order == 6)
             {
+                int friendid;
+                std::cout << "输入要阻塞的好友id:";
+                getline(std::cin, input);
+                ReadNum(input, friendid);
+                json js = {
+                    {"fromid", userid_},
+                    {"friendid", friendid}
+                }
+                waitingback_ = true;
+                SendApply(js);
+
+                waitInPutReady();
+            }
+            else if (order == 7)
+            {
+
+            }
+            else if (order == 8)
+            {
                 ClearScreen();
                 currentState_ = "friendchat_menu";
             }
-            else if (order == 7)
+            else if (order == 9)
             {
                 ClearScreen();
                 currentState_ = "group_menu";
             }
-            else if (order == 8)
+            else if (order == 10)
             {
                 std::cout << "正在退出..." << std::endl;
                 stop();
@@ -1073,6 +1139,16 @@ void Client::InputLoop()
 
                 if (order == 1)
                 {
+                    json js = {
+                        {"userid", userid_},
+                        {"groupid", groupid}
+                    };
+
+                    waitingback_ = true;
+                    SendMessage(js);
+
+                    waitInPutReady();
+
                     while (true)
                     {
                         std::string message;
