@@ -1,6 +1,7 @@
 #include "Service.h"
 #include "../muduo/logging/Logging.h"
 
+#include <cstddef>
 #include <exception>
 #include <memory>
 #include <mysql/mariadb_com.h>
@@ -482,7 +483,7 @@ void Service::Flush(const TcpConnectionPtr& conn, const json& js)
         int fromid;
         std::string fromname;
         std::string applystatus;
-        bool applynew = false;
+        std::string applyemail;
 
         while (applyresult.Next())
         {
@@ -490,9 +491,7 @@ void Service::Flush(const TcpConnectionPtr& conn, const json& js)
             fromid = row.GetInt("fromid");
             applystatus = row.GetString("status");
 
-            if (applystatus == "Pending") applynew = true;
-
-            query = "select name from users where id = " + std::to_string(fromid);
+            query = "select name, email from users where id = " + std::to_string(fromid);
             res = mysqlconn.ExcuteQuery(query);
             if (!res) {
                 LOG_ERROR << "Listfriendapply from name query failed ";
@@ -506,12 +505,13 @@ void Service::Flush(const TcpConnectionPtr& conn, const json& js)
                 return;
             }
             fromname = nameresult.GetRow().GetString("name");
+            applyemail = nameresult.GetRow().GetString("email");
 
             json apply = {
                 {"fromid", fromid},
                 {"fromname", fromname},
                 {"status", applystatus},
-                {"new", applynew}
+                {"email", applyemail}
             };
             friendapply.push_back(apply);
         }
@@ -665,7 +665,8 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
                     MysqlRow row = result.GetRow();
                     userid = row.GetInt("userid");
                     if (userid == senderid) continue;
-                    if (onlineuser_.find(userid) != onlineuser_.end())
+                    if (onlineuser_.find(userid) != onlineuser_.end() && onlineuser_[userid].GetUserInterFace() == "Group" &&
+                        onlineuser_[userid].GetUserInterFaceId() == receiverid)
                     {
                         auto reconn = onlineuser_[userid].GetConn();
                         if (reconn)
@@ -704,7 +705,8 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
                         done(false);
                 }
 
-                if (onlineuser_.find(receiverid) != onlineuser_.end())
+                if (onlineuser_.find(receiverid) != onlineuser_.end() && onlineuser_[receiverid].GetUserInterFace() == "Private" &&
+                        onlineuser_[receiverid].GetUserInterFaceId() == senderid)
                 {
                     status = "Read";
                     auto reconn = onlineuser_[receiverid].GetConn();
@@ -774,7 +776,7 @@ void Service::GetChatHistory(const TcpConnectionPtr& conn, const json& js)
         std::ostringstream oss;
         oss << "select * from messages where ( senderid = " << userid << " and receiverid = "
             << friendid << " ) or ( senderid = " << friendid << " and receiverid = " << userid
-            << " ) order by timestamp asc; ";
+            << " ) order by timestamp asc limit 100; ";
         MYSQL_RES* res = mysqlconn.ExcuteQuery(oss.str());
         if (!res)
         {
@@ -846,7 +848,7 @@ void Service::GetGroupHistory(const TcpConnectionPtr& conn, const json& js)
 
     databasethreadpool_.EnqueueTask([this, conn, userid, groupid](MysqlConnection& mysqlconn, DBCallback done) {
         std::ostringstream oss;
-        oss << "select * from messages where receiverid = " << groupid << " order by timestamp asc; ";
+        oss << "select * from messages where receiverid = " << groupid << " order by timestamp asc limit 100; ";
         MYSQL_RES* res = mysqlconn.ExcuteQuery(oss.str());
         if (!res)
         {
@@ -923,15 +925,44 @@ void Service::GetGroupHistory(const TcpConnectionPtr& conn, const json& js)
     });
 }
 
+void Service::ChanceInterFace(const TcpConnectionPtr& conn, const json& js)
+{
+    bool end = true;
+    int userid;
+    int interfaceid;
+    std::string interface;
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "interfaceid", interfaceid);
+    end &= AssignIfPresent(js, "interface", interface);
+
+    if (onlineuser_.find(userid) != onlineuser_.end())
+    {
+        onlineuser_[userid].SetUserInterFace(interface);
+        onlineuser_[userid].SetUserInterFaceId(interfaceid);
+    }
+    else
+    {
+        end = false;
+    }
+
+    if (end) {
+        LOG_DEBUG << "ChanceUserInterface Success";
+    }
+    else {
+        LOG_ERROR << "ChanceUserInterface Failed";
+        json j;
+        j["end"] = false;
+        conn->send(code_.encode(j, "ChanceInterFaceBack"));
+    }
+}
+
 void Service::SendFriendApply(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
-
     int fromid;
     std::string targetemail;
-
-    AssignIfPresent(js, "fromid", fromid);
-    AssignIfPresent(js, "targetemail", targetemail);
+    end &= AssignIfPresent(js, "fromid", fromid);
+    end &= AssignIfPresent(js, "targetemail", targetemail);
 
     databasethreadpool_.EnqueueTask([this, fromid,targetemail](MysqlConnection& mysqlconn, DBCallback done) {
         std::string query = "select id from users where email = '" + targetemail + "';";
@@ -1000,6 +1031,7 @@ void Service::ListFriendApply(const TcpConnectionPtr& conn, const json& js)
         json arr = json::array();
         int fromid;
         std::string fromname;
+        std::string email;
         std::string status;
 
         while (result.Next())
@@ -1008,7 +1040,7 @@ void Service::ListFriendApply(const TcpConnectionPtr& conn, const json& js)
             fromid = row.GetInt("fromid");
             status = row.GetString("status");
 
-            std::string qu = "select name from users where id = " + std::to_string(fromid);
+            std::string qu = "select name, email from users where id = " + std::to_string(fromid);
             MYSQL_RES* re = mysqlconn.ExcuteQuery(qu);
             if (!re) {
                 LOG_ERROR << "Listfriendapply from name query failed ";
@@ -1022,11 +1054,13 @@ void Service::ListFriendApply(const TcpConnectionPtr& conn, const json& js)
                 return;
             }
             fromname = resul.GetRow().GetString("name");
+            email = resul.GetRow().GetString("email");
 
             json apply = {
                 {"fromid", fromid},
                 {"fromname", fromname},
-                {"status", status}
+                {"status", status},
+                {"email", email}
             };
             arr.push_back(apply);
         }
@@ -1068,6 +1102,7 @@ void Service::ListSendFriendApply(const TcpConnectionPtr& conn, const json& js)
         int targetid;
         std::string targetname;
         std::string status;
+        std::string email;
 
         while (result.Next())
         {
@@ -1089,11 +1124,13 @@ void Service::ListSendFriendApply(const TcpConnectionPtr& conn, const json& js)
                 return;
             }
             targetname = resul.GetRow().GetString("name");
+            email = resul.GetRow().GetString("email");
 
             json apply = {
                 {"fromid", targetid},
                 {"fromname", targetname},
-                {"status", status}
+                {"status", status},
+                {"email", email}
             };
             arr.push_back(apply);
         }
@@ -1311,11 +1348,17 @@ void Service::BlockFriend(const TcpConnectionPtr& conn, const json& js)
     bool end = true;
     int userid;
     int friendid;
+    bool block;
     end &= AssignIfPresent(js, "userid", userid);
     end &= AssignIfPresent(js, "friendid", friendid);
+    end &= AssignIfPresent(js, "block", block);
 
-    databasethreadpool_.EnqueueTask([this, userid, friendid](MysqlConnection& mysqlconn, DBCallback done) {
-        std::string query = "update friends set block where userid = " + std::to_string(userid)
+    databasethreadpool_.EnqueueTask([this, userid, friendid, &block](MysqlConnection& mysqlconn, DBCallback done) {
+        if (block)
+            block = false;
+        else  
+            block = true;
+        std::string query = "update friends set block = " + std::to_string(block) + "where userid = " + std::to_string(userid)
                             + " and friendid = " + std::to_string(friendid) + "; ";
         if (mysqlconn.ExcuteUpdate(query))
             done(true);
@@ -1740,6 +1783,9 @@ void Service::ListGroup(const TcpConnectionPtr& conn, const json& js)
         std::string groupname;
         std::string role;
         bool mute;
+        bool newapply;
+        std::string groupstatus;
+        std::string groupmsgtime;
 
         while (result.Next())
         {
@@ -1760,11 +1806,50 @@ void Service::ListGroup(const TcpConnectionPtr& conn, const json& js)
                 groupname = ro.GetString("name");
             }
 
+            query = "select status from groupapplys where groupid = " + std::to_string(groupid);
+            res = mysqlconn.ExcuteQuery(query);
+            if (!res) 
+            {
+                LOG_ERROR << "Listfriendapply query failed ";
+                done(false);
+                return;
+            }
+
+            MysqlResult groupapplyresult(res);
+
+            while (groupapplyresult.Next())
+            {
+                MysqlRow row = groupapplyresult.GetRow();
+                groupstatus = row.GetString("status");
+                if (groupstatus == "Pending") 
+                {
+                    newapply = true;
+                    break;
+                }
+            }
+
+            query = "select max(timestamp) as latest_time from messages where ( type = 'Group' and receiverid = " + std::to_string(groupid) + "); ";
+            res = mysqlconn.ExcuteQuery(query);
+            if (!res) {
+                LOG_ERROR << "Listmessage from messages query failed ";
+                done(false);
+                return;
+            }
+            MysqlResult timeresult(res);
+            if (!timeresult.Next()) {
+                LOG_ERROR << "No message found" ;
+                done(false);
+                return;
+            }
+            groupmsgtime = timeresult.GetRow().GetString("timestamp");
+
             json member = {
                 {"groupid", groupid},
                 {"groupname", groupname},
                 {"role", role},
-                {"mute", mute}
+                {"mute", mute},
+                {"newapply", newapply},
+                {"timestamp", groupmsgtime}
             };
             arr.push_back(member);
         }

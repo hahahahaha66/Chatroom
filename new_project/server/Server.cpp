@@ -19,6 +19,7 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, std::string name)
     dispatcher_.registerHander("SendMessage", std::bind(&Service::MessageSend, &service_, _1, _2));
     dispatcher_.registerHander("ChatHistory", std::bind(&Service::GetChatHistory, &service_, _1, _2));
     dispatcher_.registerHander("GroupHistory", std::bind(&Service::GetGroupHistory, &service_, _1, _2));
+    dispatcher_.registerHander("ChanceInterFace", std::bind(&Service::ChanceInterFace, &service_, _1, _2));
     dispatcher_.registerHander("SendFriendApply", std::bind(&Service::SendFriendApply, &service_, _1, _2));
     dispatcher_.registerHander("ListFriendApply", std::bind(&Service::ListFriendApply, &service_, _1, _2));
     dispatcher_.registerHander("ListSendFriendApply", std::bind(&Service::ListSendFriendApply, &service_, _1, _2));

@@ -5,6 +5,7 @@
 #include "../muduo/net/tcp/InetAddress.h"
 #include "../tool/Codec.h"
 #include "../tool/Dispatcher.h"
+#include "../test.cpp"
 
 #include <algorithm>
 #include <atomic>
@@ -14,6 +15,7 @@
 #include <ostream>
 #include <sys/types.h>
 #include <thread>
+#include <type_traits>
 #include <unistd.h>
 #include <unordered_map>
 
@@ -36,15 +38,16 @@ struct Friend {
 };
 
 struct FriendApply {
-    FriendApply(int id, std::string name, std::string status)
-        : id_(id), name_(name), status_(status) {}
+    FriendApply(int id, std::string name, std::string status, std::string email)
+        : id_(id), name_(name), status_(status), email_(email) {}
     FriendApply() = default;
     int id_;
     std::string name_;
+    std::string email_;
     std::string status_;
-    bool new_ = false;
 };
 
+// Member Administrator Owner
 struct Group {
     Group(int id, std::string name, std::string role, bool mute)
         : id_(id), name_(name), role_(role), mute_(mute) {}
@@ -87,6 +90,8 @@ public:
     void GetChatHistoryBack(const TcpConnectionPtr& conn, const json& js);
     void GetGroupHistory(const json& js);
     void GetGroupHistoryBack(const TcpConnectionPtr& conn, const json& js);
+    void ChanceInterFace(const json& js);
+    void ChanceInterFaceBack(const TcpConnectionPtr& conn, const json& js);
 
     // 好友
     void ListAllApply(const json& js);
@@ -153,6 +158,7 @@ private:
     TcpClient client_;
     Codec codec_;
     Dispatcher dispatcher_;
+    Warning warning_;
 
     int userid_ = 0;
     std::string email_;
