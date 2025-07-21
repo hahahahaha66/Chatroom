@@ -15,6 +15,7 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, std::string name)
 
     dispatcher_.registerHander("Register", std::bind(&Service::UserRegister, &service_, _1, _2));
     dispatcher_.registerHander("Login", std::bind(&Service::UserLogin, &service_, _1, _2));
+    dispatcher_.registerHander("Flush", std::bind(&Service::Flush, &service_, _1, _2));
     dispatcher_.registerHander("SendMessage", std::bind(&Service::MessageSend, &service_, _1, _2));
     dispatcher_.registerHander("ChatHistory", std::bind(&Service::GetChatHistory, &service_, _1, _2));
     dispatcher_.registerHander("GroupHistory", std::bind(&Service::GetGroupHistory, &service_, _1, _2));
@@ -24,6 +25,7 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, std::string name)
     dispatcher_.registerHander("ProceFriendApply", std::bind(&Service::ProceFriendApply, &service_, _1, _2));
     dispatcher_.registerHander("ListFriend", std::bind(&Service::ListFriend, &service_, _1, _2));
     dispatcher_.registerHander("BlockFriend", std::bind(&Service::BlockFriend, &service_, _1, _2));
+    dispatcher_.registerHander("DeleteFriend", std::bind(&Service::DeleteFriend, &service_, _1, _2));
     dispatcher_.registerHander("CreateGroup", std::bind(&Service::CreateGroup, &service_, _1, _2));
     dispatcher_.registerHander("SendGroupApply", std::bind(&Service::SendGroupApply, &service_, _1, _2));
     dispatcher_.registerHander("ListGroupApply", std::bind(&Service::ListGroupApply, &service_, _1, _2));

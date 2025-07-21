@@ -1,8 +1,9 @@
 #include "Client.h"
+#include <unordered_map>
 
 //提取json变量
-template<typename  T>
-std::optional<T> ExtractCommonField(const json& j, const std::string& key)
+template<typename T>
+std::optional<T> Client::ExtractCommonField(const json& j, const std::string& key)
 {
     try 
     {
@@ -22,7 +23,7 @@ std::optional<T> ExtractCommonField(const json& j, const std::string& key)
 
 //更完备的提取json变量
 template<typename T>
-bool AssignIfPresent(const json& j, const std::string& key, T& out)
+bool Client::AssignIfPresent(const json& j, const std::string& key, T& out)
 {
     if (j.is_string())
     {
@@ -45,19 +46,40 @@ bool AssignIfPresent(const json& j, const std::string& key, T& out)
     return false;
 }
 
-std::string Gettime()
+std::string Client::GetCurrentTimestamp() 
 {
     auto now = std::chrono::system_clock::now();
-    auto time_t = std::chrono::system_clock::to_time_t(now);
-    std::string timestamp_str = std::ctime(&time_t);
-    // 移除换行符
-    if (!timestamp_str.empty() && timestamp_str.back() == '\n') {
-        timestamp_str.pop_back();
-    }
-    return timestamp_str;
+    std::time_t t_now = std::chrono::system_clock::to_time_t(now);
+    std::tm tm_now;
+
+    // 线程安全地转换为本地时间
+#if defined(_WIN32)
+    localtime_s(&tm_now, &t_now);  // Windows
+#else
+    localtime_r(&t_now, &tm_now);  // Linux / Unix
+#endif
+
+    std::ostringstream oss;
+    oss << std::put_time(&tm_now, "%Y-%m-%d %H:%M:%S");
+    return oss.str();
 }
 
-bool ReadNum(std::string input, int &result)
+bool Client::IsEarlier(const std::string& ts1, const std::string& ts2) {
+    std::tm tm1 = {}, tm2 = {};
+    
+    std::istringstream ss1(ts1);
+    std::istringstream ss2(ts2);
+
+    ss1 >> std::get_time(&tm1, "%Y-%m-%d %H:%M:%S");
+    ss2 >> std::get_time(&tm2, "%Y-%m-%d %H:%M:%S");
+
+    time_t time1 = std::mktime(&tm1);
+    time_t time2 = std::mktime(&tm2);
+
+    return time1 < time2;
+}
+
+bool Client::ReadNum(std::string input, int &result)
 {
     int value;
     std::stringstream ss(input);
@@ -74,7 +96,7 @@ bool ReadNum(std::string input, int &result)
     }
 }
 
-void ClearScreen() 
+void Client::ClearScreen() 
 {
     std::cout << "\033[2J\033[H";
 }
@@ -88,6 +110,7 @@ Client::Client(EventLoop& loop, InetAddress addr, std::string name)
 
     dispatcher_.registerHander("RegisterBack", std::bind(&Client::RegisterBack, this, _1, _2));
     dispatcher_.registerHander("LoginBack", std::bind(&Client::LoginBack, this, _1, _2));
+    dispatcher_.registerHander("FlushBack", std::bind(&Client::FlushBack, this, _1, _2));
     dispatcher_.registerHander("SendMessageBack", std::bind(&Client::SendMessageBack, this, _1, _2));
     dispatcher_.registerHander("RecvMessage", std::bind(&Client::RecvMessageBack, this, _1, _2));
     dispatcher_.registerHander("GetChatHistoryBack", std::bind(&Client::GetChatHistoryBack, this, _1, _2));
@@ -117,7 +140,6 @@ void Client::ConnectionCallBack(const TcpConnectionPtr& conn)
     else
     {
         LOG_INFO << "Connection disconnected: " << conn->peerAddress().toIpPort();
-        client_.getLoop()->quit();
     }
 }
 
@@ -185,12 +207,112 @@ void Client::LoginBack(const TcpConnectionPtr& conn, const json& js)
         currentState_ = "main_menu";
         userid_ = id;
         name_ = name;
+        StartFlushFromServer(1);
     }
     else
     {
         std::cout << "登陆失败" << std::endl;
     }
     notifyInputReady();
+}
+
+void Client::StartFlushFromServer(int seconds)
+{
+    running_ = true;
+    flush_thread_ = std::thread([this, seconds]() {
+        while (running_)
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(seconds));
+            Flush();
+        }
+    });
+}
+
+void Client::Flush()
+{
+    json js = {
+        {"userid", userid_}
+    };
+    this->send(codec_.encode(js, "Flush"));
+}
+
+void Client::FlushBack(const TcpConnectionPtr& conn, const json& js)
+{
+    bool end = false;
+    AssignIfPresent(js, "end", end);
+    if (end)
+    {
+        int friendid;
+        std::string friendname;
+        std::string friendemail;
+        bool online;
+        bool block;
+        std::string friendtimestamp;
+        std::unordered_map<int, Friend> newfriendlist_;
+        for (auto it : js["friends"])
+        {
+            AssignIfPresent(it, "friendid", friendid);
+            AssignIfPresent(it, "friendname", friendname);
+            AssignIfPresent(it, "friendemail", friendemail);
+            AssignIfPresent(it, "online", online);
+            AssignIfPresent(it, "block", block);
+            AssignIfPresent(it, "timestamp", friendtimestamp);
+            newfriendlist_[friendid] = Friend(friendid, friendname, friendemail, online, block);
+            newfriendlist_[friendid].maxmsgtime_ = friendlist_[friendid].maxmsgtime_;
+            if (IsEarlier(friendlist_[friendid].maxmsgtime_, friendtimestamp)) 
+                newfriendlist_[friendid].new_ = true;
+        }
+        friendlist_ = std::move(newfriendlist_);
+
+        int fromid;
+        std::string fromname;
+        std::string applystatus;
+        bool applynew;
+        std::unordered_map<int, FriendApply> newfriendapplylist_;
+        for (auto it : js["friendapply"])
+        {
+            AssignIfPresent(it, "fromid", fromid);
+            AssignIfPresent(it, "fromname", fromname);
+            AssignIfPresent(it, "status", applystatus);
+            AssignIfPresent(it, "new", applynew);
+            newfriendapplylist_[fromid] = FriendApply(friendid, friendname, applystatus);
+            newfriendapplylist_[fromid].new_ = applynew;
+        }
+        friendapplylist_ = std::move(newfriendapplylist_);
+
+        int groupid;
+        std::string groupname;
+        std::string role;
+        bool mute;
+        bool newapply;
+        std::string grouptimestamp;
+        std::unordered_map<int, Group> newgrouplist_;
+        for (auto it : js["group"])
+        {
+            AssignIfPresent(it, "groupid", groupid);
+            AssignIfPresent(it, "groupname", groupname);
+            AssignIfPresent(it, "role", role);
+            AssignIfPresent(it, "newapply", newapply);
+            AssignIfPresent(it, "timestamp", grouptimestamp);
+            AssignIfPresent(it, "mute", mute);
+            newgrouplist_[groupid] = Group(groupid, groupname, role, mute);
+            newgrouplist_[groupid].newapply_ = newapply;
+            newgrouplist_[groupid].maxmsgtime_ = grouplist_[groupid].maxmsgtime_;
+            if (IsEarlier(grouplist_[groupid].maxmsgtime_, grouptimestamp)) 
+                newgrouplist_[groupid].newmessage_ = true;
+        }
+        grouplist_ = std::move(newgrouplist_);
+    }
+    else
+    {
+        std::cout << "刷新失败" << std::endl;
+    }
+}
+
+void Client::StopFlushFromServer()
+{
+    if (flush_thread_.joinable())
+        flush_thread_.join();
 }
 
 void Client::SendMessage(const json& js)
@@ -218,12 +340,33 @@ void Client::RecvMessageBack(const TcpConnectionPtr& conn, const json& js)
     std::string sendername;
     std::string content;
     std::string timestamp;
+    std::string type;
+    int id;
 
     AssignIfPresent(js, "sendername", sendername);
     AssignIfPresent(js, "content", content);
     AssignIfPresent(js, "timestamp", timestamp);     
-    
-    std::cout << sendername << ": " << content << std::endl;
+
+    AssignIfPresent(js, "type", type);
+    if (type == "Group")
+    {
+        AssignIfPresent(js, "groupid", id);
+        if (!IsEarlier(grouplist_[id].maxmsgtime_, timestamp))
+            grouplist_[id].maxmsgtime_ = timestamp;
+    }
+    else  if (type == "Private")
+    {
+        AssignIfPresent(js, "friendid", id);
+        if (!IsEarlier(friendlist_[id].maxmsgtime_, timestamp))
+            friendlist_[id].maxmsgtime_ = timestamp;
+    }
+    else  
+    {
+        std::cout << "Wrong type" << std::endl;
+        return;
+    }
+
+    std::cout << timestamp << " " << sendername << ": " << content << std::endl;
 }
 
 void Client::GetChatHistory(const json& js)
@@ -450,18 +593,23 @@ void Client::ListFriendBack(const TcpConnectionPtr& conn, const json& js)
     {
         int friendid;
         std::string friendname;
+        std::string friendemail;
         bool block;
         bool online;
+        std::string timestamp;
         std::unordered_map<int, Friend> newfriendlist_;
 
         for (auto it : js["friends"])
         {
             AssignIfPresent(it, "friendid", friendid);
             AssignIfPresent(it, "friendname", friendname);
+            AssignIfPresent(it, "friendemail", friendemail);
             AssignIfPresent(it, "online", online);
             AssignIfPresent(it, "block", block);
-
-            newfriendlist_.emplace(friendid, Friend(friendid, friendname, online, block));
+            AssignIfPresent(it, "timestamp", timestamp);
+            newfriendlist_.emplace(friendid, Friend(friendid, friendname, friendemail, online, block));
+            if (IsEarlier(newfriendlist_[friendid].maxmsgtime_, timestamp)) 
+                newfriendlist_[friendid].new_ = true;
         }
         friendlist_ = std::move(newfriendlist_);
     }
@@ -480,7 +628,41 @@ void Client::BlockFriend(const json& js)
 
 void Client::BlockFriendBack(const TcpConnectionPtr& conn, const json& js)
 {
+    bool end = false;
+    AssignIfPresent(js, "end", end);
 
+    if (end)
+    {
+        std::cout << "阻塞好友成功" << std::endl;
+    }
+    else  
+    {
+        std::cout << "阻塞好友失败" << std::endl;
+    }
+
+    notifyInputReady();
+}
+
+void Client::DeleteFriend(const json& js)
+{
+    this->send(codec_.encode(js, "DeleteGroup"));
+}
+
+void Client::DeleteFriendBack(const TcpConnectionPtr& conn, const json& js)
+{
+    bool end = false;
+    AssignIfPresent(js, "end", end);
+
+    if (end)
+    {
+        std::cout << "删除好友成功" << std::endl;
+    }
+    else  
+    {
+        std::cout << "删除好友失败" << std::endl;
+    }
+
+    notifyInputReady();
 }
 
 void Client::CreateGroup(const json& js)
@@ -662,15 +844,17 @@ void Client::ListGroupBack(const TcpConnectionPtr& conn, const json& js)
         int groupid;
         std::string groupname;
         std::string role;
+        bool mute;
         std::unordered_map<int, Group> newgrouplist;
         for (auto it : js["groups"])
         {
             AssignIfPresent(it, "groupid", groupid);
             AssignIfPresent(it, "groupname", groupname);
             AssignIfPresent(it, "role", role);
+            AssignIfPresent(it, "mute", mute);
             std::cout << "群聊id" << "  群聊名字   " << "  角色  "<< std::endl;
             std::cout << groupid << "     " << groupname << "     " << role << std::endl;
-            newgrouplist.emplace(groupid, Group(groupid, groupname, role));
+            newgrouplist.emplace(groupid, Group(groupid, groupname, role, mute));
         }
         grouplist_ = std::move(newgrouplist);
     }
@@ -732,11 +916,12 @@ void Client::start()
 }
 
 void Client::stop()
-{
+{   
+    running_ = false;
+    StopFlushFromServer();
     client_.disconnect();
     client_.getLoop()->quit();
 }
-
 
 void Client::send(const std::string& msg)
 {
@@ -951,17 +1136,28 @@ void Client::InputLoop()
                 getline(std::cin, input);
                 ReadNum(input, friendid);
                 json js = {
-                    {"fromid", userid_},
+                    {"userid", userid_},
                     {"friendid", friendid}
-                }
+                };
                 waitingback_ = true;
-                SendApply(js);
+                BlockFriend(js);
 
                 waitInPutReady();
             }
             else if (order == 7)
             {
+                int friendid;
+                std::cout << "输入要删除的好友id:";
+                getline(std::cin, input);
+                ReadNum(input, friendid);
+                json js = {
+                    {"userid", userid_},
+                    {"friendid", friendid}
+                };
+                waitingback_ = true;
+                DeleteFriend(js);
 
+                waitInPutReady();
             }
             else if (order == 8)
             {
@@ -993,12 +1189,20 @@ void Client::InputLoop()
             if (!ReadNum(input, friendid)) continue;
             if (friendid == 0) currentState_ = "main_menu";
 
-            // if (friendlist_.find(friendid) == friendlist_.end())
-            // {
-            //     std::cout << "未知好友id" << std::endl;
-            //     currentState_ = "main_menu";
-            //     continue;
-            // }
+            if (friendlist_.find(friendid) == friendlist_.end())
+            {
+                std::cout << "未知好友id" << std::endl;
+                currentState_ = "main_menu";
+                continue;
+            } 
+            else  
+            {
+                if (friendlist_[friendid].block_ == true)
+                {
+                    std::cout << "好友已被阻塞" << std::endl;
+                    continue;
+                }
+            }
 
             json js = {
                 {"userid", userid_},
@@ -1024,6 +1228,7 @@ void Client::InputLoop()
                     {"type", "Private"},
                     {"status", "Unread"},
                 };
+                friendlist_[friendid].maxmsgtime_ = GetCurrentTimestamp();
 
                 waitingback_ = true;
                 SendMessage(js);
@@ -1145,7 +1350,7 @@ void Client::InputLoop()
                     };
 
                     waitingback_ = true;
-                    SendMessage(js);
+                    GetGroupHistory(js);
 
                     waitInPutReady();
 
@@ -1164,6 +1369,7 @@ void Client::InputLoop()
                             {"type", "Group"},
                             {"status", "Unread"},
                         };
+                        grouplist_[groupid].maxmsgtime_ = GetCurrentTimestamp();
 
                         waitingback_ = true;
                         SendMessage(js);

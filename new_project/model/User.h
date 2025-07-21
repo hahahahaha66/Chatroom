@@ -8,6 +8,7 @@ class User
 public:
     User(int id, const std::string& name, const std::string& password, const std::string& email)
         : id_(id), name_(name), password_(password), email_(email), online_(false), userinterfaceid(0) {}
+    User() = default;
 
     int GetId() const { return id_; }
     std::string GetName() const { return name_; }

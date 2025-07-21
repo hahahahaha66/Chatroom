@@ -8,7 +8,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include_directories(
     ${PROJECT_SOURCE_DIR}/client
     ${PROJECT_SOURCE_DIR}/database
-    ${PROJECT_SOURCE_DIR}/manager
     ${PROJECT_SOURCE_DIR}/model
     ${PROJECT_SOURCE_DIR}/server
     ${PROJECT_SOURCE_DIR}/tool
@@ -24,7 +23,6 @@ link_directories(${PROJECT_SOURCE_DIR}/muduo/build/lib)
 # 服务端专用源码（包含数据库、管理、工具模块）
 file(GLOB_RECURSE SERVER_COMMON_SOURCES
     ${PROJECT_SOURCE_DIR}/database/*.cpp
-    ${PROJECT_SOURCE_DIR}/manager/*.cpp
     ${PROJECT_SOURCE_DIR}/tool/*.cpp
 )
 

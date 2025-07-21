@@ -268,8 +268,6 @@ void Service::UserLogin(const TcpConnectionPtr& conn, const json& js)
     AssignIfPresent(js, "password", password);
     AssignIfPresent(js, "email", email);
 
-    std::cout << "----------" << std::endl;
-
     // 输入验证
     if (email.empty() || password.empty()) {
         json j = {
@@ -385,9 +383,246 @@ void Service::RemoveUserConnect(const TcpConnectionPtr& conn)
     }
 }
 
+void Service::Flush(const TcpConnectionPtr& conn, const json& js)
+{
+    int userid;
+    AssignIfPresent(js, "userid", userid);
+    databasethreadpool_.EnqueueTask([this, conn, userid](MysqlConnection& mysqlconn, DBCallback done) {
+        json j;
+        json friends = json::array();
+        json friendapply = json::array();
+        json sendfriendapply = json::array();
+        json group = json::array();
+
+        // 更新好友
+        std::string query = "select friendid, block from friends where userid = " + std::to_string(userid) + "; ";
+        MYSQL_RES* res = mysqlconn.ExcuteQuery(query);
+        if (!res) 
+        {
+            LOG_ERROR << "Listfriend query failed ";
+            done(false);
+            return;
+        }
+
+        MysqlResult friendresult(res);
+        int friendid;
+        bool online;
+        bool block;
+        std::string friendname;
+        std::string friendemail;
+        std::string friendmsgtime;
+        while (friendresult.Next())
+        {
+            MysqlRow friendrow = friendresult.GetRow();
+            friendid = friendrow.GetInt("friendid");
+            online = false;
+            block = friendrow.GetBool("block");
+
+            query = "select name, email from users where id = " + std::to_string(friendid);
+            res = mysqlconn.ExcuteQuery(query);
+            if (!res) {
+                LOG_ERROR << "Listfriend from name query failed ";
+                done(false);
+                return;
+            }
+            MysqlResult nameresult(res);
+            if (!nameresult.Next()) {
+                LOG_ERROR << "No user found with id: " << friendid;
+                done(false);
+                return;
+            }
+            friendname = nameresult.GetRow().GetString("name");
+            friendemail = nameresult.GetRow().GetString("email");
+
+            std::ostringstream oss;
+            oss << "select max(timestamp) as latest_time from messages where ( senderid = "
+                << userid << " and receiverid = " << friendid << ") or ( senderid = " << friendid
+                << " and receiverid = " << userid << "); ";
+            
+            res = mysqlconn.ExcuteQuery(oss.str());
+            if (!res) {
+                LOG_ERROR << "Listfriend from name query failed ";
+                done(false);
+                return;
+            }
+            MysqlResult timeresult(res);
+            if (!timeresult.Next()) {
+                LOG_ERROR << "No user found with id: " << friendid;
+                done(false);
+                return;
+            }
+            friendmsgtime = timeresult.GetRow().GetString("timestamp");
+            
+            if (onlineuser_.find(friendid) != onlineuser_.end())
+                online = true;
+
+            json fri = {
+                {"friendid", friendid},
+                {"friendname", friendname},
+                {"email", friendemail},
+                {"online", online},
+                {"block", block},
+                {"timestamp", friendmsgtime}
+            };
+            friends.push_back(fri);
+        }
+        j["friends"] = friends;
+
+        // 更新好友申请
+        query = "select fromid, status from friendapplys where targetid = " + std::to_string(userid);
+        res = mysqlconn.ExcuteQuery(query);
+        if (!res) 
+        {
+            LOG_ERROR << "Listfriendapply query failed ";
+            done(false);
+            return;
+        }
+
+        MysqlResult applyresult(res);
+        int fromid;
+        std::string fromname;
+        std::string applystatus;
+        bool applynew = false;
+
+        while (applyresult.Next())
+        {
+            MysqlRow row = applyresult.GetRow();
+            fromid = row.GetInt("fromid");
+            applystatus = row.GetString("status");
+
+            if (applystatus == "Pending") applynew = true;
+
+            query = "select name from users where id = " + std::to_string(fromid);
+            res = mysqlconn.ExcuteQuery(query);
+            if (!res) {
+                LOG_ERROR << "Listfriendapply from name query failed ";
+                done(false);
+                return;
+            }
+            MysqlResult nameresult(res);
+            if (!nameresult.Next()) {
+                LOG_ERROR << "No user found with id: " << fromid;
+                done(false);
+                return;
+            }
+            fromname = nameresult.GetRow().GetString("name");
+
+            json apply = {
+                {"fromid", fromid},
+                {"fromname", fromname},
+                {"status", applystatus},
+                {"new", applynew}
+            };
+            friendapply.push_back(apply);
+        }
+        j["friendapply"] = friendapply;
+
+        // 更新群聊
+        query = "select groupid, role, mute from groupusers where userid = " + std::to_string(userid) + "; ";
+        res = mysqlconn.ExcuteQuery(query);
+        if (!res) {
+            LOG_ERROR << "ListGroup from groupusers query failed ";
+            done(false);
+            return;
+        }
+
+        MysqlResult groupresult(res);
+        int groupid;
+        std::string groupname;
+        std::string role;
+        std::string groupstatus;
+        std::string groupmsgtime;
+        bool mute;
+        bool groupapplynew = false;
+
+        while (groupresult.Next())
+        {
+            MysqlRow grouprow = groupresult.GetRow();
+            groupid = grouprow.GetInt("groupid");
+            role = grouprow.GetString("role");
+            mute = grouprow.GetBool("mute");
+            query = "select name from groups where id = " + std::to_string(groupid) + "; ";
+            res = mysqlconn.ExcuteQuery(query);
+            if (!res) {
+                LOG_ERROR << "ListGroup from name query failed ";
+                done(false);
+                return;
+            }
+            MysqlResult groupnameresult(res);
+            if (groupnameresult.Next())
+            {
+                MysqlRow namerow = groupnameresult.GetRow();
+                groupname = namerow.GetString("name");
+            }
+
+            query = "select status from groupapplys where groupid = " + std::to_string(groupid);
+            res = mysqlconn.ExcuteQuery(query);
+            if (!res) 
+            {
+                LOG_ERROR << "Listfriendapply query failed ";
+                done(false);
+                return;
+            }
+
+            MysqlResult groupapplyresult(res);
+
+            while (groupapplyresult.Next())
+            {
+                MysqlRow row = groupapplyresult.GetRow();
+                groupstatus = row.GetString("status");
+                if (groupstatus == "Pending") 
+                {
+                    groupapplynew = true;
+                    break;
+                }
+            }
+
+            query = "select max(timestamp) as latest_time from messages where ( type = 'Group' and receiverid = " + std::to_string(groupid) + "); ";
+            res = mysqlconn.ExcuteQuery(query);
+            if (!res) {
+                LOG_ERROR << "Listmessage from messages query failed ";
+                done(false);
+                return;
+            }
+            MysqlResult timeresult(res);
+            if (!timeresult.Next()) {
+                LOG_ERROR << "No message found" ;
+                done(false);
+                return;
+            }
+            groupmsgtime = timeresult.GetRow().GetString("timestamp");
+
+            json member = {
+                {"groupid", groupid},
+                {"groupname", groupname},
+                {"role", role},
+                {"newapply", groupapplynew},
+                {"timestamp", groupmsgtime},
+                {"mute", mute}
+            };
+            group.push_back(member);
+        }
+        j["group"] = group;
+        j["end"] = true;
+        conn->send(code_.encode(j, "FlushBack"));
+
+    }, [this, conn](bool success)mutable { 
+        if (success) {
+            LOG_DEBUG << "Flush Success";
+        }
+        else { 
+            LOG_ERROR << "Flush failed";
+        }
+        json j = {
+            {"end", success}
+        };
+        conn->send(code_.encode(j, "FlushBack"));
+    });
+}
+
 void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
 {
-
+    bool end = true;
     int senderid = 0;
     std::string sendername;
     int receiverid = 0;
@@ -396,12 +631,12 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
     std::string status;
     std::string timestamp = GetCurrentTimestamp();
 
-    AssignIfPresent(js, "senderid", senderid);
-    AssignIfPresent(js, "sendername", sendername);
-    AssignIfPresent(js, "receiverid", receiverid);
-    AssignIfPresent(js, "content", content);
-    AssignIfPresent(js, "type", type);
-    AssignIfPresent(js, "status", status);
+    end &= AssignIfPresent(js, "senderid", senderid);
+    end &= AssignIfPresent(js, "sendername", sendername);
+    end &= AssignIfPresent(js, "receiverid", receiverid);
+    end &= AssignIfPresent(js, "content", content);
+    end &= AssignIfPresent(js, "type", type);
+    end &= AssignIfPresent(js, "status", status);
 
     //添加到redis,获取自增id
     int msgid = gen_.GetNextMsgId();
@@ -432,13 +667,14 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
                     if (userid == senderid) continue;
                     if (onlineuser_.find(userid) != onlineuser_.end())
                     {
-                        status = "Read";
                         auto reconn = onlineuser_[userid].GetConn();
                         if (reconn)
                         {   
                             json j = {
+                            {"groupid", receiverid},
                             {"sendername", sendername},
                             {"content", content},
+                            {"type", type},
                             {"timestamp", timestamp}
                             };
                             reconn->send(code_.encode(j, "RecvMessage"));
@@ -447,7 +683,27 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
                 }
             }
             else if (type == "Private")
-            {
+            {   
+                std::string query = "select block from friend where userid = " + std::to_string(receiverid)
+                                     + " and friendid = " + std::to_string(senderid) + "; ";
+                MYSQL_RES* res = mysqlconn.ExcuteQuery(query);
+                if (!res) 
+                {
+                    LOG_ERROR << "Listfriendapply query failed ";
+                    done(false);
+                    return;
+                }
+
+                MysqlResult result(res);
+                bool block = false;
+                if (result.Next())
+                {
+                    MysqlRow row = result.GetRow();
+                    block = row.GetBool("block");
+                    if (block)
+                        done(false);
+                }
+
                 if (onlineuser_.find(receiverid) != onlineuser_.end())
                 {
                     status = "Read";
@@ -455,8 +711,10 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
                     if (reconn)
                     {
                         json j = {
+                        {"friendid", senderid},
                         {"sendername", sendername},
                         {"content", content},
+                        {"type", type},
                         {"timestamp", timestamp}
                         };
                         reconn->send(code_.encode(j, "RecvMessage"));
@@ -489,7 +747,7 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
             done(false);
         }
 
-    }, [this, conn](bool success)mutable { 
+    }, [this, conn, timestamp](bool success)mutable { 
         if (success) {
             LOG_DEBUG << "Message Send Database Operation Success";
         }
@@ -497,6 +755,7 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
             LOG_ERROR << "Message Send Database Operation Success";
         }
         json j = {
+            {"timestamp", timestamp},
             {"end", success}
         };
         conn->send(code_.encode(j, "SendMessageBack"));
@@ -972,6 +1231,7 @@ void Service::ListFriend(const TcpConnectionPtr& conn, const json& js)
         json arr = json::array();
         int friendid;
         std::string friendname;
+        std::string friendemail;
         bool online;
         bool block;
 
@@ -981,8 +1241,9 @@ void Service::ListFriend(const TcpConnectionPtr& conn, const json& js)
             friendid = row.GetInt("friendid");
             online = false;
             block = row.GetBool("block");
+            std::string friendmsgtime;
 
-            std::string qu = "select name from users where id = " + std::to_string(friendid);
+            std::string qu = "select name, email from users where id = " + std::to_string(friendid);
             MYSQL_RES* re = mysqlconn.ExcuteQuery(qu);
             if (!re) {
                 LOG_ERROR << "Listfriend from name query failed ";
@@ -996,14 +1257,36 @@ void Service::ListFriend(const TcpConnectionPtr& conn, const json& js)
                 return;
             }
             friendname = resul.GetRow().GetString("name");
+            friendemail = resul.GetRow().GetString("email");
             if (onlineuser_.find(friendid) != onlineuser_.end())
                 online = true;
+
+            std::ostringstream oss;
+            oss << "select max(timestamp) as latest_time from messages where ( senderid = "
+                << userid << " and receiverid = " << friendid << ") or ( senderid = " << friendid
+                << "and receiverid = " << userid << "); ";
+            
+            res = mysqlconn.ExcuteQuery(oss.str());
+            if (!res) {
+                LOG_ERROR << "Listfriend from name query failed ";
+                done(false);
+                return;
+            }
+            MysqlResult timeresult(res);
+            if (!timeresult.Next()) {
+                LOG_ERROR << "No user found with id: " << friendid;
+                done(false);
+                return;
+            }
+            friendmsgtime = timeresult.GetRow().GetString("timestamp");
 
             json fri = {
                 {"friendid", friendid},
                 {"friendname", friendname},
+                {"friendemail", friendemail},
                 {"online", online},
-                {"block", block}
+                {"block", block},
+                {"timestamp", friendmsgtime}
             };
             arr.push_back(fri);
         }
@@ -1047,6 +1330,39 @@ void Service::BlockFriend(const TcpConnectionPtr& conn, const json& js)
             json j;
             j["end"] = false;
             conn->send(code_.encode(j, "BlockFriendBack"));
+        }
+    });
+}
+
+void Service::DeleteFriend(const TcpConnectionPtr& conn, const json& js)
+{
+    bool end = true;
+    int userid;
+    int friendid;
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "friendid", friendid);
+
+    databasethreadpool_.EnqueueTask([this, userid, friendid](MysqlConnection& mysqlconn, DBCallback done) {
+        std::string query = "delete friends where userid = " + std::to_string(userid)
+                            + " and friendid = " + std::to_string(friendid) + "; ";
+        if (!(mysqlconn.ExcuteUpdate(query)))
+            done(false);
+
+        query = "delete friends where userid = " + std::to_string(friendid)
+                            + " and friendid = " + std::to_string(userid) + "; ";
+        if (mysqlconn.ExcuteUpdate(query))
+            done(true);
+        else  
+            done(false);
+
+    } ,[this, conn](bool success) {
+        if (success){
+        }    LOG_DEBUG << "DeleteFriends Success";
+        else {
+            LOG_ERROR << "DeleteFriends Failed";
+            json j;
+            j["end"] = false;
+            conn->send(code_.encode(j, "DeleteFriendBack"));
         }
     });
 }
@@ -1409,7 +1725,7 @@ void Service::ListGroup(const TcpConnectionPtr& conn, const json& js)
     end &= AssignIfPresent(js, "userid", userid);
 
     databasethreadpool_.EnqueueTask([this, conn, userid](MysqlConnection& mysqlconn, DBCallback done) {
-        std::string query = "select groupid, role from groupusers where userid = " + std::to_string(userid) + "; ";
+        std::string query = "select groupid, role, mute from groupusers where userid = " + std::to_string(userid) + "; ";
         MYSQL_RES* res = mysqlconn.ExcuteQuery(query);
         if (!res) {
             LOG_ERROR << "ListGroup from groupusers query failed ";
@@ -1423,6 +1739,7 @@ void Service::ListGroup(const TcpConnectionPtr& conn, const json& js)
         int groupid;
         std::string groupname;
         std::string role;
+        bool mute;
 
         while (result.Next())
         {
@@ -1446,7 +1763,8 @@ void Service::ListGroup(const TcpConnectionPtr& conn, const json& js)
             json member = {
                 {"groupid", groupid},
                 {"groupname", groupname},
-                {"role", role}
+                {"role", role},
+                {"mute", mute}
             };
             arr.push_back(member);
         }

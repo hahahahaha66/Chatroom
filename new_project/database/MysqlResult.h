@@ -5,6 +5,7 @@
 
 #include <map>
 #include <mysql/mysql.h>
+#include <stdexcept>
 #include <string>
 
 class MysqlResult  
@@ -33,6 +34,7 @@ public:
 
     MysqlRow GetRow() const 
     {
+        if (!currentrow_) throw std::runtime_error("Attempt to access row before calling Next()");
         return MysqlRow(currentrow_, colmap_);
     }
 

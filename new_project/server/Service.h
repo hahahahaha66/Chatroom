@@ -27,6 +27,9 @@ public:
     void UserLogin(const TcpConnectionPtr& conn, const json& json);
     void RemoveUserConnect(const TcpConnectionPtr& conn);
 
+    // flush
+    void Flush(const TcpConnectionPtr& conn, const json& json);
+
     // Message
     void MessageSend(const TcpConnectionPtr& conn, const json& json);
     void GetChatHistory(const TcpConnectionPtr& conn, const json& json);
@@ -39,6 +42,7 @@ public:
     void ProceFriendApply(const TcpConnectionPtr& conn, const json& json);
     void ListFriend(const TcpConnectionPtr& conn, const json& json);
     void BlockFriend(const TcpConnectionPtr& conn, const json& json);
+    void DeleteFriend(const TcpConnectionPtr& conn, const json& json);
 
     // Group
     void CreateGroup(const TcpConnectionPtr& conn, const json& json);
