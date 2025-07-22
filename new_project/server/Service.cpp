@@ -361,13 +361,83 @@ void Service::UserLogin(const TcpConnectionPtr& conn, const json& js)
             conn->send(code_.encode(error_response, "LoginBack"));                
             done(false);
         }
-    },
-    [email](bool success) {
+    }, [email](bool success) {
             if (success) {
                 LOG_DEBUG << "Login database operation completed for: " << email;
             } else {
                 LOG_ERROR << "Login database operation failed for: " << email;
             }
+        }
+    );
+}
+
+void Service::DeleteAccount(const TcpConnectionPtr& conn, const json& js)
+{
+    bool end = true;
+    int userid;
+    end &= AssignIfPresent(js, "userid", userid);
+
+    databasethreadpool_.EnqueueTask([this, userid](MysqlConnection& mysqlconn, DBCallback done) {
+        std::string query;
+        query = "select id from groups where owner = " + std::to_string(userid) + "; ";
+        MYSQL_RES* res = mysqlconn.ExcuteQuery(query);
+        if (!res) {
+            LOG_ERROR << "Listfriend from name query failed ";
+            done(false);
+            return;
+        }
+
+        MysqlResult groupresult(res);
+        int groupid;
+
+        while (groupresult.Next())
+        {
+            MysqlRow grouprow = groupresult.GetRow();
+            groupid = grouprow.GetInt("id");
+
+            query = "delete from groupusers where groupid = " + std::to_string(groupid) + "; ";
+            if (!(mysqlconn.ExcuteUpdate(query))) 
+                done(false);
+        }
+
+        query = "delete from groupusers where userid = " + std::to_string(userid) + "; ";
+        if (!(mysqlconn.ExcuteUpdate(query))) 
+                done(false);
+
+        query = "delete from groupapplys where userid = " + std::to_string(userid) + "; ";
+        if (!(mysqlconn.ExcuteUpdate(query))) 
+                done(false);
+
+        query = "delete from friendapplys where ( fromid = " + std::to_string(userid)
+                + " or targetid = " + std::to_string(userid) + "); ";
+        if (!(mysqlconn.ExcuteUpdate(query))) 
+                done(false);
+
+        query = "delete from friends where ( userid = " + std::to_string(userid)
+                + " or friendid = " + std::to_string(userid) + "); ";
+        if (!(mysqlconn.ExcuteUpdate(query))) 
+                done(false);
+
+        query = "delete from messages where ( senderid = " + std::to_string(userid)
+                + " or receiverid = " + std::to_string(userid) + "); ";
+        if (!(mysqlconn.ExcuteUpdate(query))) 
+                done(false);
+
+        query = "delete from users where id = " + std::to_string(userid) + "; ";
+        if (!(mysqlconn.ExcuteUpdate(query))) 
+                done(false);
+
+        done(true);
+    }, [this, conn](bool success) {
+            if (success) {
+                LOG_DEBUG << "DeleteAccount success";
+            } else {
+                LOG_ERROR << "DeleteAccount failed";
+            }
+            json j = {
+                {"end", success}
+            };
+            conn->send(code_.encode(j, "DeleteAccountBack"));
         }
     );
 }
@@ -1934,4 +2004,45 @@ void Service::ChangeUserRole(const TcpConnectionPtr& conn, const json& js)
         };
         conn->send(code_.encode(j, "QuitGrouprBack"));
     });
+}
+
+void Service::DeleteGroup(const TcpConnectionPtr& conn, const json& js)
+{
+    bool end = true;
+    int groupid;
+    end &= AssignIfPresent(js, "userid", groupid);
+
+    databasethreadpool_.EnqueueTask([this, conn, groupid](MysqlConnection& mysqlconn, DBCallback done) {
+        std::string query;
+
+        query = "delete from groupusers where groupid = " + std::to_string(groupid) + "; ";
+        if (!(mysqlconn.ExcuteUpdate(query))) 
+            done(false);
+        
+        query = "delete from groups where id = " + std::to_string(groupid) + "; ";
+        if (!(mysqlconn.ExcuteUpdate(query))) 
+                done(false);
+
+        query = "delete from friendapplys where ( receiverid = " + std::to_string(groupid)
+                + " and type = Group ); ";
+        if (!(mysqlconn.ExcuteUpdate(query))) 
+                done(false);
+
+        json j = {
+            {"end", true},
+            {"groupid", groupid}
+        };
+        conn->send(code_.encode(j, "DeleteGroupBack"));
+    }, [this, conn](bool success) {
+            if (success) {
+                LOG_DEBUG << "DeleteGroup success";
+            } else {
+                LOG_ERROR << "DeleteGroup failed";
+            }
+            json j = {
+                {"end", success}
+            };
+            conn->send(code_.encode(j, "DeleteGroupBack"));
+        }
+    );
 }

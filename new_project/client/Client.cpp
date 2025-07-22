@@ -1,6 +1,7 @@
 #include "Client.h"
 #include <cstdio>
 #include <iterator>
+#include <string>
 #include <unordered_map>
 
 //提取json变量
@@ -98,7 +99,7 @@ bool Client::ReadNum(std::string input, int &result)
     }
 }
 
-void PrintfRed(char a)
+void Client::PrintfRed(char a)
 {
     std::cout << "\033[1;31m" << a << "\033[0m";
 }
@@ -117,6 +118,7 @@ Client::Client(EventLoop& loop, InetAddress addr, std::string name)
 
     dispatcher_.registerHander("RegisterBack", std::bind(&Client::RegisterBack, this, _1, _2));
     dispatcher_.registerHander("LoginBack", std::bind(&Client::LoginBack, this, _1, _2));
+    dispatcher_.registerHander("DeleteAccountBack", std::bind(&Client::DeleteAccountBack, this, _1, _2));
     dispatcher_.registerHander("FlushBack", std::bind(&Client::FlushBack, this, _1, _2));
     dispatcher_.registerHander("SendMessageBack", std::bind(&Client::SendMessageBack, this, _1, _2));
     dispatcher_.registerHander("RecvMessage", std::bind(&Client::RecvMessageBack, this, _1, _2));
@@ -137,6 +139,7 @@ Client::Client(EventLoop& loop, InetAddress addr, std::string name)
     dispatcher_.registerHander("ListGroupBack", std::bind(&Client::ListGroupBack, this, _1, _2));
     dispatcher_.registerHander("QuitGrouprBack", std::bind(&Client::QuitGroupBack, this, _1, _2));
     dispatcher_.registerHander("ProceGroupApplyBack", std::bind(&Client::ProceGroupApplyBack, this, _1, _2));
+    dispatcher_.registerHander("DeleteGroupBack", std::bind(&Client::DeleteGroupBack, this, _1, _2));
 }
 
 void Client::ConnectionCallBack(const TcpConnectionPtr& conn)
@@ -220,6 +223,43 @@ void Client::LoginBack(const TcpConnectionPtr& conn, const json& js)
     else
     {
         std::cout << "登陆失败" << std::endl;
+    }
+    notifyInputReady();
+}
+
+void Client::DeleteAccount(const json& js)
+{
+    this->send(codec_.encode(js, "DeleteAccount"));
+}
+
+void Client::DeleteAccountBack(const TcpConnectionPtr& conn, const json& js)
+{
+    bool end = false;
+    AssignIfPresent(js, "end", end);
+
+    if (end == true)
+    {
+        std::unordered_map<int, Friend> newfriendlist;
+        std::unordered_map<int, FriendApply> newfriendapplylist;
+        std::unordered_map<int, FriendApply> newfriendsendapplylist;
+        std::unordered_map<int, Group> newgrouplist;
+
+        std::cout << "注销账户成功" << std::endl;
+
+        friendlist_ = std::move(newfriendlist);
+        friendapplylist_ = std::move(newfriendapplylist);
+        friendsendapplylist_ = std::move(newfriendsendapplylist);
+        grouplist_ = std::move(newgrouplist);
+        userid_ = 0;
+        email_ = "";
+        name_ = "";
+        password_ = "";
+
+        currentState_ = "init_menu";
+    }
+    else  
+    {
+        std::cout << "注销账户失败" << std::endl;
     }
     notifyInputReady();
 }
@@ -954,6 +994,32 @@ void Client::ChangeUserRoleBack(const TcpConnectionPtr& conn, const json& js)
     notifyInputReady();
 }
 
+void Client::DeleteGroup(const json& js)
+{
+    this->send(codec_.encode(js, "DeleteGroup"));
+}
+
+void Client::DeleteGroupBack(const TcpConnectionPtr& conn, const json& js)
+{
+    bool end = false;
+    AssignIfPresent(js, "end", end);
+
+    if (end == true)
+    {
+        int groupid;
+        AssignIfPresent(js, "groupid", groupid);
+        std::cout << "解散群聊成功" << std::endl;
+
+        grouplist_.erase(groupid);
+        currentState_ = "group_menu";
+    }
+    else  
+    {
+        std::cout << "解散群聊失败" << std::endl;
+    }
+    notifyInputReady();
+}
+
 void Client::start()
 {
     client_.connect();
@@ -1078,8 +1144,8 @@ void Client::InputLoop()
                 PrintfRed('*');
             std::cout << "  " << "8. 私聊" << std::endl;
             std::cout << "4. 处理好友申请      " << "9. 群聊" << std::endl;
-            std::cout << "5. 查看被申请好友列表" << "10.退出"<< std::endl;
-            std::cout << "11.注销账户" << std::endl;
+            std::cout << "5. 查看被申请好友列表" << "10.注销账户"<< std::endl;
+            std::cout << "11.退出" << std::endl;
             getline(std::cin, input);
             if (!ReadNum(input, order)) continue;
 
@@ -1270,6 +1336,24 @@ void Client::InputLoop()
                 currentState_ = "group_menu";
             }
             else if (order == 10)
+            {
+                std::cout << "请输入密码" << std::endl;
+                getline(std::cin, input);
+                if (input != password_)
+                {
+                    std::cout << "密码输入错误" << std::endl;
+                    continue;
+                }
+
+                json js = {
+                    {"userid", userid_}
+                };                
+                waitingback_ = true;
+                DeleteAccount(js);
+
+                waitInPutReady();
+            }
+            else if (order == 11)
             {
                 std::cout << "正在退出..." << std::endl;
                 stop();
@@ -1488,13 +1572,14 @@ void Client::InputLoop()
                         PrintfRed('*');
                     std::cout << std::endl;
                     std::cout << "5. 处理群聊申请" << std::endl;
+                    std::cout << "6. 处理成员禁言" << std::endl;
                 }
                 if (grouplist_[groupid].role_ == "Owner")
                 {
-                    std::cout << "6. 更改群聊成员权限" << std::endl;
-                    std::cout << "7. 解散群聊" << std::endl;
+                    std::cout << "7. 更改群聊成员权限" << std::endl;
+                    std::cout << "8. 解散群聊" << std::endl;
                 }
-                std::cout << "8. 返回上一界面" << std::endl;
+                std::cout << "9. 返回上一界面" << std::endl;
 
                 getline(std::cin, input);
                 if (!ReadNum(input, order)) continue;
@@ -1607,6 +1692,10 @@ void Client::InputLoop()
                 }
                 else if (order == 6)
                 {
+
+                }
+                else if (order == 7)
+                {
                     int userid;
                     std::string role;
                     std::cout << "输入要改变的成员id: " << std::endl;
@@ -1631,11 +1720,17 @@ void Client::InputLoop()
 
                     waitInPutReady();
                 }
-                else if (order == 7)
-                {
-                    
-                }
                 else if (order == 8)
+                {
+                    json js = {
+                        {"groupid", groupid}
+                    };
+                    waitingback_ = true;
+                    DeleteGroup(js);
+
+                    waitInPutReady();
+                }
+                else if (order == 9)
                 {
                     currentState_ = "group_menu";
                     break;

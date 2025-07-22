@@ -25,6 +25,7 @@ public:
     // User
     void UserRegister(const TcpConnectionPtr& conn, const json& js);
     void UserLogin(const TcpConnectionPtr& conn, const json& js);
+    void DeleteAccount(const TcpConnectionPtr& conn, const json& js);
     void RemoveUserConnect(const TcpConnectionPtr& conn);
 
     // flush
@@ -55,6 +56,7 @@ public:
     void ListGroup(const TcpConnectionPtr& conn, const json& js);
     void QuitGroup(const TcpConnectionPtr& conn, const json& js);
     void ChangeUserRole(const TcpConnectionPtr& conn, const json& js);
+    void DeleteGroup(const TcpConnectionPtr& conn, const json& js);
 
     // other
     template<typename T>

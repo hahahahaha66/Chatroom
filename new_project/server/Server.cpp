@@ -15,6 +15,7 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, std::string name)
 
     dispatcher_.registerHander("Register", std::bind(&Service::UserRegister, &service_, _1, _2));
     dispatcher_.registerHander("Login", std::bind(&Service::UserLogin, &service_, _1, _2));
+    dispatcher_.registerHander("DeleteAccount", std::bind(&Service::DeleteAccount, &service_, _1, _2));
     dispatcher_.registerHander("Flush", std::bind(&Service::Flush, &service_, _1, _2));
     dispatcher_.registerHander("SendMessage", std::bind(&Service::MessageSend, &service_, _1, _2));
     dispatcher_.registerHander("ChatHistory", std::bind(&Service::GetChatHistory, &service_, _1, _2));
@@ -36,6 +37,7 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, std::string name)
     dispatcher_.registerHander("QuitGroup", std::bind(&Service::QuitGroup, &service_, _1, _2));
     dispatcher_.registerHander("ChangeUserRole", std::bind(&Service::ChangeUserRole, &service_, _1, _2));
     dispatcher_.registerHander("ProceGroupApply", std::bind(&Service::ProceGroupApply, &service_, _1, _2));
+    dispatcher_.registerHander("DeleteGroup", std::bind(&Service::DeleteGroup, &service_, _1, _2));
 }
 
 void Server::start()

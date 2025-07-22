@@ -74,6 +74,8 @@ public:
     void Login(const json& js);
     void RegisterBack(const TcpConnectionPtr& conn, const json& js);
     void LoginBack(const TcpConnectionPtr& conn, const json& js);
+    void DeleteAccount(const json& js);
+    void DeleteAccountBack(const TcpConnectionPtr& conn, const json& js);
 
     // 刷新
     void StartFlushFromServer(int seconds);
@@ -119,6 +121,7 @@ public:
     void ListGroup(const json& js);
     void QuitGroup(const json& js);
     void ChangeUserRole(const json& js);
+    void DeleteGroup(const json& js);
 
     void CreateGroupBack(const TcpConnectionPtr& conn, const json& js);
     void SendGroupApplyBack(const TcpConnectionPtr& conn, const json& js);
@@ -129,6 +132,7 @@ public:
     void ListGroupBack(const TcpConnectionPtr& conn, const json& js);
     void QuitGroupBack(const TcpConnectionPtr& conn, const json& js);
     void ChangeUserRoleBack(const TcpConnectionPtr& conn, const json& js);
+    void DeleteGroupBack(const TcpConnectionPtr& conn, const json& js);
 
     template<typename T>
     std::optional<T> ExtractCommonField(const json& j, const std::string& key);
@@ -137,6 +141,7 @@ public:
     std::string GetCurrentTimestamp();
     bool IsEarlier(const std::string& ts1, const std::string& ts2);
     bool ReadNum(std::string input, int &result);
+    void PrintfRed(char a);
     void ClearScreen();
 
     void start();
