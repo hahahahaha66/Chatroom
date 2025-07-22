@@ -122,6 +122,7 @@ public:
     void QuitGroup(const json& js);
     void ChangeUserRole(const json& js);
     void DeleteGroup(const json& js);
+    void BlockGroupUser(const json& js);
 
     void CreateGroupBack(const TcpConnectionPtr& conn, const json& js);
     void SendGroupApplyBack(const TcpConnectionPtr& conn, const json& js);
@@ -133,6 +134,7 @@ public:
     void QuitGroupBack(const TcpConnectionPtr& conn, const json& js);
     void ChangeUserRoleBack(const TcpConnectionPtr& conn, const json& js);
     void DeleteGroupBack(const TcpConnectionPtr& conn, const json& js);
+    void BlockGroupUserBack(const TcpConnectionPtr& conn, const json& js);
 
     template<typename T>
     std::optional<T> ExtractCommonField(const json& j, const std::string& key);
@@ -171,7 +173,7 @@ private:
     std::string password_;
 
     std::unordered_map<int, Friend> friendlist_;
-    std::unordered_map<int, FriendApply> friendapplylist_;
-    std::unordered_map<int, FriendApply> friendsendapplylist_;
+    std::unordered_multimap<int, FriendApply> friendapplylist_;
+    std::unordered_multimap<int, FriendApply> friendsendapplylist_;
     std::unordered_map<int, Group> grouplist_;
 };

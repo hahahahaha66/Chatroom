@@ -57,6 +57,7 @@ public:
     void QuitGroup(const TcpConnectionPtr& conn, const json& js);
     void ChangeUserRole(const TcpConnectionPtr& conn, const json& js);
     void DeleteGroup(const TcpConnectionPtr& conn, const json& js);
+    void BlockGroupUser(const TcpConnectionPtr& conn, const json& js);
 
     // other
     template<typename T>
