@@ -3,6 +3,7 @@
 #include "../muduo/net/tcp/TcpConnection.h"
 #include "../manager/IdGenerator.h"
 #include "../tool/Codec.h"
+#include "../tool/Json.h"
 #include "../database/DatabaseThreadPool.h"
 #include "../database/MysqlResult.h"
 #include "../model/User.h"
@@ -59,11 +60,10 @@ public:
     void DeleteGroup(const TcpConnectionPtr& conn, const json& js);
     void BlockGroupUser(const TcpConnectionPtr& conn, const json& js);
 
-    // other
-    template<typename T>
-    std::optional<T> ExtractCommonField(const json& j, const std::string& key);
-    template<typename T>
-    bool AssignIfPresent(const json& j, const std::string& key, T& out);
+    // File
+    void UpLoadFileForward(const TcpConnectionPtr& conn, const json& js);
+    void DownLoadFileForward(const TcpConnectionPtr& conn, const json& js);
+
     std::string Escape(const std::string& input);
     std::string GetCurrentTimestamp();
     

@@ -36,7 +36,7 @@ public:
     }
 
     //触发不同命令的回调函数
-    void dispatch(const std::string type, const TcpConnectionPtr conn, const json& js, Timestamp time)
+    void dispatch(const std::string type, const TcpConnectionPtr conn, const json& js)
     {
         MessageHander cb;
 

@@ -5,6 +5,7 @@
 #include "../muduo/net/tcp/InetAddress.h"
 #include "../tool/Codec.h"
 #include "../tool/Dispatcher.h"
+#include "../tool/Json.h"
 #include "../test.cpp"
 
 #include <algorithm>
@@ -136,10 +137,6 @@ public:
     void DeleteGroupBack(const TcpConnectionPtr& conn, const json& js);
     void BlockGroupUserBack(const TcpConnectionPtr& conn, const json& js);
 
-    template<typename T>
-    std::optional<T> ExtractCommonField(const json& j, const std::string& key);
-    template<typename T>
-    bool AssignIfPresent(const json& j, const std::string& key, T& out);
     std::string GetCurrentTimestamp();
     bool IsEarlier(const std::string& ts1, const std::string& ts2);
     bool ReadNum(std::string input, int &result);

@@ -4,51 +4,6 @@
 #include <string>
 #include <unordered_map>
 
-//提取json变量
-template<typename T>
-std::optional<T> Client::ExtractCommonField(const json& j, const std::string& key)
-{
-    try 
-    {
-        if (j.contains(key) && !j.at(key).is_null())
-        {
-            return j.at(key).get<T>();
-        }
-    }
-    catch (const std::exception& e)
-    {
-        LOG_ERROR << "Extract field [" << key << "] error: " << e.what();
-        // 也可以记录当前的json值
-        LOG_ERROR << "Json value for key [" << key << "] is: " << j.at(key).dump();
-    }
-    return std::nullopt;
-}
-
-//更完备的提取json变量
-template<typename T>
-bool Client::AssignIfPresent(const json& j, const std::string& key, T& out)
-{
-    if (j.is_string())
-    {
-        try 
-        {
-            json pared = json::parse(j.get<std::string>());
-            return AssignIfPresent(pared, key, out);
-        }
-        catch(...)
-        {
-            return false;
-        }
-    }
-
-    auto opt = ExtractCommonField<T>(j, key);
-    if (opt.has_value()) {
-        out = std::move(opt.value());
-        return true;
-    }
-    return false;
-}
-
 std::string Client::GetCurrentTimestamp() 
 {
     auto now = std::chrono::system_clock::now();
@@ -173,7 +128,7 @@ void Client::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timestamp t
 
     LOG_INFO << js.dump();
 
-    dispatcher_.dispatch(type, conn, js, time);
+    dispatcher_.dispatch(type, conn, js);
 }
 
 void Client::MessageCompleteCallback(const TcpConnectionPtr& conn)

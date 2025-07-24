@@ -8,6 +8,8 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, std::string name)
 {
     MysqlConnectionPool::Instance().Init("localhost", 3306, "hahaha", "123456", "chatroom", 20);
 
+    server_.setThreadNum(8);
+
     server_.setConnectionCallback(std::bind(&Server::OnConnection, this, _1));
     server_.setMessageCallback(std::bind(&Server::OnMessage, this, _1, _2, _3));
     server_.setWriteCompleteCallback(std::bind(&Server::MessageCompleteCallback, this, _1));
@@ -41,6 +43,8 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, std::string name)
     dispatcher_.registerHander("ProceGroupApply", std::bind(&Service::ProceGroupApply, &service_, _1, _2));
     dispatcher_.registerHander("DeleteGroup", std::bind(&Service::DeleteGroup, &service_, _1, _2));
     dispatcher_.registerHander("BlockGroupUser", std::bind(&Service::BlockGroupUser, &service_, _1, _2));
+
+
 }
 
 void Server::start()
@@ -89,5 +93,5 @@ void Server::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timestamp t
     auto [type, js] = msgopt.value();
 
     LOG_INFO << "Start Processing " << type;
-    dispatcher_.dispatch(type, conn, js, time);
+    dispatcher_.dispatch(type, conn, js);
 }
