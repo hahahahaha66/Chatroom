@@ -76,29 +76,33 @@ void FileServer::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timesta
             return;
         }
     }
-
-    auto task = it->second;
-    const char* data = buffer->peek();
-    size_t len = buffer->readableBytes();
-
-    if (len == 0) return;
-
-    size_t remain = task->filesize_ - task->received_;
-    size_t towrite = std::min(len, remain);
-
-    task->ofs_.write(data, towrite);
-    task->received_ += towrite;
-    buffer->retrieve(towrite);
-
-    if (task->received_ >= task->filesize_)
+    else  
     {
-        LOG_INFO << "Upload complete: " << task->filename_;
-        task->ofs_.close();
-        conn->shutdown();
+        auto task = it->second;
+        const char* data = buffer->peek();
+        size_t len = buffer->readableBytes();
 
-        // 这里通知主服务器加载完成，可以写入消息并转发
+        std::cout << task->received_ << std::endl;
 
-        filetasks_.erase(conn);
+        if (len == 0) return;
+
+        size_t remain = task->filesize_ - task->received_;
+        size_t towrite = std::min(len, remain);
+
+        task->ofs_.write(data, towrite);
+        task->received_ += towrite;
+        buffer->retrieve(towrite);
+
+        if (task->received_ >= task->filesize_)
+        {
+            LOG_INFO << "Upload complete: " << task->filename_;
+            task->ofs_.close();
+            conn->shutdown();
+
+            // 这里通知主服务器加载完成，可以写入消息并转发
+
+            filetasks_.erase(conn);
+        }
     }
 }
 
@@ -109,9 +113,19 @@ void FileServer::UpLoadFile(const TcpConnectionPtr& conn, const json& js)
     int64_t filesize;
     end &= AssignIfPresent(js, "filename", filename);
     end &= AssignIfPresent(js, "filesize", filesize);
+
+    int senderid = -1;
+    int receiverid = -1;
+    std::string type;
+    AssignIfPresent(js, "senderid", senderid);
+    AssignIfPresent(js, "receiverid", receiverid);
+    AssignIfPresent(js, "type", type);
+
     if (!end)
     {
         LOG_ERROR << "Missing filename or filesize in upload request";
+        json j = {{"end", false}};
+        conn->send(codec_.encode(j, "UploadJsonBack"));
         conn->shutdown();
         return;
     }
@@ -138,13 +152,6 @@ void FileServer::UpLoadFile(const TcpConnectionPtr& conn, const json& js)
         return;
     }
 
-    int senderid;
-    int receiverid;
-    std::string type;
-    AssignIfPresent(js, "senderid", senderid);
-    AssignIfPresent(js, "receiverid", receiverid);
-    AssignIfPresent(js, "type", type);
-
     task->filepath_ = filepath;
     task->cmd_ = "Upload";
     task->senderid_ = senderid;
@@ -163,45 +170,75 @@ void FileServer::UpLoadFile(const TcpConnectionPtr& conn, const json& js)
 
 void FileServer::DownLoadFile(const TcpConnectionPtr& conn, const json& js)
 {
+    bool end = true;
     std::string filename;
+    std::streamsize filesize = 0;
     if (!AssignIfPresent(js, "filename", filename))
     {
         LOG_ERROR << "Missing filename in download request";
-        conn->shutdown();
-        return;
+        end = false;
     }
 
     std::string filepath = "/home/hahaha/work/Chatroom/new_project/FTP/files/" + filename;
-    std::ifstream ifs(filepath, std::ios::binary);
-    if (!ifs.is_open())
+    std::ifstream ifs;
+    if (end)
     {
-        LOG_ERROR << "Request file not found: " << filename;
-        conn->shutdown();
-        return;
+        ifs.open(filepath, std::ios::binary);
+        if (!ifs.is_open())
+        {
+            LOG_ERROR << "Request file not found: " << filename;
+            end = false;
+        }
+        else  
+        {
+            ifs.seekg(0, std::ios::end);
+            filesize = ifs.tellg();
+            ifs.seekg(0, std::ios::beg);
+        }
     }
 
-    ifs.seekg(0, std::ios::end);
-    std::streamsize filesize = ifs.tellg();
-    ifs.seekg(0, std::ios::beg);
-
-    json j = {
-        {"filename", filename},
-        {"filesize", filesize}
-    };
+    json j;
+    if (end)
+    {
+        j = {
+            {"end", true},
+            {"filename", filename},
+            {"filesize", filesize}
+        };
+    }
+    else  
+    {
+        j = {
+            {"end", false}
+        };
+    }
 
     conn->send(codec_.encode(j, "DownloadJsonBack"));
 
-    const size_t buffersize = 64 * 1024;
-    char bufferout[buffersize];
-
-    while (ifs.good())
+    if (end && ifs.is_open())
     {
-        ifs.read(bufferout, buffersize);
-        size_t readsize = ifs.gcount();
-        conn->send(bufferout);
-    }
+        const size_t buffersize = 64 * 1024;
+        char bufferout[buffersize];
+        std::streamsize totalsent = 0;
 
-    ifs.close();
+        while (ifs.good() && totalsent < filesize)
+        {
+            ifs.read(bufferout, buffersize);
+            std::streamsize readsize = ifs.gcount();
+
+            if (readsize > 0)
+            {
+                if (totalsent + readsize > filesize)
+                {
+                    readsize = filesize - totalsent;
+                }
+                conn->send(std::string(bufferout, readsize));
+                totalsent += readsize;
+            }
+        }
+        ifs.close();
+        LOG_INFO << "File transfer complete: " << filename << " sent : " << totalsent;
+    }
+    
     conn->shutdown(); // 发送完关闭连接
-    return;
 }

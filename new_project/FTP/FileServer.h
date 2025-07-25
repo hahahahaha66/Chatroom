@@ -4,6 +4,7 @@
 #include "../muduo/net/EventLoop.h"
 #include "../tool/Codec.h"
 #include "../tool/Json.h"
+#include "../muduo/logging/Logging.h"
 
 #include <cstdint>
 #include <memory>
@@ -17,7 +18,6 @@ using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
 using std::placeholders::_4;
-
 
 struct FileTask {
     std::string filename_;

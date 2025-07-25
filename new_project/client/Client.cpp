@@ -64,6 +64,47 @@ void Client::ClearScreen()
     std::cout << "\033[2J\033[H";
 }
 
+void Client::start()
+{
+    client_.connect();
+}
+
+void Client::stop()
+{   
+    running_ = false;
+    StopFlushFromServer();
+    client_.disconnect();
+    client_.getLoop()->quit();
+}
+
+void Client::send(const std::string& msg)
+{
+    client_.getLoop()->runInLoop([this, msg]() {
+        if (client_.connection() && client_.connection()->connected())
+        {
+            client_.connection()->send(msg);
+        }
+    });
+}
+
+inline void Client::waitInPutReady()
+{
+    if (waitingback_)
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        cv_.wait(lock, [this] { return !waitingback_; });
+    }
+}
+
+inline void Client::notifyInputReady() 
+{
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        waitingback_ = false;
+    }
+    cv_.notify_one();
+}
+
 Client::Client(EventLoop& loop, InetAddress addr, std::string name)
     : client_(&loop, addr, name)
 {
@@ -1000,47 +1041,6 @@ void Client::BlockGroupUserBack(const TcpConnectionPtr& conn, const json& js)
     }
 
     notifyInputReady();
-}
-
-void Client::start()
-{
-    client_.connect();
-}
-
-void Client::stop()
-{   
-    running_ = false;
-    StopFlushFromServer();
-    client_.disconnect();
-    client_.getLoop()->quit();
-}
-
-void Client::send(const std::string& msg)
-{
-    client_.getLoop()->runInLoop([this, msg]() {
-        if (client_.connection() && client_.connection()->connected())
-        {
-            client_.connection()->send(msg);
-        }
-    });
-}
-
-inline void Client::waitInPutReady()
-{
-    if (waitingback_)
-    {
-        std::unique_lock<std::mutex> lock(mutex_);
-        cv_.wait(lock, [this] { return !waitingback_; });
-    }
-}
-
-inline void Client::notifyInputReady() 
-{
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        waitingback_ = false;
-    }
-    cv_.notify_one();
 }
 
 void Client::InputLoop()
