@@ -24,11 +24,15 @@ struct FileTask {
     std::string filepath_;
 
     int64_t filesize_ = 0;
-    int64_t received_ = 0;
-    bool headerParsed_ = false;  // 是否完成了文件的解析
+    int64_t received_ = 0;  // upload
+    int64_t sent_ = 0;      // download 
 
     std::ofstream ofs_;  // 写入文件
     std::ifstream ifs_;  // 读取文件
+
+    // download
+    bool headersent_;
+    bool filedatastarted_ = false;
 
     int senderid_;
     int receiverid_;
@@ -51,6 +55,7 @@ private:
     void OnMessage(const TcpConnectionPtr&, Buffer*, Timestamp);
     void ThreadInitCallback(EventLoop* loop);
     void MessageCompleteCallback(const TcpConnectionPtr& conn);
+    void SendFileData(const TcpConnectionPtr& conn);
 
     TcpServer server_;
     Codec codec_;

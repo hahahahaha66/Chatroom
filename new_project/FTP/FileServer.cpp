@@ -1,10 +1,13 @@
 #include "FileServer.h"
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
 #include <ios>
 #include <memory>
 #include <ostream>
+#include <thread>
+#include <unistd.h>
 
 FileServer::FileServer(EventLoop* loop, const InetAddress& fileAddr, std::string name)
     : server_(loop, fileAddr, name)
@@ -29,10 +32,15 @@ void FileServer::ThreadInitCallback(EventLoop* loop)
 
 void FileServer::MessageCompleteCallback(const TcpConnectionPtr& conn)
 {
-    if (conn->connected())
-    {
-        LOG_INFO << conn->getLoop() << " Loop and send messages to " << conn->peerAddress().toIpPort();
-    }
+   auto it = filetasks_.find(conn);
+   if (it != filetasks_.end() && it->second->cmd_ == "Download")
+   {
+        auto task = it->second;
+        if (task->filedatastarted_ && task->sent_ < task->filesize_)
+        {
+            SendFileData(conn);
+        }
+   }
 }
 
 void FileServer::OnConnection(const TcpConnectionPtr& conn) 
@@ -44,6 +52,10 @@ void FileServer::OnConnection(const TcpConnectionPtr& conn)
     else
     {
         LOG_INFO << "Connection disconnected: " << conn->peerAddress().toIpPort();
+        if (filetasks_.find(conn) != filetasks_.end())
+        {
+            filetasks_.erase(conn);
+        }
     }
 }
 
@@ -82,16 +94,24 @@ void FileServer::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timesta
         const char* data = buffer->peek();
         size_t len = buffer->readableBytes();
 
-        std::cout << task->received_ << std::endl;
-
         if (len == 0) return;
 
         size_t remain = task->filesize_ - task->received_;
         size_t towrite = std::min(len, remain);
 
         task->ofs_.write(data, towrite);
+        if (task->ofs_.fail())
+        {
+            LOG_ERROR << "Write failed for file: " << task->filename_;
+            task->ofs_.close();
+            conn->shutdown();
+            filetasks_.erase(conn);
+            return;
+        }
         task->received_ += towrite;
         buffer->retrieve(towrite);
+
+        std::cout << task->filesize_ << " : " << task->received_ << std::endl;
 
         if (task->received_ >= task->filesize_)
         {
@@ -141,7 +161,6 @@ void FileServer::UpLoadFile(const TcpConnectionPtr& conn, const json& js)
     task->filename_ = filename;
     task->filesize_ = filesize;
     task->received_ = 0;
-    task->headerParsed_ = true;
 
     std::string filepath = "/home/hahaha/work/Chatroom/new_project/FTP/files/" + filename;
     task->ofs_.open(filepath, std::ios::binary);
@@ -179,23 +198,29 @@ void FileServer::DownLoadFile(const TcpConnectionPtr& conn, const json& js)
         end = false;
     }
 
+    auto task = std::make_shared<FileTask>();
     std::string filepath = "/home/hahaha/work/Chatroom/new_project/FTP/files/" + filename;
-    std::ifstream ifs;
     if (end)
     {
-        ifs.open(filepath, std::ios::binary);
-        if (!ifs.is_open())
+        task->ifs_.open(filepath, std::ios::binary);
+        if (!task->ifs_.is_open())
         {
             LOG_ERROR << "Request file not found: " << filename;
             end = false;
         }
         else  
         {
-            ifs.seekg(0, std::ios::end);
-            filesize = ifs.tellg();
-            ifs.seekg(0, std::ios::beg);
+            task->ifs_.seekg(0, std::ios::end);
+            filesize = task->ifs_.tellg();
+            task->ifs_.seekg(0);
         }
     }
+
+    task->filename_ = filename;
+    task->filesize_ = filesize;
+    task->filepath_ = filepath;
+    task->cmd_ = "Download";
+    filetasks_[conn] = task;
 
     json j;
     if (end)
@@ -213,32 +238,62 @@ void FileServer::DownLoadFile(const TcpConnectionPtr& conn, const json& js)
         };
     }
 
-    conn->send(codec_.encode(j, "DownloadJsonBack"));
-
-    if (end && ifs.is_open())
+    conn->send(codec_.encode(j, "DownloadBack"));
+    if (end) 
     {
-        const size_t buffersize = 64 * 1024;
-        char bufferout[buffersize];
-        std::streamsize totalsent = 0;
-
-        while (ifs.good() && totalsent < filesize)
-        {
-            ifs.read(bufferout, buffersize);
-            std::streamsize readsize = ifs.gcount();
-
-            if (readsize > 0)
-            {
-                if (totalsent + readsize > filesize)
-                {
-                    readsize = filesize - totalsent;
-                }
-                conn->send(std::string(bufferout, readsize));
-                totalsent += readsize;
-            }
-        }
-        ifs.close();
-        LOG_INFO << "File transfer complete: " << filename << " sent : " << totalsent;
+        sleep(1);
+        task->filedatastarted_ = true;
+        SendFileData(conn);
     }
-    
-    conn->shutdown(); // 发送完关闭连接
+}
+
+void FileServer::SendFileData(const TcpConnectionPtr& conn)
+{
+    auto it = filetasks_.find(conn);
+    if (it == filetasks_.end())
+    {
+        LOG_ERROR << "Failed to find filetask data";
+        conn->shutdown();
+        return;
+    }
+    else  
+    {
+        auto task = it->second;
+        if (task->ifs_.eof() || task->sent_ >= task->filesize_)
+        {
+            if (task->sent_ >= task->filesize_)
+            {
+                LOG_INFO << "Download complete: " << task->filename_ << ", sent: " << task->sent_;
+            }
+            task->ifs_.close();
+            conn->shutdown();
+            filetasks_.erase(conn);
+            return;
+        }
+
+        const size_t bufferSize = 8 * 1024; 
+        char buffer[bufferSize];
+
+        task->ifs_.read(buffer, bufferSize);
+        std::streamsize readbytes = task->ifs_.gcount();
+
+        if (readbytes > 0) 
+        {
+            if (task->sent_ + readbytes > task->filesize_)
+            {
+                readbytes = task->filesize_ - task->sent_;
+            }
+
+            conn->send(std::string(buffer, readbytes));
+            task->sent_ += readbytes;
+            std::cout << task->filesize_  << " : " << task->sent_ << std::endl;
+        }
+        else 
+        {
+            LOG_ERROR << "Failed to read file data";
+            task->ifs_.close();
+            conn->shutdown();
+            filetasks_.erase(conn);
+        }
+    }
 }

@@ -18,36 +18,6 @@ using std::placeholders::_2;
 using std::placeholders::_3;
 using std::placeholders::_4;
 
-class FileDownloader 
-{
-public:
-    FileDownloader(EventLoop* loop,
-                   const std::string& serverip,
-                   uint16_t serverport,
-                   const std::string& filename,
-                   const std::string& savedir);
-
-    void Start(); 
-
-private:
-    void OnConnection(const TcpConnectionPtr& conn);
-    void OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timestamp time);
-    void SendDownloadRequest();
-
-    EventLoop* loop_;
-    TcpClient client_;
-    TcpConnectionPtr conn_;
-    Codec codec_;
-
-    std::string filename_;
-    std::string savepath_;
-    std::ofstream file_;
-
-    int64_t filesize_ = 0;
-    int64_t received_ = 0;
-    bool gotheader_ = false;
-};
-
 class FileUploader
 {
 public:
@@ -76,10 +46,39 @@ private:
     int64_t filesize_ = 0;
     int64_t sent_ = 0;
 
-    bool headersent_ = false;
-    bool filedatastarted_ = false;
+    bool filedatastarted_;
 
     int senderid_;
     int receiverid_;
     std::string type_;
+};
+
+class FileDownloader 
+{
+public:
+    FileDownloader(EventLoop* loop,
+                   const std::string& serverip,
+                   uint16_t serverport,
+                   const std::string& filename,
+                   const std::string& savedir);
+
+    void Start(); 
+
+private:
+    void OnConnection(const TcpConnectionPtr& conn);
+    void OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timestamp time);
+    void SendDownloadRequest();
+
+    EventLoop* loop_;
+    TcpClient client_;
+    TcpConnectionPtr conn_;
+    Codec codec_;
+
+    std::string filename_;
+    std::string savepath_;
+    std::ofstream file_;
+
+    int64_t filesize_;
+    int64_t received_;
+    bool gotheader_;
 };
