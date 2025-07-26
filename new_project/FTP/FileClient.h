@@ -40,7 +40,8 @@ private:
     TcpConnectionPtr conn_;
     Codec codec_;
 
-    std::ifstream file_;
+    int fd_;
+    off_t offset_ = 0;
     std::string filename_;
     std::string filepath_;
     int64_t filesize_ = 0;
@@ -76,7 +77,7 @@ private:
 
     std::string filename_;
     std::string savepath_;
-    std::ofstream file_;
+    int fd_;
 
     int64_t filesize_;
     int64_t received_;

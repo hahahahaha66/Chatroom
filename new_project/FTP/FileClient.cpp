@@ -3,6 +3,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <sys/sendfile.h>
+#include <sys/types.h>
+#include <fcntl.h>
 
 FileUploader::FileUploader(EventLoop* loop, const std::string& serverip,
                  uint16_t serverport, const std::string& filename,
@@ -18,15 +21,16 @@ FileUploader::FileUploader(EventLoop* loop, const std::string& serverip,
       sent_(0),
       filedatastarted_(false)
 {
-    file_.open(filepath_, std::ios::binary | std::ios::in);
-    if (!file_.is_open()) 
+    fd_ = ::open(filepath_.c_str(), O_RDONLY | O_NONBLOCK);
+    if (fd_ < 0) 
     {
         LOG_ERROR << "Failed to open file: " << filepath_;
+        perror("Reason");
         return;
     }
-    file_.seekg(0, std::ios::end);
-    filesize_ = file_.tellg();
-    file_.seekg(0);
+    off_t sz = ::lseek(fd_, 0, SEEK_END);
+    ::lseek(fd_, 0, SEEK_SET);
+    filesize_ = static_cast<int64_t>(sz);
 
     client_.setConnectionCallback(std::bind(&FileUploader::OnConnection, this, _1));
     client_.setMessageCallback(std::bind(&FileUploader::OnMessage, this, _1, _2, _3));
@@ -57,6 +61,7 @@ void FileUploader::SendHeader()
         {"type", type_}
     };
     std::string msg = codec_.encode(js, "Upload");
+    std::cout << js.dump() << std::endl;
 
     if (conn_ && conn_->connected())
     {
@@ -67,7 +72,6 @@ void FileUploader::SendHeader()
 
 void FileUploader::OnWriteComplete(const TcpConnectionPtr& conn) 
 {
-
     if (filedatastarted_ && sent_ < filesize_)
     {
         SendFileData();
@@ -112,49 +116,56 @@ void FileUploader::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Times
 
 void FileUploader::SendFileData() 
 {
-    if (file_.eof() || sent_ >= filesize_)
+    if (fd_ < 0) 
     {
-        if (sent_ >= filesize_)
-        {
-            LOG_INFO << "Upload complete: " << filename_ << ", sent: " << sent_;
-        }
-        file_.close();
+        LOG_ERROR << "Invalid file descriptor";
         conn_->shutdown();
         return;
     }
 
-    while (sent_ < filesize_ && !file_.eof())
+    if (!filedatastarted_)
     {
-        const size_t bufferSize = 8 * 1024;  // 64KB
-        char buffer[bufferSize];
+        conn_->shutdown();
+        ::close(fd_);
+        return;
+    }
 
-        file_.read(buffer, bufferSize);
-        std::streamsize readbytes = file_.gcount();
+    const size_t maxchunk= 128 * 1024;
+    while (sent_ < filesize_)
+    {
+        off_t remaining = filesize_ - offset_;
+        size_t tosend = static_cast<size_t>(std::min<off_t>(maxchunk, remaining));
 
-        if (readbytes > 0) 
+        size_t n = ::sendfile(conn_->fd(), fd_, &offset_, tosend);
+
+        if (n > 0)
         {
-            if (sent_ + readbytes > filesize_)
-            {
-                readbytes = filesize_ - sent_;
+            sent_ = offset_;
+            std::cout << filesize_ << " : " << sent_ << std::endl;
+        }
+        else if (n == 0)
+        {
+            break;
+        }
+        else  
+        {
+             if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // 内核发送缓冲区已满，下次再继续
+                return;
             }
+            // 真正错误
+            LOG_ERROR << "sendfile error: " << strerror(errno);
+            ::close(fd_);
+            conn_->shutdown();
+            return;
+        }
 
-            conn_->send(std::string(buffer, readbytes));
-            sent_ += readbytes;
-            std::cout << filesize_  << " : " << sent_ << std::endl;
-
-            if (sent_ >= filesize_)
+        if (sent_ >= filesize_)
             {
                 LOG_INFO << "Upload complete: " << filename_ << ",sent: " << sent_;
-                file_.close();
+                ::close(fd_);
                 conn_->shutdown();
             }
-        }
-        else 
-        {
-            LOG_ERROR << "Failed to read file data";
-            file_.close();
-            conn_->shutdown();
-        }
     }
 }
 
@@ -226,9 +237,10 @@ void FileDownloader::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Tim
                 AssignIfPresent(js, "filesize", filesize_);
                 gotheader_ = true;
 
-                file_.open(savepath_, std::ios::binary);
-                if (!file_.is_open()) {
-                    LOG_ERROR << "Failed to open file for writing: " << savepath_;
+                fd_ = ::open(savepath_.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_NONBLOCK, 0644);
+                if (fd_ < 0)
+                {
+                    LOG_ERROR << "Failed to open upload file";
                     conn->shutdown();
                     return;
                 }
@@ -261,24 +273,25 @@ void FileDownloader::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Tim
         size_t remaining = filesize_ - received_;
         size_t towrite = std::min(len, remaining);
 
-        file_.write(data, towrite);
-        if (file_.fail())
+        ssize_t n = ::write(fd_, data, towrite);
+        if (n > 0)
+        {
+            received_ += n;
+            buffer->retrieve(n);
+            std::cout << "every write: " << n << std::endl;
+            std::cout << filesize_ << " : " << received_ << std::endl;
+        }
+        else 
         {
             LOG_ERROR << "Write failed for file: " << filename_;
-            file_.close();
+            ::close(fd_);
             conn->shutdown();
             return;
         }
-        std::cout << "every write: " << towrite << std::endl;
-        received_ += towrite;
-        buffer->retrieve(towrite);
-        
-        std::cout << filesize_ << " : " << received_ << std::endl;
 
         if (received_ >= filesize_) {
-            std::cout << "Download complete: " << filename_ << std::endl;
             LOG_INFO << "Download complete: " << filename_ << ", received: " << received_;
-            file_.close();
+            ::close(fd_);
             conn->shutdown();
             return;
         }
