@@ -11,7 +11,7 @@ FileUploader::FileUploader(EventLoop* loop, const std::string& serverip,
     : loop_(loop),
       client_(loop, InetAddress(serverport, serverip), "FileUploader"),
       filename_(filename),
-      filepath_(filepath),
+      filepath_(filepath + '/' + filename),
       senderid_(senderid),
       receiverid_(receiverid),
       type_(type),
@@ -123,35 +123,38 @@ void FileUploader::SendFileData()
         return;
     }
 
-    const size_t bufferSize = 8 * 1024;  // 64KB
-    char buffer[bufferSize];
-
-    file_.read(buffer, bufferSize);
-    std::streamsize readbytes = file_.gcount();
-
-    if (readbytes > 0) 
+    while (sent_ < filesize_ && !file_.eof())
     {
-        if (sent_ + readbytes > filesize_)
+        const size_t bufferSize = 8 * 1024;  // 64KB
+        char buffer[bufferSize];
+
+        file_.read(buffer, bufferSize);
+        std::streamsize readbytes = file_.gcount();
+
+        if (readbytes > 0) 
         {
-            readbytes = filesize_ - sent_;
+            if (sent_ + readbytes > filesize_)
+            {
+                readbytes = filesize_ - sent_;
+            }
+
+            conn_->send(std::string(buffer, readbytes));
+            sent_ += readbytes;
+            std::cout << filesize_  << " : " << sent_ << std::endl;
+
+            if (sent_ >= filesize_)
+            {
+                LOG_INFO << "Upload complete: " << filename_ << ",sent: " << sent_;
+                file_.close();
+                conn_->shutdown();
+            }
         }
-
-        conn_->send(std::string(buffer, readbytes));
-        sent_ += readbytes;
-        std::cout << filesize_  << " : " << sent_ << std::endl;
-
-        if (sent_ >= filesize_)
+        else 
         {
-            LOG_INFO << "Upload complete: " << filename_ << ",sent: " << sent_;
+            LOG_ERROR << "Failed to read file data";
             file_.close();
             conn_->shutdown();
         }
-    }
-    else 
-    {
-        LOG_ERROR << "Failed to read file data";
-        file_.close();
-        conn_->shutdown();
     }
 }
 
@@ -248,7 +251,7 @@ void FileDownloader::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Tim
     }
 
     // 正式读取文件内容
-    if (gotheader_ && buffer->readableBytes() > 0)
+    while (gotheader_ && buffer->readableBytes() > 0 && received_ < filesize_)
     {
         const char* data = buffer->peek();
         size_t len = buffer->readableBytes();

@@ -6,8 +6,11 @@
 #include <ios>
 #include <memory>
 #include <ostream>
+#include <sys/sendfile.h>
 #include <thread>
 #include <unistd.h>
+#include <filesystem>
+#include <fcntl.h>
 
 FileServer::FileServer(EventLoop* loop, const InetAddress& fileAddr, std::string name)
     : server_(loop, fileAddr, name)
@@ -18,6 +21,7 @@ FileServer::FileServer(EventLoop* loop, const InetAddress& fileAddr, std::string
     server_.setMessageCallback(std::bind(&FileServer::OnMessage, this, _1, _2, _3));
     server_.setWriteCompleteCallback(std::bind(&FileServer::MessageCompleteCallback, this, _1));
     server_.setThreadInitCallback(std::bind(&FileServer::ThreadInitCallback, this, _1));
+    server_.setHighWaterMarkCallback(std::bind(&FileServer::OnHighWaterMark, this, _1, _2), 1 * 1024 * 1024);
 }
 
 void FileServer::start()
@@ -36,11 +40,28 @@ void FileServer::MessageCompleteCallback(const TcpConnectionPtr& conn)
    if (it != filetasks_.end() && it->second->cmd_ == "Download")
    {
         auto task = it->second;
-        if (task->filedatastarted_ && task->sent_ < task->filesize_)
-        {
-            SendFileData(conn);
+        task->paused_ = false;
+
+        SendFileData(conn);
+
+        // 如果发送完毕，再关闭
+        if (task->sent_ >= task->filesize_) {
+            LOG_INFO << "[Server] Download complete: " << task->filename_;
+            ::close(task->fd_);
+            conn->shutdown();
+            filetasks_.erase(conn);
         }
    }
+}
+
+void FileServer::OnHighWaterMark(const TcpConnectionPtr& conn, size_t bytespending)
+{
+    LOG_WARN << "[Server] HighWaterMark: pending=" << bytespending;
+    // 在这里可以记录一个标志，告诉 SendFileData 暂停读文件
+    auto it = filetasks_.find(conn);
+    if (it != filetasks_.end()) {
+        it->second->paused_ = true;
+    }
 }
 
 void FileServer::OnConnection(const TcpConnectionPtr& conn) 
@@ -91,38 +112,45 @@ void FileServer::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timesta
     else  
     {
         auto task = it->second;
-        const char* data = buffer->peek();
-        size_t len = buffer->readableBytes();
 
-        if (len == 0) return;
-
-        size_t remain = task->filesize_ - task->received_;
-        size_t towrite = std::min(len, remain);
-
-        task->ofs_.write(data, towrite);
-        if (task->ofs_.fail())
+        if (task->cmd_ == "Upload")
         {
-            LOG_ERROR << "Write failed for file: " << task->filename_;
-            task->ofs_.close();
-            conn->shutdown();
-            filetasks_.erase(conn);
-            return;
+            const char* data = buffer->peek();
+            size_t len = buffer->readableBytes();
+
+            if (len == 0) return;
+
+            size_t remain = task->filesize_ - task->received_;
+            size_t towrite = std::min(len, remain);
+
+            ssize_t n = ::write(task->fd_, data, towrite);
+            if (n > 0)
+            {
+                task->received_ += n;
+                buffer->retrieve(n);
+                std::cout << task->filesize_ << " : " << task->received_ << std::endl;
+            }
+            else  
+            {
+                LOG_ERROR << "Write failed for file: " << task->filename_;
+                ::close(task->fd_);
+                conn->shutdown();
+                filetasks_.erase(conn);
+                return;
+            }            
+
+            if (task->received_ >= task->filesize_)
+            {
+                LOG_INFO << "Upload complete: " << task->filename_;
+                ::close(task->fd_);
+                conn->shutdown();
+
+                // 这里通知主服务器加载完成，可以写入消息并转发
+
+                filetasks_.erase(conn);
+            }
         }
-        task->received_ += towrite;
-        buffer->retrieve(towrite);
-
-        std::cout << task->filesize_ << " : " << task->received_ << std::endl;
-
-        if (task->received_ >= task->filesize_)
-        {
-            LOG_INFO << "Upload complete: " << task->filename_;
-            task->ofs_.close();
-            conn->shutdown();
-
-            // 这里通知主服务器加载完成，可以写入消息并转发
-
-            filetasks_.erase(conn);
-        }
+        
     }
 }
 
@@ -163,8 +191,8 @@ void FileServer::UpLoadFile(const TcpConnectionPtr& conn, const json& js)
     task->received_ = 0;
 
     std::string filepath = "/home/hahaha/work/Chatroom/new_project/FTP/files/" + filename;
-    task->ofs_.open(filepath, std::ios::binary);
-    if (!task->ofs_.is_open())
+    task->fd_ = ::open(filepath.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_NONBLOCK, 0644);
+    if (task->fd_ < 0)
     {
         LOG_ERROR << "Failed to open upload file";
         conn->shutdown();
@@ -202,25 +230,28 @@ void FileServer::DownLoadFile(const TcpConnectionPtr& conn, const json& js)
     std::string filepath = "/home/hahaha/work/Chatroom/new_project/FTP/files/" + filename;
     if (end)
     {
-        task->ifs_.open(filepath, std::ios::binary);
-        if (!task->ifs_.is_open())
+        task->fd_ = ::open(filepath.c_str(), O_RDONLY | O_NONBLOCK);
+        if (task->fd_ < 0)
         {
             LOG_ERROR << "Request file not found: " << filename;
             end = false;
         }
         else  
         {
-            task->ifs_.seekg(0, std::ios::end);
-            filesize = task->ifs_.tellg();
-            task->ifs_.seekg(0);
+            off_t sz = ::lseek(task->fd_, 0, SEEK_END);
+            ::lseek(task->fd_, 0, SEEK_SET);
+            filesize = static_cast<int64_t>(sz);
         }
     }
 
     task->filename_ = filename;
     task->filesize_ = filesize;
     task->filepath_ = filepath;
+    task->offset_ = 0;
     task->cmd_ = "Download";
     filetasks_[conn] = task;
+    task->sent_ = 0;
+    task->filedatastarted_ = end;
 
     json j;
     if (end)
@@ -241,7 +272,6 @@ void FileServer::DownLoadFile(const TcpConnectionPtr& conn, const json& js)
     conn->send(codec_.encode(j, "DownloadBack"));
     if (end) 
     {
-        sleep(1);
         task->filedatastarted_ = true;
         SendFileData(conn);
     }
@@ -256,44 +286,60 @@ void FileServer::SendFileData(const TcpConnectionPtr& conn)
         conn->shutdown();
         return;
     }
-    else  
+
+    auto task = it->second;
+
+    if (!task->filedatastarted_)
     {
-        auto task = it->second;
-        if (task->ifs_.eof() || task->sent_ >= task->filesize_)
+        conn->shutdown();
+        filetasks_.erase(conn);
+        ::close(task->fd_);
+        return;
+    }
+
+    if (task->paused_) return;
+
+    const size_t maxchunk= 128 * 1024; 
+    while (task->sent_ < task->filesize_)
+    {
+        off_t remaining = task->filesize_ - task->offset_;
+        size_t tosend = static_cast<size_t>(std::min<off_t>(maxchunk, remaining));
+
+        ssize_t n = ::sendfile(conn->fd(), task->fd_, &task->offset_, tosend);
+
+        if (n > 0)
         {
-            if (task->sent_ >= task->filesize_)
-            {
-                LOG_INFO << "Download complete: " << task->filename_ << ", sent: " << task->sent_;
+            task->sent_ = task->offset_;
+            std::cout << task->filesize_  << " : " << task->sent_ << std::endl;
+        }
+        else if (n == 0)
+        {
+            break;
+        }
+        else  
+        {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // 内核发送缓冲区已满，下次再继续
+                return;
             }
-            task->ifs_.close();
+            // 真正错误
+            LOG_ERROR << "sendfile error: " << strerror(errno);
+            ::close(task->fd_);
             conn->shutdown();
             filetasks_.erase(conn);
             return;
         }
 
-        const size_t bufferSize = 8 * 1024; 
-        char buffer[bufferSize];
-
-        task->ifs_.read(buffer, bufferSize);
-        std::streamsize readbytes = task->ifs_.gcount();
-
-        if (readbytes > 0) 
-        {
-            if (task->sent_ + readbytes > task->filesize_)
-            {
-                readbytes = task->filesize_ - task->sent_;
-            }
-
-            conn->send(std::string(buffer, readbytes));
-            task->sent_ += readbytes;
-            std::cout << task->filesize_  << " : " << task->sent_ << std::endl;
+        if (conn->getOutputBuffer().readableBytes() >= conn->getHighWaterMark()) {
+            LOG_INFO << "[Server] Pausing send: bufferSize=" 
+                     << conn->getOutputBuffer().readableBytes();
+            task->paused_ = true;
+            break;
         }
-        else 
-        {
-            LOG_ERROR << "Failed to read file data";
-            task->ifs_.close();
-            conn->shutdown();
-            filetasks_.erase(conn);
-        }
+    }
+
+    if (task->sent_ >= task->filesize_)
+    {
+        LOG_INFO << "Download complete: " << task->filename_ << ", sent: " << task->sent_;
     }
 }

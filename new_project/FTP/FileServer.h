@@ -6,11 +6,14 @@
 #include "../tool/Json.h"
 #include "../muduo/logging/Logging.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <unistd.h>
 #include <unordered_map>
 #include <fstream>
+#include <sys/sendfile.h>
 
 using json = nlohmann::json;
 
@@ -22,17 +25,19 @@ using std::placeholders::_4;
 struct FileTask {
     std::string filename_;
     std::string filepath_;
-
     int64_t filesize_ = 0;
-    int64_t received_ = 0;  // upload
-    int64_t sent_ = 0;      // download 
 
-    std::ofstream ofs_;  // 写入文件
-    std::ifstream ifs_;  // 读取文件
+    int fd_;  // 读取文件
+    off_t offset_ = 0;  // 偏移指针
+
+    // upload
+    int64_t received_ = 0; 
 
     // download
+    int64_t sent_ = 0;
     bool headersent_;
     bool filedatastarted_ = false;
+    bool paused_ = false;  // 水位暂停
 
     int senderid_;
     int receiverid_;
@@ -55,6 +60,7 @@ private:
     void OnMessage(const TcpConnectionPtr&, Buffer*, Timestamp);
     void ThreadInitCallback(EventLoop* loop);
     void MessageCompleteCallback(const TcpConnectionPtr& conn);
+    void OnHighWaterMark(const TcpConnectionPtr& conn, size_t bytespending);
     void SendFileData(const TcpConnectionPtr& conn);
 
     TcpServer server_;
