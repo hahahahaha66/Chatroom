@@ -11,6 +11,8 @@
 #include <string>
 #include <thread>
 
+using MysqlConnPtr = std::shared_ptr<MysqlConnection>;
+
 class MysqlConnectionPool
 {
 public:

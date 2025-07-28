@@ -3,9 +3,8 @@
 int main ()
 {
     EventLoop loop;
-    InetAddress addr(10101, "10.30.0.120");
 
-    Client client(loop, addr, "ChatClient");
+    Client client(loop, 10101, "10.30.0.120", "ChatClient");
 
     client.start();
 

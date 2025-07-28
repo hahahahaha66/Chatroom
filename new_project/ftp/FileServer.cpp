@@ -1,4 +1,8 @@
 #include "FileServer.h"
+#include <fstream>
+#include <openssl/evp.h>
+#include <openssl/sha.h>
+#include <string>
 
 FileServer::FileServer(EventLoop* loop, const InetAddress& fileAddr, std::string name)
     : server_(loop, fileAddr, name)
@@ -131,15 +135,93 @@ void FileServer::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timesta
             {
                 LOG_INFO << "Upload complete: " << task->filename_;
                 ::close(task->fd_);
-                conn->shutdown();
+                std::string filehash = ComputeSHA256(task->filepath_);
+                RenameFileToHash(task->filepath_, filehash, "/home/hahaha/work/Chatroom/new_project/FTP/files/");
 
-                // 这里通知主服务器加载完成，可以写入消息并转发
-
+                json js = {
+                    {"senderid", task->senderid_},
+                    {"receiverid", task->receiverid_},
+                    {"type", task->type_},
+                    {"filename", task->filename_},
+                    {"filesize", task->filesize_}
+                };
+                
+                bool end = NotifyMainServer(codec_.encode(js, "AddFileToMessage"));
                 filetasks_.erase(conn);
+
+                js = {
+                    {"end", end}
+                };
+                conn->send(codec_.encode(js, "AddFileToMessage"));
+
+                conn->shutdown();
             }
         }
         
     }
+}
+
+inline void FileServer::waitInPutReady()
+{
+    if (waitingback_)
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        cv_.wait(lock, [this] { return !waitingback_; });
+    }
+}
+
+inline void FileServer::notifyInputReady() 
+{
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        waitingback_ = false;
+    }
+    cv_.notify_one();
+}
+
+std::string FileServer::ComputeSHA256(const std::string& filepath)
+{
+    std::ifstream file(filepath, std::ios::binary);
+    if (!file) { return ""; }
+
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    if (!ctx) return "";
+
+    if (EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr) != 1) {
+        EVP_MD_CTX_free(ctx);
+        return "";
+    }
+
+    char buffer[8192];
+    while (file.good()) {
+        file.read(buffer, sizeof(buffer));
+        if (EVP_DigestUpdate(ctx, buffer, file.gcount()) != 1) {
+            EVP_MD_CTX_free(ctx);
+            return "";
+        }
+    }
+
+    unsigned char hash[EVP_MAX_MD_SIZE];
+    unsigned int len = 0;
+    if (EVP_DigestFinal_ex(ctx, hash, &len) != 1) {
+        EVP_MD_CTX_free(ctx);
+        return "";
+    }
+
+    EVP_MD_CTX_free(ctx);
+
+    std::ostringstream oss;
+    for (unsigned int i = 0; i < len; ++i) {
+        oss << std::hex << std::setw(2) << std::setfill('0') << (int)hash[i];
+    }
+
+    return oss.str();
+}
+
+bool FileServer::RenameFileToHash(const std::string& oldpath, const std::string& hash, const std::string& dir)
+{
+    std::string newpath = dir + "/" + hash;
+    return std::rename(oldpath.c_str(), newpath.c_str()) == 0;
 }
 
 void FileServer::UpLoadFile(const TcpConnectionPtr& conn, const json& js)
@@ -207,15 +289,35 @@ void FileServer::DownLoadFile(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
     std::string filename;
+    std::string filehash;
     std::streamsize filesize = 0;
-    if (!AssignIfPresent(js, "filename", filename))
+    std::string timestamp;
+    end &= AssignIfPresent(js, "filename", filename);
+    end &= AssignIfPresent(js, "timestamp", timestamp);
+
+    if (end)
     {
-        LOG_ERROR << "Missing filename in download request";
-        end = false;
+        MysqlConnPtr conn = MysqlConnectionPool::Instance().GetConnection();
+        if (conn->IsConnected())
+        {
+            std::string query = "select filehash from files where filename = '" + filename + "' and timestamp = '"
+                                + timestamp + "' limit 1 ; ";
+            MYSQL_RES* res = conn->ExcuteQuery(query);
+            if (!res) {
+                LOG_ERROR << "No files found with name: " << filename << " query failed ";
+                return;
+            }
+            MysqlResult result(res);
+            if (!result.Next()) {
+                LOG_ERROR << "No files found with name: " << filename;
+                return;
+            }
+            filehash = result.GetRow().GetString("filehash");
+        }
     }
 
     auto task = std::make_shared<FileTask>();
-    std::string filepath = "/home/hahaha/work/Chatroom/new_project/FTP/files/" + filename;
+    std::string filepath = "/home/hahaha/work/Chatroom/new_project/FTP/files/" + filehash;
     if (end)
     {
         task->fd_ = ::open(filepath.c_str(), O_RDONLY | O_NONBLOCK);
@@ -330,4 +432,37 @@ void FileServer::SendFileData(const TcpConnectionPtr& conn)
     {
         LOG_INFO << "Download complete: " << task->filename_ << ", sent: " << task->sent_;
     }
+}
+
+bool FileServer::NotifyMainServer(const std::string messages)
+{
+    EventLoop loop;
+    InetAddress inet(10101, "10.30.0.120");
+    TcpClient tempclient(&loop, inet, "tempclient");
+    tempclient.connect();
+    bool end = false;
+    tempclient.setMessageCallback([&end, this](const TcpConnectionPtr& conn, Buffer* buffer, Timestamp time) {
+        auto msgopt = codec_.tryDecode(buffer);
+        if (!msgopt.has_value())
+        {
+            LOG_INFO << "Recv from " << conn->peerAddress().toIpPort() << " failed";
+            return ;
+        }
+        auto [type, js] = msgopt.value();
+        if (type == "AddFileToMessageBack") 
+        {
+            AssignIfPresent(js, "end", end);
+
+        }
+        notifyInputReady();
+    });
+
+    waitingback_ = true;
+    if (tempclient.connection() && tempclient.connection()->connected())
+    {
+        tempclient.connection()->send(messages);
+    }
+    waitInPutReady();
+
+    return end;
 }

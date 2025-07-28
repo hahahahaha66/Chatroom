@@ -1,14 +1,19 @@
 #pragma once
 
 #include "../muduo/net/tcp/TcpServer.h"
+#include "../muduo/net/tcp/TcpClient.h"
 #include "../muduo/net/EventLoop.h"
 #include "../tool/Codec.h"
 #include "../tool/Json.h"
 #include "../muduo/logging/Logging.h"
+#include "../database/MysqlConnectionpool.h"
+#include "../database/MysqlResult.h"
 
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <nlohmann/json.hpp>
 #include <unistd.h>
 #include <unordered_map>
@@ -18,6 +23,7 @@
 #include <ios>
 #include <ostream>
 #include <fcntl.h>
+#include <openssl/evp.h>
 
 using json = nlohmann::json;
 
@@ -58,8 +64,14 @@ public:
 
     void UpLoadFile(const TcpConnectionPtr& conn, const json& js);
     void DownLoadFile(const TcpConnectionPtr& conn, const json& js);
+    bool NotifyMainServer(const std::string messages);
 
     const std::string GetServerPort() { return server_.inPort(); }
+    void waitInPutReady();
+    void notifyInputReady();
+
+    std::string ComputeSHA256(const std::string& filepath);
+    bool RenameFileToHash(const std::string& oldpath, const std::string& hash, const std::string& dir);
 
 private:
     void OnConnection(const TcpConnectionPtr&);
@@ -71,6 +83,10 @@ private:
 
     TcpServer server_;
     Codec codec_;
+
+    bool waitingback_;
+    std::mutex mutex_;
+    std::condition_variable cv_;
 
     std::unordered_map<TcpConnectionPtr, std::shared_ptr<FileTask>> filetasks_;
 };

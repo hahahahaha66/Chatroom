@@ -66,7 +66,8 @@ public:
                    const std::string& serverip,
                    uint16_t serverport,
                    const std::string& filename,
-                   const std::string& savedir);
+                   const std::string& savedir,
+                   const std::string& timestamp);
 
     void Start(); 
 
@@ -81,6 +82,7 @@ private:
     Codec codec_;
 
     std::string filename_;
+    std::string timestamp_;
     std::string savepath_;
     int fd_;
 

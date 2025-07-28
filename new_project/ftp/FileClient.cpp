@@ -81,9 +81,9 @@ void FileUploader::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Times
     }
     auto [type, js] = msgopt.value();
 
+    bool end = true;
     if (type == "UploadJsonBack")
     {
-        bool end = true;
         AssignIfPresent(js, "end", end);
         if (end)
         {
@@ -97,6 +97,19 @@ void FileUploader::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Times
         else  
         {
             LOG_ERROR << "UploadJsonBack failed";
+            conn->shutdown();
+        }
+    }
+    else if (type == "AddFileToMessage")
+    {
+        AssignIfPresent(js, "end", end);
+        if (end)
+        {
+            LOG_INFO << "AddFileToMessage success";
+        }
+        else  
+        {
+            LOG_ERROR << "AddFileToMessage failed";
             conn->shutdown();
         }
     }
@@ -129,7 +142,7 @@ void FileUploader::SendFileData()
         off_t remaining = filesize_ - offset_;
         size_t tosend = static_cast<size_t>(std::min<off_t>(maxchunk, remaining));
 
-        size_t n = ::sendfile(conn_->fd(), fd_, &offset_, tosend);
+        ssize_t n = ::sendfile(conn_->fd(), fd_, &offset_, tosend);
 
         if (n > 0)
         {
@@ -166,10 +179,12 @@ FileDownloader::FileDownloader(EventLoop* loop,
                                const std::string& serverip,
                                uint16_t serverport,
                                const std::string& filename,
-                               const std::string& savedir)
+                               const std::string& savedir,
+                               const std::string& timestamp)
     : loop_(loop),
       client_(loop, InetAddress(serverport, serverip), "FileDownloader"),
       filename_(filename),
+      timestamp_(timestamp),
       savepath_(savedir + "/" + filename),
       filesize_(0),
       received_(0),
@@ -198,7 +213,8 @@ void FileDownloader::OnConnection(const TcpConnectionPtr& conn)
 void FileDownloader::SendDownloadRequest() 
 {
     json js = {
-        {"filename", filename_}
+        {"filename", filename_},
+        {"timestamp", timestamp_}
     };
     std::string msg = codec_.encode(js, "Download");
 

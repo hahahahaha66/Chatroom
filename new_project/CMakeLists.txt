@@ -11,6 +11,7 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/model
     ${PROJECT_SOURCE_DIR}/server
     ${PROJECT_SOURCE_DIR}/tool
+    ${PROJECT_SOURCE_DIR}/ftp
     ${PROJECT_SOURCE_DIR}/muduo/base
     ${PROJECT_SOURCE_DIR}/muduo/net
     /usr/include/mysql               # MySQL 头文件路径
@@ -32,10 +33,13 @@ file(GLOB_RECURSE CLIENT_COMMON_SOURCES
 )
 
 # ========= 服务端 =========
+find_package(OpenSSL REQUIRED)
+
 add_executable(server
     ${PROJECT_SOURCE_DIR}/main/main_server.cpp
     ${PROJECT_SOURCE_DIR}/server/Server.cpp
     ${PROJECT_SOURCE_DIR}/server/Service.cpp
+    ${PROJECT_SOURCE_DIR}/ftp/FileServer.cpp
     ${SERVER_COMMON_SOURCES}
 )
 
@@ -45,12 +49,14 @@ target_link_libraries(server
     mysqlclient
     hiredis
     redis++                         # sw::redis++
+    OpenSSL::Crypto 
 )
 
 # ========= 客户端 =========
 add_executable(client
     ${PROJECT_SOURCE_DIR}/main/main_client.cpp
     ${PROJECT_SOURCE_DIR}/client/Client.cpp
+    ${PROJECT_SOURCE_DIR}/ftp/FileClient.cpp
     ${CLIENT_COMMON_SOURCES}
 )
 

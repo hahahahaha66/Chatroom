@@ -2163,3 +2163,35 @@ void Service::BlockGroupUser(const TcpConnectionPtr& conn, const json& js)
         }
     );
 }
+
+void Service::AddFileToMessage(const TcpConnectionPtr& conn, const json& js)
+{
+    bool end = true;
+
+    int senderid;
+    int receiverid;
+    std::string type;
+    std::string filename;
+    int64_t filesize;
+
+    end &= AssignIfPresent(js, "senderid", senderid);
+    end &= AssignIfPresent(js, "receiverid", receiverid);
+    end &= AssignIfPresent(js, "type", type);
+    end &= AssignIfPresent(js, "filename", filename);
+    end &= AssignIfPresent(js, "filesize", filesize);
+
+    databasethreadpool_.EnqueueTask([this, senderid, receiverid, type, filename, filesize](MysqlConnection& conn, DBCallback done) {
+        
+    }, [this, conn](bool success) {
+            if (success) {
+                LOG_DEBUG << "BlockGroupUser success";
+            } else {
+                LOG_ERROR << "BlockGroupUser failed";
+            }
+            json j = {
+                {"end", success}
+            };
+            conn->send(code_.encode(j, "BlockGroupUserBack"));
+        }
+    );
+}

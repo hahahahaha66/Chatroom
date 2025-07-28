@@ -88,7 +88,7 @@ void DatabaseThreadPool::Worker()
         for (int attempt = 0; attempt < 3; ++attempt) 
         {
             conn = MysqlConnectionPool::Instance().GetConnection();
-           if (conn) 
+            if (conn) 
             {
                 connection_success = true;
                 break;

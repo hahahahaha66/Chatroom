@@ -67,7 +67,7 @@ struct Group {
 class Client 
 {
 public:
-    Client(EventLoop& loop, InetAddress addr, std::string name);
+    Client(EventLoop& loop, uint16_t port, std::string ip, std::string name);
     
     void ConnectionCallBack(const TcpConnectionPtr& conn);
     void OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timestamp time);
@@ -140,8 +140,11 @@ public:
     void BlockGroupUserBack(const TcpConnectionPtr& conn, const json& js);
 
     // 文件
-    void ConnectFileServer(const json& js);
-    void ConnectFileServerBack(const TcpConnectionPtr& conn, const json& js);
+    void GetFileServerPort(const json& js);
+    void GetFileServerPortBack(const TcpConnectionPtr& conn, const json& js);
+
+    void UploadFile(std::string filename, std::string filepath, int receiverid, std::string type);
+    void DownloadFile(std::string filename, std::string savepath, std::string timestamp);
 
     std::string GetCurrentTimestamp();
     bool IsEarlier(const std::string& ts1, const std::string& ts2);
@@ -169,7 +172,10 @@ private:
     Codec codec_;
     Dispatcher dispatcher_;
     Warning warning_;
+    std::string ip_;
+    uint16_t mainserverport_ = -1;
     uint16_t fileserverport_ = -1;
+    EventLoop* loop_;
 
     int userid_ = 0;
     std::string email_;

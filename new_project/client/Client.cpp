@@ -1,4 +1,5 @@
 #include "Client.h"
+#include <cstdint>
 #include <string>
 #include <unordered_map>
 
@@ -103,8 +104,9 @@ inline void Client::notifyInputReady()
     cv_.notify_one();
 }
 
-Client::Client(EventLoop& loop, InetAddress addr, std::string name)
-    : client_(&loop, addr, name)
+Client::Client(EventLoop& loop, uint16_t port, std::string ip, std::string name)
+    : client_(&loop, InetAddress(port, ip), name), 
+      ip_(ip), mainserverport_(port), loop_(&loop)
 {
     client_.setConnectionCallback(std::bind(&Client::ConnectionCallBack, this, _1));
     client_.setMessageCallback(std::bind(&Client::OnMessage, this, _1, _2, _3));
@@ -140,7 +142,7 @@ Client::Client(EventLoop& loop, InetAddress addr, std::string name)
     dispatcher_.registerHander("DeleteGroupBack", std::bind(&Client::DeleteGroupBack, this, _1, _2));
     dispatcher_.registerHander("BlockGroupUserBack", std::bind(&Client::BlockGroupUserBack, this, _1, _2));
 
-    dispatcher_.registerHander("ConnectFileServerBack", std::bind(&Client::ConnectFileServerBack, this, _1, _2));
+    dispatcher_.registerHander("ConnectFileServerBack", std::bind(&Client::GetFileServerPortBack, this, _1, _2));
 }
 
 void Client::ConnectionCallBack(const TcpConnectionPtr& conn)
@@ -1043,12 +1045,12 @@ void Client::BlockGroupUserBack(const TcpConnectionPtr& conn, const json& js)
     notifyInputReady();
 }
 
-void Client::ConnectFileServer(const json& js)
+void Client::GetFileServerPort(const json& js)
 {
     this->send(codec_.encode(js, "ConnectFileServer"));
 }
 
-void Client::ConnectFileServerBack(const TcpConnectionPtr& conn, const json& js)
+void Client::GetFileServerPortBack(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
     end &= AssignIfPresent(js, "port", fileserverport_);
@@ -1063,6 +1065,27 @@ void Client::ConnectFileServerBack(const TcpConnectionPtr& conn, const json& js)
     notifyInputReady();
 }
 
+void Client::UploadFile(std::string filename, std::string filepath, int receiverid, std::string type)
+{
+    waitingback_ = true;
+    json js = {};
+    GetFileServerPort(js);
+    waitInPutReady();
+
+    FileUploader uploader(loop_, ip_, fileserverport_, filename, filepath, userid_, receiverid, type);
+    uploader.Start();
+}
+
+void Client::DownloadFile(std::string filename, std::string savepath, std::string timestamp)
+{
+    waitingback_ = true;
+    json js = {};
+    GetFileServerPort(js);
+    waitInPutReady();
+
+    FileDownloader uploader(loop_, ip_, fileserverport_, filename, savepath, timestamp);
+    uploader.Start();
+}
 
 void Client::InputLoop()
 {
