@@ -14,6 +14,10 @@
 #include <unordered_map>
 #include <fstream>
 #include <sys/sendfile.h>
+#include <cassert>
+#include <ios>
+#include <ostream>
+#include <fcntl.h>
 
 using json = nlohmann::json;
 
@@ -54,6 +58,8 @@ public:
 
     void UpLoadFile(const TcpConnectionPtr& conn, const json& js);
     void DownLoadFile(const TcpConnectionPtr& conn, const json& js);
+
+    const std::string GetServerPort() { return server_.inPort(); }
 
 private:
     void OnConnection(const TcpConnectionPtr&);

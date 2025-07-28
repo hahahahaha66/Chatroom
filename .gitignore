@@ -1,6 +1,6 @@
 .vscode/
 muduo/
 build/
-new_project/FTP/files/
-new_project/FTP/download/
-new_project/FTP/upload/
+new_project/ftp/files/
+new_project/ftp/download/
+new_project/ftp/upload/

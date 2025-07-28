@@ -7,10 +7,12 @@
 #include "../tool/Dispatcher.h"
 #include "../tool/Json.h"
 #include "../test.cpp"
+#include "../ftp/FileClient.h"
 
 #include <algorithm>
 #include <atomic>
 #include <condition_variable>
+#include <cstdint>
 #include <cstdio>
 #include <iostream>
 #include <ostream>
@@ -137,6 +139,10 @@ public:
     void DeleteGroupBack(const TcpConnectionPtr& conn, const json& js);
     void BlockGroupUserBack(const TcpConnectionPtr& conn, const json& js);
 
+    // 文件
+    void ConnectFileServer(const json& js);
+    void ConnectFileServerBack(const TcpConnectionPtr& conn, const json& js);
+
     std::string GetCurrentTimestamp();
     bool IsEarlier(const std::string& ts1, const std::string& ts2);
     bool ReadNum(std::string input, int &result);
@@ -163,6 +169,7 @@ private:
     Codec codec_;
     Dispatcher dispatcher_;
     Warning warning_;
+    uint16_t fileserverport_ = -1;
 
     int userid_ = 0;
     std::string email_;

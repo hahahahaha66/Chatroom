@@ -1,139 +1,142 @@
-#include <iostream>
-#include <thread>
 #include <chrono>
-#include <cstdlib>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <iostream>
+#include <random>
 #include <string>
+#include <thread>
 #include <vector>
-
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 using namespace std;
 using namespace std::chrono_literals;
 
-const std::string RED     = "\033[31m";
-const std::string BOLD    = "\033[1m";
-const std::string BLINK   = "\033[5m";
-const std::string RESET   = "\033[0m";
-
-void Beep() {
-    cout << '\a' << flush;
-}
-
-void SlowPrint(const string& msg, int delay_ms = 40) {
-    for (char c : msg) {
-        cout << c << flush;
-        this_thread::sleep_for(chrono::milliseconds(delay_ms));
-    }
-    cout << endl;
-}
-
-string GetCommandOutput(const string& cmd) {
-    string data;
-    FILE* stream = popen(cmd.c_str(), "r");
-    if (!stream) return "N/A";
-    char buffer[256];
-    while (fgets(buffer, sizeof(buffer), stream)) {
-        data += buffer;
-    }
-    pclose(stream);
-    return data;
-}
-
-// 逐字符输出
-void slow_print(const std::string& line, int delay_ms = 10, bool red = false, bool blink = false) {
-    std::string prefix;
-    if (red) prefix += RED;
-    if (blink) prefix += BLINK;
-    prefix += BOLD;
-
-    std::cout << prefix;
-
-    for (char c : line) {
-        std::cout << c << std::flush;
-        std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+class Warning {
+public:
+    void clearScreenBlackBg() {
+        cout << "\033[2J\033[1;1H";      // 清屏并移动
+        cout << "\033[40m\033[97m";       // 黑底白字
     }
 
-    std::cout << RESET << std::endl;
-}
+    string execCmd(const string& cmd) {
+        string data;
+        FILE* stream = popen(cmd.c_str(), "r");
+        if (!stream) return "";
+        char buf[256];
+        while (fgets(buf, sizeof buf, stream))
+            data += buf;
+        pclose(stream);
+        return data;
+    }
+
+    void beep() {
+        cout << "\a" << flush;           // 蜂鸣
+    }
+
+    void printStackTrace() {
+        vector<string> syms = {
+            "panic+0x123/0x456",
+            "do_page_fault+0x29f/0x4b0",
+            "__do_kernel_fault+0x134/0x1f0",
+            "exc_page_fault+0x87/0x180",
+            "asm_exc_page_fault+0x22/0x30",
+            "schedule+0x45/0xe0",
+            "worker_thread+0x15a/0x3b0",
+            "kthread+0x133/0x170",
+            "ret_from_fork+0x1f/0x30"
+        };
+        uint64_t rsp = 0xffffb0b00080f8f0;
+        mt19937_64 rnd(time(nullptr));
+        for (auto& s : syms) {
+            printf(" [<%016lx>] %s\n", rsp, s.c_str());
+            rsp += 0x10 + (rnd() % 0x20);
+            this_thread::sleep_for(60ms);
+        }
+    }
+
+    void countdownReboot(int seconds = 10) {
+        for (int i = seconds; i > 0; --i) {
+            printf("!!! REBOOT IN %2d SECONDS !!!\n", i);
+            beep();
+            this_thread::sleep_for(700ms);
+        }
+        printf(">>> System restarting now... <<<\n");
+    }
+
+    void simulatePanic() {
+        clearScreenBlackBg();
+        srand(time(nullptr));
+        cout << "\033[1;31m";  // 红色加粗
+
+        // 初始 Panic 框
+        printf("╔══════════════════════════════════════════════════════════════════════════════════════╗\n");
+        printf("║                         KERNEL PANIC - CRITICAL SYSTEM ERROR                        ║\n");
+        printf("╚══════════════════════════════════════════════════════════════════════════════════════╝\n");
+        this_thread::sleep_for(1s);
+
+        // 关键 Panic 信息
+        printf("\n[    0.000000] Kernel panic - not syncing: Fatal exception in interrupt\n");
+        printf("[    0.000001] CPU: %d PID: %d Comm: %s Tainted: %s\n",
+               rand()%8, 2 + rand()%5000, "kworker/0:1", "G    6.1.33-arch1-1 #1");
+        printf("[    0.000002] Hardware name: QEMU Standard PC (Q35 + ICH9, 2009)\n");
+        printf("[    0.000003] Call Trace:\n");
+        printStackTrace();
+        this_thread::sleep_for(500ms);
+
+        // 加载更多日志条目，刷屏效果
+        vector<string> extraLogs = {
+            "EXT4-fs warning: mounting fs with errors, running journal recovery",
+            "sd 0:0:0:0: [sda] tag#0 FAILED Result: hostbyte=DID_OK driverbyte=DRIVER_SENSE",
+            "Buffer I/O error on dev sda1, logical block 0",
+            "end_request: I/O error, dev sda, sector 8",
+            "eth0: link down",
+            "eth0: link up, 100Mbps, full-duplex, lpa 0x45E1",
+            "tcp: too many orphaned sockets",
+            "oom-killer: killing process 3456 (chrome) score 987 or sacrifice child",
+            "PCIe Bus Error: severity=Corrected, type=Data Link Layer, (Transmitter ID)",
+            "audit: type=1400 audit(0.123:45): apparmor=\"DENIED\" operation=\"open\" profile=\"snapd\" name=\"/etc/shadow\"",
+            "NETDEV WATCHDOG: eth0: transmit queue 0 timed out",
+            "systemd-journald[1]: Failed to rotate journal: Input/output error"
+        };
+        // 随机刷屏 80 行
+        for (int i = 0; i < 80; ++i) {
+            int idx = rand() % extraLogs.size();
+            double t = (rand() % 1000) / 1000.0 + 0.010 * i;
+            printf("[ %8.6f] %s\n", t, extraLogs[idx].c_str());
+            auto delay = (i % 2 == 0 ? 30ms : 50ms);
+            this_thread::sleep_for(delay);
+        }
+
+        // 系统信息
+        auto host = execCmd("hostname");
+        auto uni  = execCmd("uname -a");
+        auto mem  = execCmd("free -m");
+        printf("\n--- SYSTEM INFO ---\nHostname: %s", host.c_str());
+        printf("Kernel:   %s", uni.c_str());
+        printf("Memory:\n%s", mem.c_str());
+        this_thread::sleep_for(1s);
+
+        // 再一轮刷屏，模拟更多 I/O、网络、文件系统日志
+        for (int i = 0; i < 60; ++i) {
+            int idx = rand() % extraLogs.size();
+            double t = (rand() % 1000) / 1000.0 + 1.500 + 0.005 * i;
+            printf("[ %8.6f] %s\n", t, extraLogs[idx].c_str());
+            auto delay = (i % 3 == 0 ? 40ms : 60ms);
+            this_thread::sleep_for(delay);
+        }
+
+        // 最终倒计时（保留原来15秒）
+        countdownReboot(5);
+        cout << "\033[0m";  // 恢复颜色
+    }
+};
 
 int main() {
-    system("clear");
-
-    std::vector<std::string> lines = {
-        "[  104.932001] BUG: kernel NULL pointer dereference, address: 0000000000000000",
-        "[  104.932103] #PF: supervisor instruction fetch in kernel mode",
-        "[  104.932207] #PF: error_code(0x0010) - not-present page",
-        "[  104.932313] PGD 0 P4D 0 ",
-        "[  104.932400] Oops: 0010 [#1] SMP NOPTI",
-        "[  104.932485] CPU: 3 PID: 2184 Comm: kworker/3:1 Not tainted 6.1.33-arch1-1 #1",
-        "[  104.932593] Hardware name: QEMU Standard PC (Q35 + ICH9, 2009)",
-        "[  104.932692] RIP: 0010:0x0",
-        "[  104.932784] Code: Unable to access opcode bytes at RIP 0x0.",
-        "[  104.932879] RSP: 0018:ffffb0b00080f8f0 EFLAGS: 00010246",
-        "[  104.932971] Call Trace:",
-        "[  104.933055]  <IRQ>",
-        "[  104.933137]  panic+0x123/0x456",
-        "[  104.933218]  __do_softirq+0xf4/0x2e0",
-        "[  104.933302]  irq_exit_rcu+0xa4/0xd0",
-        "[  104.933384]  common_interrupt+0xb4/0xd0",
-        "[  104.933467]  </IRQ>",
-        "[  104.933548]  kernel_thread_helper+0x0/0x10",
-        "[  104.933630] ---[ end trace 37f61a0f8481e47a ]---",
-        "[  104.933712] " + std::string(RED) + std::string(BLINK) + "Kernel panic - not syncing: Fatal exception" + RESET
-    };
-
-    for (const auto& line : lines) {
-        bool red = line.find("BUG:") != std::string::npos ||
-                   line.find("panic") != std::string::npos ||
-                   line.find("Fatal") != std::string::npos;
-
-        bool blink = line.find("panic") != std::string::npos;
-
-        slow_print(line, 5, red, blink);
-        std::this_thread::sleep_for(std::chrono::milliseconds(80));
-    }
-
-    // 模拟紧急错误
-    cout << "\033[1;31m*** KERNEL PANIC - SYSTEM FAILURE ***\033[0m\n";
-    SlowPrint("[  0.000001] CRITICAL ERROR: Unable to mount root fs on unknown-block(0,0)");
-    SlowPrint("[  0.000002] System halt requested by kernel");
-    SlowPrint("[  0.000003] Dumping stack trace...");
-
-    cout << "↘ PID: 1   COMMAND: init\n";
-    cout << "↘ PID: 137 systemd-journald\n";
-    cout << "↘ PID: 253 Xorg\n";
-
-    this_thread::sleep_for(1s);
-
-    // 获取系统信息
-    string hostname = GetCommandOutput("hostname");
-    string kernel   = GetCommandOutput("uname -r");
-    string time     = GetCommandOutput("date");
-
-    cout << "\n\033[1;36mSYSTEM INFO:\033[0m\n";
-    cout << "Hostname: " << hostname;
-    cout << "Kernel:   Linux " << kernel;
-    cout << "Time:     " << time;
-
-    this_thread::sleep_for(1s);
-
-    // 输出致命错误提示
-    for (int i = 0; i < 3; ++i) {
-        Beep();
-        cout << "\033[5;31m!! FATAL ERROR DETECTED !!\033[0m" << endl;
-        this_thread::sleep_for(500ms);
-    }
-
-    // 倒计时重启
-    for (int i = 5; i > 0; --i) {
-        Beep();
-        cout << "\033[5;31mREBOOT IN " << i << "...\033[0m" << endl;
-        this_thread::sleep_for(1s);
-    }
-
-    // 假装“重启”
-    cout << "\033[1;32mSystem restarting now...\033[0m\n";
-    this_thread::sleep_for(1s);
-    cout << "\033[1;33m[ OK ] Rebooting...\033[0m\n";
-
+    Warning w;
+    w.simulatePanic();
     return 0;
 }

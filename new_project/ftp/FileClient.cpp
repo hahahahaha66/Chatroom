@@ -1,12 +1,5 @@
 #include "FileClient.h"
 
-#include <cstddef>
-#include <cstdint>
-#include <iostream>
-#include <sys/sendfile.h>
-#include <sys/types.h>
-#include <fcntl.h>
-
 FileUploader::FileUploader(EventLoop* loop, const std::string& serverip,
                  uint16_t serverport, const std::string& filename,
                  const std::string& filepath, int senderid,

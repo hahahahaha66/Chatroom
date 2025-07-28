@@ -2,9 +2,9 @@
 #include "../muduo/logging/Logging.h"
 #include <functional>
 
-Server::Server(EventLoop* loop,const InetAddress& listenAddr, std::string name)
+Server::Server(EventLoop* loop,const InetAddress& listenAddr, const InetAddress& fileAddr, std::string name)
     : server_(loop, listenAddr, name), 
-      dispatcher_() 
+      fileserver_(loop, fileAddr, "fileserver")
 {
     MysqlConnectionPool::Instance().Init("localhost", 3306, "hahaha", "123456", "chatroom", 20);
 
@@ -14,6 +14,8 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, std::string name)
     server_.setMessageCallback(std::bind(&Server::OnMessage, this, _1, _2, _3));
     server_.setWriteCompleteCallback(std::bind(&Server::MessageCompleteCallback, this, _1));
     server_.setThreadInitCallback(std::bind(&Server::ThreadInitCallback, this, _1));
+
+    fileserver_.start();
 
     dispatcher_.registerHander("Register", std::bind(&Service::UserRegister, &service_, _1, _2));
     dispatcher_.registerHander("Login", std::bind(&Service::UserLogin, &service_, _1, _2));
@@ -43,8 +45,6 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, std::string name)
     dispatcher_.registerHander("ProceGroupApply", std::bind(&Service::ProceGroupApply, &service_, _1, _2));
     dispatcher_.registerHander("DeleteGroup", std::bind(&Service::DeleteGroup, &service_, _1, _2));
     dispatcher_.registerHander("BlockGroupUser", std::bind(&Service::BlockGroupUser, &service_, _1, _2));
-
-
 }
 
 void Server::start()
@@ -93,5 +93,16 @@ void Server::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timestamp t
     auto [type, js] = msgopt.value();
 
     LOG_INFO << "Start Processing " << type;
+
+    if (type == "ConnectFileServer")
+    {
+        uint16_t fileport = stoi(fileserver_.GetServerPort());
+        json j = {
+            {"port", fileport}
+        };
+        conn->send(codec_.encode(j, "ConnectFileServerBack"));
+        return;
+    }
+
     dispatcher_.dispatch(type, conn, js);
 }

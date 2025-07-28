@@ -1,9 +1,7 @@
 #include "Service.h"
 #include "../muduo/logging/Logging.h"
 
-#include <cstddef>
 #include <exception>
-#include <memory>
 #include <mysql/mariadb_com.h>
 #include <mysql/mysql.h>
 #include <ostream>

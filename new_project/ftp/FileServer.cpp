@@ -1,16 +1,4 @@
 #include "FileServer.h"
-#include <cassert>
-#include <cstddef>
-#include <cstdint>
-#include <fstream>
-#include <ios>
-#include <memory>
-#include <ostream>
-#include <sys/sendfile.h>
-#include <thread>
-#include <unistd.h>
-#include <filesystem>
-#include <fcntl.h>
 
 FileServer::FileServer(EventLoop* loop, const InetAddress& fileAddr, std::string name)
     : server_(loop, fileAddr, name)

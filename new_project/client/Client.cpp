@@ -1,6 +1,4 @@
 #include "Client.h"
-#include <cstdio>
-#include <iterator>
 #include <string>
 #include <unordered_map>
 
@@ -141,6 +139,8 @@ Client::Client(EventLoop& loop, InetAddress addr, std::string name)
     dispatcher_.registerHander("ProceGroupApplyBack", std::bind(&Client::ProceGroupApplyBack, this, _1, _2));
     dispatcher_.registerHander("DeleteGroupBack", std::bind(&Client::DeleteGroupBack, this, _1, _2));
     dispatcher_.registerHander("BlockGroupUserBack", std::bind(&Client::BlockGroupUserBack, this, _1, _2));
+
+    dispatcher_.registerHander("ConnectFileServerBack", std::bind(&Client::ConnectFileServerBack, this, _1, _2));
 }
 
 void Client::ConnectionCallBack(const TcpConnectionPtr& conn)
@@ -1043,6 +1043,27 @@ void Client::BlockGroupUserBack(const TcpConnectionPtr& conn, const json& js)
     notifyInputReady();
 }
 
+void Client::ConnectFileServer(const json& js)
+{
+    this->send(codec_.encode(js, "ConnectFileServer"));
+}
+
+void Client::ConnectFileServerBack(const TcpConnectionPtr& conn, const json& js)
+{
+    bool end = true;
+    end &= AssignIfPresent(js, "port", fileserverport_);
+    if (end)
+    {
+
+    }
+    else  
+    {
+        std::cout << "获取文件服务器端口失败" << std::endl;
+    }
+    notifyInputReady();
+}
+
+
 void Client::InputLoop()
 {
     while (true)
@@ -1150,8 +1171,9 @@ void Client::InputLoop()
                 if (email == email_)
                 {
                     std::cout << "邮箱为用户邮箱" << std::endl;
-                    std::cout << "Logic Wrong!!!" << std::endl;
                     warning_.simulatePanic();
+                    ClearScreen();
+                    continue;
                 }
                 for (auto it : friendlist_)
                 {

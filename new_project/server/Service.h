@@ -60,10 +60,6 @@ public:
     void DeleteGroup(const TcpConnectionPtr& conn, const json& js);
     void BlockGroupUser(const TcpConnectionPtr& conn, const json& js);
 
-    // File
-    void UpLoadFileForward(const TcpConnectionPtr& conn, const json& js);
-    void DownLoadFileForward(const TcpConnectionPtr& conn, const json& js);
-
     std::string Escape(const std::string& input);
     std::string GetCurrentTimestamp();
     

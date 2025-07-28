@@ -10,6 +10,11 @@
 #include <fstream>
 #include <string>
 #include <memory>
+#include <cstddef>
+#include <iostream>
+#include <sys/sendfile.h>
+#include <sys/types.h>
+#include <fcntl.h>
 
 using json = nlohmann::json;
 
