@@ -62,6 +62,8 @@ public:
 
     // File
     void AddFileToMessage(const TcpConnectionPtr& conn, const json& js);
+    void ListFriendFile(const TcpConnectionPtr& conn, const json& js);
+    void ListGroupFile(const TcpConnectionPtr& conn, const json& js);
 
     std::string Escape(const std::string& input);
     std::string GetCurrentTimestamp();

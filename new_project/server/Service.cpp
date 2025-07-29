@@ -852,15 +852,10 @@ void Service::GetChatHistory(const TcpConnectionPtr& conn, const json& js)
             if (status == "Unread")
             {
                 std::string query = "update messages set status = 'Read' where id = " + std::to_string(messageid) + "; ";
-                if (mysqlconn.ExcuteUpdate(query))
+                if (!mysqlconn.ExcuteUpdate(query))
                 {
-                    done(true);
-                    return;
-                }
-                else 
-                {
+                    LOG_ERROR << "Failed to update message status for id: " << messageid;
                     done(false);
-                    return;
                 }
             }
 
@@ -2167,31 +2162,297 @@ void Service::BlockGroupUser(const TcpConnectionPtr& conn, const json& js)
 void Service::AddFileToMessage(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
-
     int senderid;
     int receiverid;
     std::string type;
     std::string filename;
+    std::string filehash;
     int64_t filesize;
-
     end &= AssignIfPresent(js, "senderid", senderid);
     end &= AssignIfPresent(js, "receiverid", receiverid);
     end &= AssignIfPresent(js, "type", type);
     end &= AssignIfPresent(js, "filename", filename);
+    end &= AssignIfPresent(js, "filehash", filehash);
     end &= AssignIfPresent(js, "filesize", filesize);
 
-    databasethreadpool_.EnqueueTask([this, senderid, receiverid, type, filename, filesize](MysqlConnection& conn, DBCallback done) {
+    databasethreadpool_.EnqueueTask([this, senderid, receiverid, type, filename, filehash, filesize](MysqlConnection& mysqlconn, DBCallback done) {
+        std::string content = "Send a File: " + filename + ", size: " + std::to_string(filesize);
+        std::string timestamp = GetCurrentTimestamp();
+        int msgid = gen_.GetNextMsgId();
+        std::string status = "Unread";
+        std::ostringstream oss;
+        oss << "insert into messages (id, senderid, receiverid, content, type, status, timestamp, isfile) values ("
+            << msgid << ", " << senderid << ", " << receiverid << ", '" << content << "','"
+            << type  << "','" << status << "','" << timestamp << "', " << true << "); ";
+
+        if (!mysqlconn.ExcuteUpdate(oss.str())) 
+        {
+            LOG_ERROR << "Failed to insert message into database, query: " << oss.str();
+            done(false);
+            return; 
+        }
+
+        std::ostringstream os;
+        os << "insert into files (filehash, filename, filesize, timestamp) values ('" << filehash
+           << "', '" << filename << "', " << filesize << ", '" << timestamp << "'); ";
         
+        if (!mysqlconn.ExcuteUpdate(os.str())) 
+        {
+            LOG_ERROR << "Failed to insert file into database, query: " << os.str();
+            done(false);
+            return;  
+        }
+
+        std::string sendername;
+        std::string query = "select name from users where id = " + std::to_string(senderid) + "; ";
+        MYSQL_RES* res = mysqlconn.ExcuteQuery(query);
+        if (!res) {
+            LOG_ERROR << "Listname from users query failed ";
+            done(false);
+            return;
+        }
+        MysqlResult result(res);
+        if (!result.Next()) {
+            LOG_ERROR << "No user found" ;
+            done(false);
+            return;
+        }
+        sendername = result.GetRow().GetString("name");
+        
+        if (type == "Group")
+        {
+            std::string query = "select userid from groupusers where groupid = " + std::to_string(receiverid) + "; ";
+            MYSQL_RES* res = mysqlconn.ExcuteQuery(query);
+            if (!res) 
+            {
+                LOG_ERROR << "ListGorupuser query failed ";
+                done(false);
+                return;
+            }
+
+            MysqlResult result(res);
+            int userid;
+
+            while (result.Next())
+            {
+                MysqlRow row = result.GetRow();
+                userid = row.GetInt("userid");
+                if (userid == senderid) continue;
+                if (onlineuser_.find(userid) != onlineuser_.end() && onlineuser_[userid].GetUserInterFace() == "Group" &&
+                    onlineuser_[userid].GetUserInterFaceId() == receiverid)
+                {
+                    auto reconn = onlineuser_[userid].GetConn();
+                    if (reconn)
+                    {   
+                        json j = {
+                        {"groupid", receiverid},
+                        {"sendername", sendername},
+                        {"content", content},
+                        {"type", type},
+                        {"timestamp", timestamp}
+                        };
+                        reconn->send(code_.encode(j, "RecvMessage"));
+                    }
+                }
+            }
+        }
+        else if (type == "Private")
+        {   
+            std::string query = "select block from friends where userid = " + std::to_string(receiverid)
+                                    + " and friendid = " + std::to_string(senderid) + "; ";
+            MYSQL_RES* res = mysqlconn.ExcuteQuery(query);
+            if (!res) 
+            {
+                LOG_ERROR << "Listfriendapply query failed ";
+                done(false);
+                return;
+            }
+
+            MysqlResult result(res);
+            bool block = false;
+            if (!result.Next())
+            {
+                done(false);
+                return;
+            }
+            MysqlRow row = result.GetRow();
+            block = row.GetBool("block");
+            if (block)
+            {
+                done(false);
+                return;
+            }
+
+            if (onlineuser_.find(receiverid) != onlineuser_.end() && onlineuser_[receiverid].GetUserInterFace() == "Private" &&
+                    onlineuser_[receiverid].GetUserInterFaceId() == senderid)
+            {
+                status = "Read";
+                auto reconn = onlineuser_[receiverid].GetConn();
+                if (reconn)
+                {
+                    json j = {
+                    {"friendid", senderid},
+                    {"sendername", sendername},
+                    {"content", content},
+                    {"type", type},
+                    {"timestamp", timestamp}
+                    };
+                    reconn->send(code_.encode(j, "RecvMessage"));
+                }
+            }
+        }
+        else
+        {
+            LOG_ERROR << "Message type wrong";
+            done(false);
+            return;
+        }
+
+        done(true);
     }, [this, conn](bool success) {
             if (success) {
-                LOG_DEBUG << "BlockGroupUser success";
-            } else {
-                LOG_ERROR << "BlockGroupUser failed";
+                LOG_DEBUG << "AddFileToMessage success";
+            } 
+            else {
+                LOG_ERROR << "AddFileToMessage failed";
             }
             json j = {
                 {"end", success}
             };
             conn->send(code_.encode(j, "BlockGroupUserBack"));
+        }
+    );
+}
+
+void Service::ListFriendFile(const TcpConnectionPtr& conn, const json& js)
+{
+    bool end = true;
+    int userid;
+    int friendid;
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "friendid", friendid);
+    databasethreadpool_.EnqueueTask([this, conn, userid, friendid](MysqlConnection& mysqlconn, DBCallback done) {
+        std::ostringstream oss;
+        oss << "select * from messages where isfile = 1 and (( senderid = " << userid
+            << " and receiverid = " << friendid << " ) or (senderid = " << friendid 
+            << " and receiverid = " << userid << " )); ";
+        std::cout << oss.str() << std::endl;
+        MYSQL_RES* res = mysqlconn.ExcuteQuery(oss.str());
+        if (!res)
+        {
+            LOG_ERROR << "Getfriendfile query failed for userid: " << userid;
+            done(false);
+            return;
+        }
+
+        MysqlResult result(res);
+        json j;
+        json arr = json::array();
+        int messageid;
+        int senderid;
+        std::string content;
+        std::string status;
+        std::string timestamp;
+
+        while (result.Next())
+        {
+            MysqlRow row = result.GetRow();
+            messageid = row.GetInt("id");
+            senderid = row.GetInt("senderid");
+            content = row.GetString("content");
+            status = row.GetString("status");
+            timestamp = row.GetString("timestamp");
+
+            if (status == "Unread")
+            {
+                std::string query = "update messages set status = 'Read' where id = " + std::to_string(messageid) + "; ";
+                if (!mysqlconn.ExcuteUpdate(query))
+                {
+                    LOG_ERROR << "Failed to update message status for id: " << messageid;
+                    done(false);
+                }
+            }
+
+            json file = {
+                {"senderid", senderid},
+                {"content", content},
+                {"status", status},
+                {"timestamp", timestamp}
+            };
+            arr.push_back(file);
+        }
+        j["files"] = arr;
+        j["end"] = true;
+        conn->send(code_.encode(j, "ListFriendFileBack"));
+    }, [this, conn](bool success) {
+            if (success) {
+                LOG_DEBUG << "ListFriendFile success";
+            } else {
+                LOG_ERROR << "ListFriendFile failed";
+                json j = {
+                    {"end", success}
+                };
+                conn->send(code_.encode(j, "ListFriendFileBack"));
+            }
+        }
+    );
+}
+
+void Service::ListGroupFile(const TcpConnectionPtr& conn, const json& js)
+{
+    bool end = true;
+    int groupid;
+    end &= AssignIfPresent(js, "groupid", groupid);
+    databasethreadpool_.EnqueueTask([this, conn, groupid](MysqlConnection& mysqlconn, DBCallback done) {
+        std::ostringstream oss;
+        oss << "select * from messages where isfile = 1 and ( receiverid = " << groupid << "); ";
+        MYSQL_RES* res = mysqlconn.ExcuteQuery(oss.str());
+        if (!res)
+        {
+            LOG_ERROR << "Getgroupfile query failed for groupid: " << groupid;
+            done(false);
+            return;
+        }
+
+        MysqlResult result(res);
+        json j;
+        json arr = json::array();
+        int messageid;
+        int senderid;
+        std::string content;
+        std::string status;
+        std::string timestamp;
+
+        while (result.Next())
+        {
+            MysqlRow row = result.GetRow();
+            messageid = row.GetInt("id");
+            senderid = row.GetInt("senderid");
+            content = row.GetString("content");
+            status = row.GetString("status");
+            timestamp = row.GetString("timestamp");
+
+            json file = {
+                {"senderid", senderid},
+                {"content", content},
+                {"status", status},
+                {"timestamp", timestamp}
+            };
+            arr.push_back(file);
+        }
+        j["files"] = arr;
+        j["end"] = true;
+        conn->send(code_.encode(j, "ListGroupFileBack"));
+    }, [this, conn](bool success) {
+            if (success) {
+                LOG_DEBUG << "ListGroupFile success";
+            } else {
+                LOG_ERROR << "ListGroupFile failed";
+                json j = {
+                    {"end", success}
+                };
+                conn->send(code_.encode(j, "ListGroupFileBack"));
+            }
         }
     );
 }

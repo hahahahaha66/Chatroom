@@ -4,7 +4,7 @@ int main ()
 {
     EventLoop loop;
 
-    Client client(loop, 10101, "10.30.0.120", "ChatClient");
+    Client client(loop, 10101, "127.0.0.1", "ChatClient");
 
     client.start();
 

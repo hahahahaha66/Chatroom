@@ -21,11 +21,17 @@
 #include <type_traits>
 #include <unistd.h>
 #include <unordered_map>
+#include <fcntl.h>
+#include <unistd.h>
+#include <filesystem>
+#include <iostream>
 
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
 using std::placeholders::_4;
+
+namespace fs = std::filesystem;
 
 struct Friend {
     Friend(int id, std::string name, std::string email, bool online, bool block)
@@ -62,6 +68,16 @@ struct Group {
     bool newmessage_ = false;
     bool newapply_ = false;
     std::string maxmsgtime_;
+};
+
+struct File {
+    File(int senderid, std::string filename, int64_t filesize, std::string timestamp)
+        : senderid_(senderid), filename_(filename), filesize_(filesize), timestamp_(timestamp) {}
+    File() = default;
+    int senderid_;
+    std::string filename_;
+    int64_t filesize_;
+    std::string timestamp_;
 };
 
 class Client 
@@ -141,10 +157,14 @@ public:
 
     // 文件
     void GetFileServerPort(const json& js);
-    void GetFileServerPortBack(const TcpConnectionPtr& conn, const json& js);
-
+    void ListFriendFile(const json& js);
+    void ListGroupFile(const json& js);
     void UploadFile(std::string filename, std::string filepath, int receiverid, std::string type);
     void DownloadFile(std::string filename, std::string savepath, std::string timestamp);
+    
+    void GetFileServerPortBack(const TcpConnectionPtr& conn, const json& js);
+    void ListFriendFileBack(const TcpConnectionPtr& conn, const json& js);
+    void ListGroupFileBack(const TcpConnectionPtr& conn, const json& js);
 
     std::string GetCurrentTimestamp();
     bool IsEarlier(const std::string& ts1, const std::string& ts2);
@@ -177,6 +197,9 @@ private:
     uint16_t fileserverport_ = -1;
     EventLoop* loop_;
 
+    std::shared_ptr<FileUploader> uploader_;
+    std::shared_ptr<FileDownloader> downloader_;
+
     int userid_ = 0;
     std::string email_;
     std::string name_;
@@ -186,4 +209,5 @@ private:
     std::unordered_multimap<int, FriendApply> friendapplylist_;
     std::unordered_multimap<int, FriendApply> friendsendapplylist_;
     std::unordered_map<int, Group> grouplist_;
+    std::vector<File> filelist_;
 };

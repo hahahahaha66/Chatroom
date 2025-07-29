@@ -1,19 +1,40 @@
 #include "FileServer.h"
 #include <fstream>
+#include <memory>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
 #include <string>
 
 FileServer::FileServer(EventLoop* loop, const InetAddress& fileAddr, std::string name)
-    : server_(loop, fileAddr, name)
+    : server_(loop, fileAddr, name), loop_(loop)
 {
     server_.setThreadNum(8);
-
     server_.setConnectionCallback(std::bind(&FileServer::OnConnection, this, _1));
     server_.setMessageCallback(std::bind(&FileServer::OnMessage, this, _1, _2, _3));
     server_.setWriteCompleteCallback(std::bind(&FileServer::MessageCompleteCallback, this, _1));
     server_.setThreadInitCallback(std::bind(&FileServer::ThreadInitCallback, this, _1));
     server_.setHighWaterMarkCallback(std::bind(&FileServer::OnHighWaterMark, this, _1, _2), 1 * 1024 * 1024);
+
+    InetAddress addr(10101, "10.30.0.120");
+    client_ = std::make_unique<TcpClient>(loop_, addr, "serverclient");
+    client_->setMessageCallback([this](const TcpConnectionPtr& conn, Buffer* buffer, Timestamp time) {
+        auto msgopt = codec_.tryDecode(buffer);
+        if (!msgopt.has_value())
+        {
+            LOG_INFO << "Recv from " << conn->peerAddress().toIpPort() << " failed";
+            return ;
+        }
+        auto [type, js] = msgopt.value();
+        if (type == "AddFileToMessageBack") 
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            AssignIfPresent(js, "end", msgsend);
+            waitingback_ = false;
+        }
+        cv_.notify_one();
+    });
+
+    client_->connect();
 }
 
 void FileServer::start()
@@ -136,28 +157,29 @@ void FileServer::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timesta
                 LOG_INFO << "Upload complete: " << task->filename_;
                 ::close(task->fd_);
                 std::string filehash = ComputeSHA256(task->filepath_);
-                RenameFileToHash(task->filepath_, filehash, "/home/hahaha/work/Chatroom/new_project/FTP/files/");
+                RenameFileToHash(task->filepath_, filehash, "/home/hahaha/work/Chatroom/new_project/ftp/files/");
 
                 json js = {
                     {"senderid", task->senderid_},
                     {"receiverid", task->receiverid_},
                     {"type", task->type_},
                     {"filename", task->filename_},
+                    {"filehash", filehash},
                     {"filesize", task->filesize_}
                 };
-                
-                bool end = NotifyMainServer(codec_.encode(js, "AddFileToMessage"));
                 filetasks_.erase(conn);
 
+                waitingback_ = true;
+                NotifyMainServer(codec_.encode(js, "AddFileToMessage"));
+                waitInPutReady();
                 js = {
-                    {"end", end}
+                    {"end", msgsend}
                 };
                 conn->send(codec_.encode(js, "AddFileToMessage"));
 
                 conn->shutdown();
             }
         }
-        
     }
 }
 
@@ -168,15 +190,6 @@ inline void FileServer::waitInPutReady()
         std::unique_lock<std::mutex> lock(mutex_);
         cv_.wait(lock, [this] { return !waitingback_; });
     }
-}
-
-inline void FileServer::notifyInputReady() 
-{
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        waitingback_ = false;
-    }
-    cv_.notify_one();
 }
 
 std::string FileServer::ComputeSHA256(const std::string& filepath)
@@ -260,7 +273,7 @@ void FileServer::UpLoadFile(const TcpConnectionPtr& conn, const json& js)
     task->filesize_ = filesize;
     task->received_ = 0;
 
-    std::string filepath = "/home/hahaha/work/Chatroom/new_project/FTP/files/" + filename;
+    std::string filepath = "/home/hahaha/work/Chatroom/new_project/ftp/files/" + filename;
     task->fd_ = ::open(filepath.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_NONBLOCK, 0644);
     if (task->fd_ < 0)
     {
@@ -317,10 +330,11 @@ void FileServer::DownLoadFile(const TcpConnectionPtr& conn, const json& js)
     }
 
     auto task = std::make_shared<FileTask>();
-    std::string filepath = "/home/hahaha/work/Chatroom/new_project/FTP/files/" + filehash;
+    std::string filepath = "/home/hahaha/work/Chatroom/new_project/ftp/files/" + filehash;
     if (end)
     {
         task->fd_ = ::open(filepath.c_str(), O_RDONLY | O_NONBLOCK);
+        std::cout << filepath << std::endl;
         if (task->fd_ < 0)
         {
             LOG_ERROR << "Request file not found: " << filename;
@@ -434,35 +448,16 @@ void FileServer::SendFileData(const TcpConnectionPtr& conn)
     }
 }
 
-bool FileServer::NotifyMainServer(const std::string messages)
+void FileServer::NotifyMainServer(const std::string messages)
 {
-    EventLoop loop;
-    InetAddress inet(10101, "10.30.0.120");
-    TcpClient tempclient(&loop, inet, "tempclient");
-    tempclient.connect();
-    bool end = false;
-    tempclient.setMessageCallback([&end, this](const TcpConnectionPtr& conn, Buffer* buffer, Timestamp time) {
-        auto msgopt = codec_.tryDecode(buffer);
-        if (!msgopt.has_value())
+    loop_->runInLoop([this, messages]() {
+        if (client_->connection() && client_->connection()->connected())
         {
-            LOG_INFO << "Recv from " << conn->peerAddress().toIpPort() << " failed";
-            return ;
+            client_->connection()->send(messages);
         }
-        auto [type, js] = msgopt.value();
-        if (type == "AddFileToMessageBack") 
+        else 
         {
-            AssignIfPresent(js, "end", end);
-
+            LOG_ERROR << "main server not conected";
         }
-        notifyInputReady();
     });
-
-    waitingback_ = true;
-    if (tempclient.connection() && tempclient.connection()->connected())
-    {
-        tempclient.connection()->send(messages);
-    }
-    waitInPutReady();
-
-    return end;
 }

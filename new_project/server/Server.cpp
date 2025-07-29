@@ -15,8 +15,6 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, const InetAddress&
     server_.setWriteCompleteCallback(std::bind(&Server::MessageCompleteCallback, this, _1));
     server_.setThreadInitCallback(std::bind(&Server::ThreadInitCallback, this, _1));
 
-    fileserver_.start();
-
     dispatcher_.registerHander("Register", std::bind(&Service::UserRegister, &service_, _1, _2));
     dispatcher_.registerHander("Login", std::bind(&Service::UserLogin, &service_, _1, _2));
     dispatcher_.registerHander("DeleteAccount", std::bind(&Service::DeleteAccount, &service_, _1, _2));
@@ -47,11 +45,14 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, const InetAddress&
     dispatcher_.registerHander("BlockGroupUser", std::bind(&Service::BlockGroupUser, &service_, _1, _2));
 
     dispatcher_.registerHander("AddFileToMessage", std::bind(&Service::AddFileToMessage, &service_, _1, _2));
+    dispatcher_.registerHander("ListFriendFile", std::bind(&Service::ListFriendFile, &service_, _1, _2));
+    dispatcher_.registerHander("ListGroupFile", std::bind(&Service::ListGroupFile, &service_, _1, _2));
 }
 
 void Server::start()
 {
     server_.start();
+    fileserver_.start();
 }
 
 void Server::ThreadInitCallback(EventLoop* loop)
@@ -98,7 +99,19 @@ void Server::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timestamp t
 
     if (type == "GetFileServerPort")
     {
-        uint16_t fileport = stoi(fileserver_.GetServerPort());
+        uint16_t fileport;
+        std::string addr = fileserver_.GetServerPort();
+        size_t pos = addr.find(':');
+        if (pos != std::string::npos) 
+        {
+            std::string port_str = addr.substr(pos + 1);
+            fileport = stoi(port_str);
+        }
+        else 
+        {
+            LOG_ERROR << "Invalid address format";
+        }
+        std::cout << fileport <<  std::endl;
         json j = {
             {"port", fileport}
         };

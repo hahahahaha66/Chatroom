@@ -43,7 +43,6 @@ bool AssignIfPresent(const json& j, const std::string& key, T& out)
         }
     }
 
-
     auto opt = ExtractCommonField<T>(j, key);
     if (opt.has_value()) {
         out = std::move(opt.value());

@@ -1,5 +1,9 @@
 #include "Client.h"
+#include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <fcntl.h>
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -142,7 +146,9 @@ Client::Client(EventLoop& loop, uint16_t port, std::string ip, std::string name)
     dispatcher_.registerHander("DeleteGroupBack", std::bind(&Client::DeleteGroupBack, this, _1, _2));
     dispatcher_.registerHander("BlockGroupUserBack", std::bind(&Client::BlockGroupUserBack, this, _1, _2));
 
-    dispatcher_.registerHander("ConnectFileServerBack", std::bind(&Client::GetFileServerPortBack, this, _1, _2));
+    dispatcher_.registerHander("GetFileServerPortBack", std::bind(&Client::GetFileServerPortBack, this, _1, _2));
+    dispatcher_.registerHander("ListFriendFileBack", std::bind(&Client::ListFriendFileBack, this, _1, _2));
+    dispatcher_.registerHander("ListGroupFileBack", std::bind(&Client::ListGroupFileBack, this, _1, _2));
 }
 
 void Client::ConnectionCallBack(const TcpConnectionPtr& conn)
@@ -1047,7 +1053,7 @@ void Client::BlockGroupUserBack(const TcpConnectionPtr& conn, const json& js)
 
 void Client::GetFileServerPort(const json& js)
 {
-    this->send(codec_.encode(js, "ConnectFileServer"));
+    this->send(codec_.encode(js, "GetFileServerPort"));
 }
 
 void Client::GetFileServerPortBack(const TcpConnectionPtr& conn, const json& js)
@@ -1056,11 +1062,93 @@ void Client::GetFileServerPortBack(const TcpConnectionPtr& conn, const json& js)
     end &= AssignIfPresent(js, "port", fileserverport_);
     if (end)
     {
-
+        std::cout << "获取文件服务器端口成功" << std::endl;
     }
     else  
     {
         std::cout << "获取文件服务器端口失败" << std::endl;
+    }
+    notifyInputReady();
+}
+
+void Client::ListFriendFile(const json& js)
+{
+    this->send(codec_.encode(js, "ListFriendFile"));
+}
+
+void Client::ListFriendFileBack(const TcpConnectionPtr& conn, const json& js)
+{
+    bool end = true;
+    AssignIfPresent(js, "end", end);
+    if (end)
+    {
+        int senderid;
+        std::string content;
+        std::string filename;
+        uint64_t filesize;
+        std::string status;
+        std::string timestamp;
+        std::vector<File> newfilelist;
+        for (auto it : js["files"])
+        {
+            AssignIfPresent(it, "senderid", senderid);
+            AssignIfPresent(it, "content", content);
+            AssignIfPresent(it, "status", status);
+            AssignIfPresent(it, "timestamp", timestamp);
+            size_t start = content.find(": ") + 2;
+            size_t end = content.find(", size:");
+            filename = content.substr(start, end - start);
+            start = content.find("size: ") + 6;
+            std::string tempsize = content.substr(start);
+            filesize = std::stoull(tempsize);
+            newfilelist.emplace_back(senderid, filename, filesize, timestamp);
+        }
+        filelist_ = std::move(newfilelist);
+    }
+    else  
+    {
+        std::cout << "获取好友文件列表失败";
+    }
+    notifyInputReady();
+}
+
+void Client::ListGroupFile(const json& js)
+{
+    this->send(codec_.encode(js, "ListGroupFile"));
+}
+
+void Client::ListGroupFileBack(const TcpConnectionPtr& conn, const json& js)
+{
+    bool end = true;
+    AssignIfPresent(js, "end", end);
+    if (end)
+    {
+        int senderid;
+        std::string content;
+        std::string filename;
+        uint64_t filesize;
+        std::string status;
+        std::string timestamp;
+        std::vector<File> newfilelist;
+        for (auto it : js["files"])
+        {
+            AssignIfPresent(it, "senderid", senderid);
+            AssignIfPresent(it, "content", content);
+            AssignIfPresent(it, "status", status);
+            AssignIfPresent(it, "timestamp", timestamp);
+            size_t start = content.find(": ") + 2;
+            size_t end = content.find(", size:");
+            filename = content.substr(start, end - start);
+            start = content.find("size: ") + 6;
+            std::string tempsize = content.substr(start);
+            filesize = std::stoull(tempsize);
+            newfilelist.emplace_back(senderid, filename, filesize, timestamp);
+        }
+        filelist_ = std::move(newfilelist);
+    }
+    else  
+    {
+        std::cout << "获取好友文件列表失败";
     }
     notifyInputReady();
 }
@@ -1072,8 +1160,8 @@ void Client::UploadFile(std::string filename, std::string filepath, int receiver
     GetFileServerPort(js);
     waitInPutReady();
 
-    FileUploader uploader(loop_, ip_, fileserverport_, filename, filepath, userid_, receiverid, type);
-    uploader.Start();
+    uploader_ = std::make_shared<FileUploader>(loop_, ip_, fileserverport_, filename, filepath, userid_, receiverid, type);
+    uploader_->Start();
 }
 
 void Client::DownloadFile(std::string filename, std::string savepath, std::string timestamp)
@@ -1083,8 +1171,8 @@ void Client::DownloadFile(std::string filename, std::string savepath, std::strin
     GetFileServerPort(js);
     waitInPutReady();
 
-    FileDownloader uploader(loop_, ip_, fileserverport_, filename, savepath, timestamp);
-    uploader.Start();
+    downloader_ = std::make_shared<FileDownloader>(loop_, ip_, fileserverport_, filename, savepath, timestamp);
+    downloader_->Start();
 }
 
 void Client::InputLoop()
@@ -1178,7 +1266,7 @@ void Client::InputLoop()
             std::cout << "3. 查看好友申请列表";
             if (newapply)
                 PrintfRed('*');
-            std::cout << "  " << "8. 私聊" << std::endl;
+            std::cout << "  " << "8. 好友界面" << std::endl;
             std::cout << "4. 处理好友申请      " << "9. 群聊" << std::endl;
             std::cout << "5. 查看被申请好友列表" << "10.注销账户"<< std::endl;
             std::cout << "11.退出" << std::endl;
@@ -1442,7 +1530,7 @@ void Client::InputLoop()
         {
             int friendid;
             std::string input;
-            std::cout << "输入聊天的好友id(输入0退出): ";
+            std::cout << "输入要进入的好友界面id(输入0退出): ";
             getline(std::cin, input);
             if (!ReadNum(input, friendid)) continue;
             if (friendid == 0) currentState_ = "main_menu";
@@ -1473,39 +1561,128 @@ void Client::InputLoop()
 
             ClearScreen();
 
-            js = {
-                {"userid", userid_},
-                {"friendid", friendid},
-            };
-            waitingback_ = true;
-            GetChatHistory(js);
-
-            waitInPutReady();
-
             while (true)
             {
-                std::string message;
-                std::cout << "输入(输入0返回): " ;
-                getline(std::cin, message);
-                if (message == "0") break;
+                int order;
+                std::cout << "1. 聊天" << std::endl;
+                std::cout << "2. 发送文件" << std::endl;
+                std::cout << "3. 查看聊天文件" << std::endl;
+                std::cout << "4. 退出" << std::endl;
+                getline(std::cin, input);
+                if (!ReadNum(input, order)) continue;
 
-                json js = {
-                    {"senderid", userid_},
-                    {"sendername", name_},
-                    {"receiverid", friendid},
-                    {"content", message},
-                    {"type", "Private"},
-                    {"status", "Unread"},
-                };
-                friendlist_[friendid].maxmsgtime_ = GetCurrentTimestamp();
-                friendlist_[friendid].new_ = false;
-                waitingback_ = true;
-                SendMessage(js);
+                if (order == 1)
+                {
+                    js = {
+                        {"userid", userid_},
+                        {"friendid", friendid},
+                    };
+                    waitingback_ = true;
+                    GetChatHistory(js);
 
-                waitInPutReady();
+                    waitInPutReady();
+
+                    while (true)
+                    {
+                        std::string message;
+                        std::cout << "输入(输入0返回): " ;
+                        getline(std::cin, message);
+                        if (message == "0") 
+                        {
+                            ClearScreen();
+                            break;
+                        }
+                        json js = {
+                            {"senderid", userid_},
+                            {"sendername", name_},
+                            {"receiverid", friendid},
+                            {"content", message},
+                            {"type", "Private"},
+                            {"status", "Unread"},
+                        };
+                        friendlist_[friendid].maxmsgtime_ = GetCurrentTimestamp();
+                        friendlist_[friendid].new_ = false;
+                        waitingback_ = true;
+                        SendMessage(js);
+
+                        waitInPutReady();
+                    }
+                    ClearScreen();
+                }
+                else if (order == 2)
+                {
+                    std::string filename;
+                    std::string filepath;
+                    std::cout << "输入上传的文件名: ";
+                    getline(std::cin, filename);
+                    std::cout << "输入上传文件的完整路径(不用包括文件名): ";
+                    getline(std::cin, filepath);
+                    std::string temp = filepath + '/' + filename;
+                    std::cout << temp << std::endl;
+                    int tempfd = ::open(temp.c_str(), O_RDONLY);
+                    if (tempfd < 0) 
+                    {
+                        std::cout << "无法打开文件" << std::endl;
+                        continue;
+                    }
+                    else  
+                    {
+                        ::close(tempfd);
+                    }
+                    UploadFile(filename, filepath, friendid, "Private");
+                }
+                else if (order == 3)
+                {
+                    json js = {
+                        {"userid", userid_},
+                        {"friendid", friendid}
+                    };
+                    waitingback_ = true;
+                    ListFriendFile(js);
+
+                    waitInPutReady();
+                    for (int i = 0; i < filelist_.size(); i++)
+                    {
+                        std::string sendname = friendlist_[filelist_[i].senderid_].name_;
+                        std::cout << i+1 << " " << sendname << ": " << filelist_[i].filename_ << std::endl;
+                    }
+
+                    int id;
+                    std::cout << "输入要下载的文件标号(退出输入0)";
+                    getline(std::cin, input);
+                    if (!ReadNum(input, id)) continue;
+                    if (id == 0) continue;
+                    if (id > filelist_.size())
+                    {
+                        std::cout << "错误输入" << std::endl;
+                        continue;
+                    }
+                    id--;
+                    std::string filename = filelist_[id].filename_;
+                    std::string timestamp = filelist_[id].timestamp_;
+                    std::string savepath;
+                    std::cout << "输入保存路径";
+                    getline(std::cin, savepath);
+                    if (!(fs::exists(savepath) && fs::is_directory(savepath)))
+                    {
+                        std::cout << "不存在的文件夹";
+                        continue;
+                    }
+                    DownloadFile(filename, savepath, timestamp);
+                    std::vector<File> newfilelist;
+                    filelist_ = std::move(newfilelist);
+                }
+                else if (order == 4)
+                {
+                    currentState_ = "main_menu";
+                    break;
+                }
+                else  
+                {
+                    std::cout << "错误输入" << std::endl;
+                    continue;
+                }
             }
-
-            ClearScreen();
         }
         else if (currentState_ == "group_menu")
         {
@@ -1560,7 +1737,7 @@ void Client::InputLoop()
                 {
                     if (it.second.name_ == groupname)
                     {
-                        std::cout << "群聊已加入" << std::endl;
+                        std::cout << "你已在群聊" << std::endl;
                         same = true;
                         break;
                     }
@@ -1652,22 +1829,24 @@ void Client::InputLoop()
                     PrintfRed('*');
                 std::cout << std::endl;
                 std::cout << "2. 查看群聊成员" << std::endl;
-                std::cout << "3. 退出群聊" << std::endl;
+                std::cout << "3. 发送文件" << std::endl;
+                std::cout << "4. 查看群聊文件" << std::endl;
+                std::cout << "5. 退出群聊" << std::endl;
                 if (grouplist_[groupid].role_ == "Administrator" || grouplist_[groupid].role_ == "Owner")
                 {
-                    std::cout << "4. 查看群聊申请";
+                    std::cout << "6. 查看群聊申请";
                     if (grouplist_[groupid].newapply_)
                         PrintfRed('*');
                     std::cout << std::endl;
-                    std::cout << "5. 处理群聊申请" << std::endl;
-                    std::cout << "6. 处理成员禁言" << std::endl;
+                    std::cout << "7. 处理群聊申请" << std::endl;
+                    std::cout << "8. 处理成员禁言" << std::endl;
                 }
                 if (grouplist_[groupid].role_ == "Owner")
                 {
-                    std::cout << "7. 更改群聊成员权限" << std::endl;
-                    std::cout << "8. 解散群聊" << std::endl;
+                    std::cout << "9. 更改群聊成员权限" << std::endl;
+                    std::cout << "10. 解散群聊" << std::endl;
                 }
-                std::cout << "9. 返回上一界面" << std::endl;
+                std::cout << "11. 返回上一界面" << std::endl;
 
                 getline(std::cin, input);
                 if (!ReadNum(input, order)) continue;
@@ -1738,6 +1917,66 @@ void Client::InputLoop()
                 }
                 else if (order == 3)
                 {
+                    std::string filename;
+                    std::string filepath;
+                    std::cout << "输入上传的文件名: ";
+                    getline(std::cin, filename);
+                    std::cout << "输入上传文件的完整路径(不用包括文件名): ";
+                    getline(std::cin, filepath);
+                    std::string temp = filepath + '/' + filename;
+                    std::cout << temp << std::endl;
+                    int tempfd = ::open(temp.c_str(), O_RDONLY);
+                    if (tempfd < 0) 
+                    {
+                        std::cout << "无法打开文件" << std::endl;
+                        continue;
+                    }
+                    else  
+                    {
+                        ::close(tempfd);
+                    }
+                    UploadFile(filename, filepath, groupid, "Group");
+                }
+                else if (order == 4)
+                {
+                    json js = {
+                        {"groupid",groupid}
+                    };
+                    waitingback_ = true;
+                    ListGroupFile(js);
+
+                    waitInPutReady();
+                    for (int i = 0; i < filelist_.size(); i++)
+                    {
+                        std::cout << i+1 << " " << filelist_[i].senderid_ << ": " << filelist_[i].filename_ << std::endl;
+                    }
+
+                    int id;
+                    std::cout << "输入要下载的文件标号(退出输入0)";
+                    getline(std::cin, input);
+                    if (!ReadNum(input, id)) continue;
+                    if (id == 0) continue;
+                    if (id > filelist_.size())
+                    {
+                        std::cout << "错误输入" << std::endl;
+                        continue;
+                    }
+                    std::string filename = filelist_[id].filename_;
+                    std::string timestamp = filelist_[id].timestamp_;
+                    std::string savepath;
+                    std::cout << "输入保存路径";
+                    getline(std::cin, savepath);
+                    if (!(fs::exists(savepath) && fs::is_directory(savepath)))
+                    {
+                        std::cout << "不存在的文件夹";
+                        continue;
+                    }
+                    DownloadFile(filename, savepath, timestamp);
+                    std::vector<File> newfilelist;
+                    filelist_ = std::move(newfilelist);
+                }
+                else if (order == 5)
+                {
                     json js = {
                         {"groupid", groupid},
                         {"userid", userid_}
@@ -1750,7 +1989,7 @@ void Client::InputLoop()
                     currentState_ = "group_menu";
                     break;
                 }
-                else if (order == 4)
+                else if (order == 6)
                 {
                     json js = {
                         {"groupid", groupid}
@@ -1761,7 +2000,7 @@ void Client::InputLoop()
 
                     waitInPutReady();
                 }
-                else if (order == 5)
+                else if (order == 7)
                 {
                     int applyid;
                     std::string status;
@@ -1788,7 +2027,7 @@ void Client::InputLoop()
 
                     waitInPutReady();
                 }
-                else if (order == 6)
+                else if (order == 8)
                 {
                     int userid;
                     bool block;
@@ -1806,7 +2045,7 @@ void Client::InputLoop()
 
                     waitInPutReady();
                 }
-                else if (order == 7)
+                else if (order == 9)
                 {
                     int userid;
                     std::string role;
@@ -1832,7 +2071,7 @@ void Client::InputLoop()
 
                     waitInPutReady();
                 }
-                else if (order == 8)
+                else if (order == 10)
                 {
                     json js = {
                         {"groupid", groupid}
@@ -1844,7 +2083,7 @@ void Client::InputLoop()
                     if (currentState_ == "group_menu")
                         break;
                 }
-                else if (order == 9)
+                else if (order == 11)
                 {
                     currentState_ = "group_menu";
                     break;

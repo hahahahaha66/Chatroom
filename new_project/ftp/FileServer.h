@@ -64,11 +64,10 @@ public:
 
     void UpLoadFile(const TcpConnectionPtr& conn, const json& js);
     void DownLoadFile(const TcpConnectionPtr& conn, const json& js);
-    bool NotifyMainServer(const std::string messages);
+    void NotifyMainServer(const std::string messages);
 
     const std::string GetServerPort() { return server_.inPort(); }
     void waitInPutReady();
-    void notifyInputReady();
 
     std::string ComputeSHA256(const std::string& filepath);
     bool RenameFileToHash(const std::string& oldpath, const std::string& hash, const std::string& dir);
@@ -83,6 +82,9 @@ private:
 
     TcpServer server_;
     Codec codec_;
+    EventLoop* loop_;
+    std::unique_ptr<TcpClient> client_;
+    bool msgsend;
 
     bool waitingback_;
     std::mutex mutex_;
