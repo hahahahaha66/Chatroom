@@ -175,7 +175,7 @@ void Client::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timestamp t
 
     auto [type, js] = msgopt.value();
 
-    LOG_INFO << js.dump();
+    // LOG_INFO << js.dump();
 
     dispatcher_.dispatch(type, conn, js);
 }
@@ -184,7 +184,7 @@ void Client::MessageCompleteCallback(const TcpConnectionPtr& conn)
 {
     if (conn->connected())
     {
-        LOG_INFO << conn->getLoop() << " Loop and send messages to " << conn->peerAddress().toIpPort();
+        // LOG_INFO << conn->getLoop() << " Loop and send messages to " << conn->peerAddress().toIpPort();
     }
 }
 

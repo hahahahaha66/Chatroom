@@ -864,9 +864,9 @@ void Service::GetChatHistory(const TcpConnectionPtr& conn, const json& js)
 
     databasethreadpool_.EnqueueTask([this, conn, userid, friendid](MysqlConnection& mysqlconn, DBCallback done) {
         std::ostringstream oss;
-        oss << "select * from messages where ( senderid = " << userid << " and receiverid = "
-            << friendid << " ) or ( senderid = " << friendid << " and receiverid = " << userid
-            << " ) order by timestamp asc limit 100; ";
+        oss << "select * from (select * from messages where ( senderid = " << userid 
+            << " and receiverid = " << friendid << " ) or ( senderid = " << friendid 
+            << " and receiverid = " << userid << " ) order by timestamp desc limit 500) as recent order by timestamp asc;";
         MYSQL_RES* res = mysqlconn.ExcuteQuery(oss.str());
         if (!res)
         {
@@ -939,7 +939,9 @@ void Service::GetGroupHistory(const TcpConnectionPtr& conn, const json& js)
 
     databasethreadpool_.EnqueueTask([this, conn, userid, groupid](MysqlConnection& mysqlconn, DBCallback done) {
         std::ostringstream oss;
-        oss << "select * from messages where receiverid = " << groupid << " order by timestamp asc limit 100; ";
+        oss << "select * from (select * from messages where receiverid = " << groupid 
+            << " order by timestamp desc limit 500) as recent order by timestamp asc;";
+
         MYSQL_RES* res = mysqlconn.ExcuteQuery(oss.str());
         if (!res)
         {

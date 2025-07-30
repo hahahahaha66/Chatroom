@@ -4,6 +4,9 @@ project(ChatSystem)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
+
 # 添加 include 目录
 include_directories(
     ${PROJECT_SOURCE_DIR}/client
@@ -50,6 +53,7 @@ target_link_libraries(server
     hiredis
     redis++                         # sw::redis++
     OpenSSL::Crypto 
+    profiler
 )
 
 # ========= 客户端 =========
@@ -63,4 +67,5 @@ add_executable(client
 target_link_libraries(client
     mynet
     pthread
+    profiler
 )

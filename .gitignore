@@ -1,5 +1,5 @@
 .vscode/
-muduo/
+muduo/build
 build/
 new_project/ftp/files/
 new_project/ftp/download/
