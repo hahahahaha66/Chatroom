@@ -555,7 +555,7 @@ void Service::Flush(const TcpConnectionPtr& conn, const json& js)
         j["friendapply"] = friendapply;
 
         // 更新群聊
-        query = "select groupid, role, mute from groupusers where userid = " + std::to_string(userid) + "; ";
+        query = "select groupid from groupusers where userid = " + std::to_string(userid) + "; ";
         res = mysqlconn.ExcuteQuery(query);
         if (!res) {
             LOG_ERROR << "ListGroup from groupusers query failed ";
@@ -566,18 +566,63 @@ void Service::Flush(const TcpConnectionPtr& conn, const json& js)
         MysqlResult groupresult(res);
         int groupid;
         std::string groupname;
-        std::string role;
         std::string groupstatus;
         std::string groupmsgtime;
-        bool mute;
         bool groupapplynew = false;
 
         while (groupresult.Next())
         {
             MysqlRow grouprow = groupresult.GetRow();
             groupid = grouprow.GetInt("groupid");
-            role = grouprow.GetString("role");
-            mute = grouprow.GetBool("mute");
+
+            query = "select * from groupusers where groupid = " + std::to_string(groupid) + "; ";
+            res = mysqlconn.ExcuteQuery(query);
+            if (!res)
+            {
+                LOG_ERROR << "ListGroupUsers from groupusers query failed ";
+                done(false);
+                return;
+            }
+
+            MysqlResult groupuserresult(res);
+            json groupusers = json::array();
+            int userid;
+            std::string username;
+            std::string role;
+            bool mute;
+
+            while (groupuserresult.Next())
+            {
+                MysqlRow row = groupuserresult.GetRow();
+                userid = row.GetInt("userid");
+                role = row.GetString("role");
+                mute = row.GetBool("mute");
+                query = "select name from users where id = " + std::to_string(userid) + "; ";
+                res = mysqlconn.ExcuteQuery(query);
+                if (!res)
+                {
+                    LOG_ERROR << "Username from users query failed ";
+                    done(false);
+                    return;
+                }
+                MysqlResult usernameresult(res);
+                if (!usernameresult.Next())
+                {
+                    LOG_ERROR << "No user found with id: " << fromid;
+                    done(false);
+                    return;
+                }
+                username = usernameresult.GetRow().GetString("name");
+
+                json groupuser = {
+                    {"userid", userid},
+                    {"username", username},
+                    {"role", role},
+                    {"mute", mute}
+                };
+                groupusers.push_back(groupuser);
+            }
+
             query = "select name from groups where id = " + std::to_string(groupid) + "; ";
             res = mysqlconn.ExcuteQuery(query);
             if (!res) {
@@ -634,14 +679,13 @@ void Service::Flush(const TcpConnectionPtr& conn, const json& js)
             json member = {
                 {"groupid", groupid},
                 {"groupname", groupname},
-                {"role", role},
+                {"groupuser", groupusers},
                 {"newapply", groupapplynew},
                 {"timestamp", groupmsgtime},
-                {"mute", mute}
             };
             group.push_back(member);
         }
-        j["group"] = group;
+        j["groups"] = group;
         j["end"] = true;
         conn->send(code_.encode(j, "FlushBack"));
 
@@ -1793,51 +1837,118 @@ void Service::ListGroupMember(const TcpConnectionPtr& conn, const json& js)
     databasethreadpool_.EnqueueTask([this, conn, groupid](MysqlConnection& mysqlconn, DBCallback done) {
         std::string query = "select * from groupusers where groupid = " + std::to_string(groupid) + "; ";
         MYSQL_RES* res = mysqlconn.ExcuteQuery(query);
-        if (!res) {
-            LOG_ERROR << "ListGroupmember from groupusers query failed ";
+        if (!res)
+        {
+            LOG_ERROR << "ListGroupUsers from groupusers query failed ";
             done(false);
             return;
         }
 
-        MysqlResult result(res);
+        MysqlResult groupuserresult(res);
+        json groupusers = json::array();
         json j;
-        json arr = json::array();
+        std::string groupname;
+        std::string groupstatus;
+        std::string groupmsgtime;
+        bool groupapplynew;
         int userid;
-        std::string role;
         std::string username;
+        std::string role;
         bool mute;
 
-        while (result.Next())
+        while (groupuserresult.Next())
         {
-            MysqlRow row = result.GetRow();
+            MysqlRow row = groupuserresult.GetRow();
             userid = row.GetInt("userid");
             role = row.GetString("role");
             mute = row.GetBool("mute");
-            std::string query = "select name from users where id = " + std::to_string(userid) + "; ";
-            MYSQL_RES* re = mysqlconn.ExcuteQuery(query);
-            if (!re) {
-                LOG_ERROR << "ListGroupmamber from name query failed ";
-                done(false);
-                return;
-            }
-            MysqlResult resul(re);
-            if (!resul.Next())
+            query = "select name from users where id = " + std::to_string(userid) + "; ";
+            res = mysqlconn.ExcuteQuery(query);
+            if (!res)
             {
+                LOG_ERROR << "Username from users query failed ";
                 done(false);
                 return;
             }
-            MysqlRow ro = resul.GetRow();
-            username = ro.GetString("name");
+            MysqlResult usernameresult(res);
+            if (!usernameresult.Next())
+            {
+                LOG_ERROR << "No user found with id: " << userid;
+                done(false);
+                return;
+            }
+            username = usernameresult.GetRow().GetString("name");
 
-            json member = {
+            json groupuser = {
                 {"userid", userid},
                 {"username", username},
                 {"role", role},
                 {"mute", mute}
             };
-            arr.push_back(member);
+            groupusers.push_back(groupuser);
         }
-        j["groupmembers"] = arr;
+
+        query = "select name from groups where id = " + std::to_string(groupid) + "; ";
+        res = mysqlconn.ExcuteQuery(query);
+        if (!res) {
+            LOG_ERROR << "ListGroup from name query failed ";
+            done(false);
+            return;
+        }
+        MysqlResult groupnameresult(res);
+        if (!groupnameresult.Next())
+        {
+            done(false);
+            return;
+        }
+        MysqlRow namerow = groupnameresult.GetRow();
+        groupname = namerow.GetString("name");
+
+        query = "select status from groupapplys where groupid = " + std::to_string(groupid);
+        res = mysqlconn.ExcuteQuery(query);
+        if (!res) 
+        {
+            LOG_ERROR << "Listfriendapply query failed ";
+            done(false);
+            return;
+        }
+
+        MysqlResult groupapplyresult(res);
+
+        while (groupapplyresult.Next())
+        {
+            MysqlRow row = groupapplyresult.GetRow();
+            groupstatus = row.GetString("status");
+            if (groupstatus == "Pending") 
+            {
+                groupapplynew = true;
+                break;
+            }
+        }
+
+        query = "select max(timestamp) as latest_time from messages where ( type = 'Group' and receiverid = " + std::to_string(groupid) + "); ";
+        res = mysqlconn.ExcuteQuery(query);
+        if (!res) {
+            LOG_ERROR << "Listmessage from messages query failed ";
+            done(false);
+            return;
+        }
+        MysqlResult timeresult(res);
+        if (!timeresult.Next()) {
+            LOG_ERROR << "No message found" ;
+            done(false);
+            return;
+        }
+        groupmsgtime = timeresult.GetRow().GetString("timestamp");
+
+        json member = {
+            {"groupid", groupid},
+            {"groupname", groupname},
+            {"groupuser", groupusers},
+            {"newapply", groupapplynew},
+            {"timestamp", groupmsgtime},
+        };
+        j["group"] = member;
         j["end"] = true;
 
         conn->send(code_.encode(j, "ListGroupMemberBack"));
@@ -1862,7 +1973,7 @@ void Service::ListGroup(const TcpConnectionPtr& conn, const json& js)
     end &= AssignIfPresent(js, "userid", userid);
 
     databasethreadpool_.EnqueueTask([this, conn, userid](MysqlConnection& mysqlconn, DBCallback done) {
-        std::string query = "select groupid, role, mute from groupusers where userid = " + std::to_string(userid) + "; ";
+        std::string query = "select groupid from groupusers where userid = " + std::to_string(userid) + "; ";
         MYSQL_RES* res = mysqlconn.ExcuteQuery(query);
         if (!res) {
             LOG_ERROR << "ListGroup from groupusers query failed ";
@@ -1870,37 +1981,83 @@ void Service::ListGroup(const TcpConnectionPtr& conn, const json& js)
             return;
         }
 
-        MysqlResult result(res);
+        MysqlResult groupresult(res);
         json j;
         json arr = json::array();
         int groupid;
         std::string groupname;
-        std::string role;
-        bool mute;
-        bool newapply = false;
         std::string groupstatus;
         std::string groupmsgtime;
-
-        while (result.Next())
+        bool groupapplynew = false;
+        
+        while (groupresult.Next())
         {
-            MysqlRow row = result.GetRow();
-            groupid = row.GetInt("groupid");
-            role = row.GetString("role");
-            std::string query = "select name from groups where id = " + std::to_string(groupid) + "; ";
-            MYSQL_RES* re = mysqlconn.ExcuteQuery(query);
-            if (!re) {
+            MysqlRow grouprow = groupresult.GetRow();
+            groupid = grouprow.GetInt("groupid");
+
+            query = "select * from groupusers where groupid = " + std::to_string(groupid) + "; ";
+            res = mysqlconn.ExcuteQuery(query);
+            if (!res)
+            {
+                LOG_ERROR << "ListGroupUsers from groupusers query failed ";
+                done(false);
+                return;
+            }
+
+            MysqlResult groupuserresult(res);
+            json groupusers = json::array();
+            int groupuserid;
+            std::string groupusername;
+            std::string role;
+            bool mute;
+
+            while (groupuserresult.Next())
+            {
+                MysqlRow row = groupuserresult.GetRow();
+                groupuserid = row.GetInt("userid");
+                role = row.GetString("role");
+                mute = row.GetBool("mute");
+                query = "select name from users where id = " + std::to_string(groupuserid) + "; ";
+                res = mysqlconn.ExcuteQuery(query);
+                if (!res)
+                {
+                    LOG_ERROR << "Username from users query failed ";
+                    done(false);
+                    return;
+                }
+                MysqlResult usernameresult(res);
+                if (!usernameresult.Next())
+                {
+                    LOG_ERROR << "No user found with id: " << groupuserid;
+                    done(false);
+                    return;
+                }
+                groupusername = usernameresult.GetRow().GetString("name");
+
+                json groupuser = {
+                    {"userid", groupuserid},
+                    {"username", groupusername},
+                    {"role", role},
+                    {"mute", mute}
+                };
+                groupusers.push_back(groupuser);
+            }
+
+            query = "select name from groups where id = " + std::to_string(groupid) + "; ";
+            res = mysqlconn.ExcuteQuery(query);
+            if (!res) {
                 LOG_ERROR << "ListGroup from name query failed ";
                 done(false);
                 return;
             }
-            MysqlResult resul(re);
-            if (!resul.Next())
+            MysqlResult groupnameresult(res);
+            if (!groupnameresult.Next())
             {
                 done(false);
                 return;
             }
-            MysqlRow ro = resul.GetRow();
-            groupname = ro.GetString("name");
+            MysqlRow namerow = groupnameresult.GetRow();
+            groupname = namerow.GetString("name");
 
             query = "select status from groupapplys where groupid = " + std::to_string(groupid);
             res = mysqlconn.ExcuteQuery(query);
@@ -1919,7 +2076,7 @@ void Service::ListGroup(const TcpConnectionPtr& conn, const json& js)
                 groupstatus = row.GetString("status");
                 if (groupstatus == "Pending") 
                 {
-                    newapply = true;
+                    groupapplynew = true;
                     break;
                 }
             }
@@ -1942,15 +2099,14 @@ void Service::ListGroup(const TcpConnectionPtr& conn, const json& js)
             json member = {
                 {"groupid", groupid},
                 {"groupname", groupname},
-                {"role", role},
-                {"mute", mute},
-                {"newapply", newapply},
-                {"timestamp", groupmsgtime}
+                {"groupuser", groupusers},
+                {"newapply", groupapplynew},
+                {"timestamp", groupmsgtime},
             };
             arr.push_back(member);
         }
         j["groups"] = arr;
-        j["end"] = true;
+        j["end"] = true; 
 
         conn->send(code_.encode(j, "ListGroupBack"));
     }, [this, conn](bool success) {

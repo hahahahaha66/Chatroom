@@ -227,7 +227,7 @@ void Client::LoginBack(const TcpConnectionPtr& conn, const json& js)
         currentState_ = "main_menu";
         userid_ = id;
         name_ = name;
-        // StartFlushFromServer(5);
+        StartFlushFromServer(5);
     }
     else
     {
@@ -337,21 +337,31 @@ void Client::FlushBack(const TcpConnectionPtr& conn, const json& js)
 
         int groupid;
         std::string groupname;
-        std::string role;
-        bool mute;
         bool newapply;
         std::string grouptimestamp;
         std::unordered_map<int, Group> newgrouplist;
-        for (auto it : js["group"])
+        for (auto its : js["groups"])
         {
-            AssignIfPresent(it, "groupid", groupid);
-            AssignIfPresent(it, "groupname", groupname);
-            AssignIfPresent(it, "role", role);
-            AssignIfPresent(it, "newapply", newapply);
-            AssignIfPresent(it, "timestamp", grouptimestamp);
-            AssignIfPresent(it, "mute", mute);
-            newgrouplist[groupid] = Group(groupid, groupname, role, mute);
-            newgrouplist[groupid].newapply_ = newapply;
+            std::unordered_map<int, GroupUser> groupuserlist;
+            AssignIfPresent(its, "groupid", groupid);
+            AssignIfPresent(its, "groupname", groupname);
+            AssignIfPresent(its, "newapply", newapply);
+            AssignIfPresent(its, "timestamp", grouptimestamp);
+            newgrouplist.emplace(groupid, Group(groupid, groupname, newapply));
+
+            int userid;
+            std::string username;
+            std::string role;
+            bool mute;
+            for (auto it : its["groupuser"])
+            {
+                AssignIfPresent(it, "userid", userid);
+                AssignIfPresent(it, "username", username);
+                AssignIfPresent(it, "role", role);
+                AssignIfPresent(it, "mute", mute);
+                groupuserlist.emplace(userid, GroupUser(userid, username, role, mute));
+            }
+            newgrouplist[groupid].groupuserlist_ = groupuserlist;
             if (IsEarlier(grouplist_[groupid].maxmsgtime_, grouptimestamp)) 
                 newgrouplist[groupid].newmessage_ = true;
         }
@@ -894,19 +904,33 @@ void Client::GroupMemberBack(const TcpConnectionPtr& conn, const json& js)
 
     if (end)
     {
+        int groupid;
+        std::string groupname;
+        bool groupapplynew;
+        std::string timestamp;
+        std::unordered_map<int, GroupUser> groupuserlist;
+        AssignIfPresent(js["group"], "groupid", groupid);
+        AssignIfPresent(js["group"], "groupname", groupname);
+        AssignIfPresent(js["group"], "groupapplynew", groupapplynew);
+        AssignIfPresent(js["group"], "timestamp", timestamp);
+
         int userid;
         std::string username;
         std::string role;
         bool mute;
-        std::cout << "成员id" << "  成员名字   " << "  身份  " << " 是否禁言 "<< std::endl;
-        for (auto it : js["groupmembers"])
+        for (auto it : js["group"]["groupuser"])
         {
             AssignIfPresent(it, "userid", userid);
             AssignIfPresent(it, "username", username);
             AssignIfPresent(it, "role", role);
             AssignIfPresent(it, "mute", mute);
-            std::cout << userid << "    " << username << "           " << role << "     " << mute << std::endl;
+            groupuserlist.emplace(userid, GroupUser(userid, username, role, mute));
         }
+
+        Group newgroup(groupid, groupname, groupapplynew);
+        newgroup.groupuserlist_ = std::move(groupuserlist);
+        newgroup.maxmsgtime_ = timestamp;
+        grouplist_[groupid] = std::move(newgroup);
     }
     else  
     {
@@ -930,24 +954,33 @@ void Client::ListGroupBack(const TcpConnectionPtr& conn, const json& js)
     {
         int groupid;
         std::string groupname;
-        std::string role;
-        bool mute;
         bool newapply;
-        std::string timestamp;
+        std::string grouptimestamp;
         std::unordered_map<int, Group> newgrouplist;
-        for (auto it : js["groups"])
+        for (auto its : js["groups"])
         {
-            AssignIfPresent(it, "groupid", groupid);
-            AssignIfPresent(it, "groupname", groupname);
-            AssignIfPresent(it, "role", role);
-            AssignIfPresent(it, "newapply", newapply);
-            AssignIfPresent(it, "timestamp", timestamp);
-            AssignIfPresent(it, "mute", mute);
-            newgrouplist.emplace(groupid, Group(groupid, groupname, role, mute));
-            newgrouplist[groupid].newapply_ = newapply;
-            if (IsEarlier(grouplist_[groupid].maxmsgtime_, timestamp)) 
-                newgrouplist[groupid].newmessage_ = true;
+            std::unordered_map<int, GroupUser> groupuserlist;
+            AssignIfPresent(its, "groupid", groupid);
+            AssignIfPresent(its, "groupname", groupname);
+            AssignIfPresent(its, "newapply", newapply);
+            AssignIfPresent(its, "timestamp", grouptimestamp);
+            newgrouplist.emplace(groupid, Group(groupid, groupname, newapply));
 
+            int userid;
+            std::string username;
+            std::string role;
+            bool mute;
+            for (auto it : its["groupuser"])
+            {
+                AssignIfPresent(it, "userid", userid);
+                AssignIfPresent(it, "username", username);
+                AssignIfPresent(it, "role", role);
+                AssignIfPresent(it, "mute", mute);
+                groupuserlist.emplace(userid, GroupUser(userid, username, role, mute));
+            }
+            newgrouplist[groupid].groupuserlist_ = groupuserlist;
+            if (IsEarlier(grouplist_[groupid].maxmsgtime_, grouptimestamp)) 
+                newgrouplist[groupid].newmessage_ = true;
         }
         grouplist_ = std::move(newgrouplist);
     }
@@ -1663,7 +1696,7 @@ void Client::InputLoop()
                     std::string savepath;
                     std::cout << "输入保存路径";
                     getline(std::cin, savepath);
-                    if (!(fs::exists(savepath) && fs::is_directory(savepath)))
+                    if (!(std::filesystem::exists(savepath) && std::filesystem::is_directory(savepath)))
                     {
                         std::cout << "不存在的文件夹";
                         continue;
@@ -1765,10 +1798,10 @@ void Client::InputLoop()
 
                 waitInPutReady();
 
-                std::cout << "id  " << "  名字" << "        " << "身份" << std::endl;
+                std::cout << "id  " << "  名字" << "        "  << std::endl;
                 for (auto it : grouplist_)
                 {
-                    std::cout << it.first << " " << it.second.name_ << "    " << it.second.role_ << "   ";
+                    std::cout << it.first << " " << it.second.name_  << "   ";
                     if (it.second.newapply_ || it.second.newmessage_)
                         PrintfRed('*');
                     std::cout << std::endl;
@@ -1824,6 +1857,8 @@ void Client::InputLoop()
 
                 waitInPutReady();
 
+                std::string userrole = grouplist_[groupid].groupuserlist_[userid_].role_;
+
                 std::cout << "1. 聊天";
                 if (grouplist_[groupid].newmessage_)
                     PrintfRed('*');
@@ -1832,7 +1867,7 @@ void Client::InputLoop()
                 std::cout << "3. 发送文件" << std::endl;
                 std::cout << "4. 查看群聊文件" << std::endl;
                 std::cout << "5. 退出群聊" << std::endl;
-                if (grouplist_[groupid].role_ == "Administrator" || grouplist_[groupid].role_ == "Owner")
+                if (userrole== "Administrator" || userrole == "Owner")
                 {
                     std::cout << "6. 查看群聊申请";
                     if (grouplist_[groupid].newapply_)
@@ -1841,7 +1876,7 @@ void Client::InputLoop()
                     std::cout << "7. 处理群聊申请" << std::endl;
                     std::cout << "8. 处理成员禁言" << std::endl;
                 }
-                if (grouplist_[groupid].role_ == "Owner")
+                if (userrole == "Owner")
                 {
                     std::cout << "9. 更改群聊成员权限" << std::endl;
                     std::cout << "10. 解散群聊" << std::endl;
@@ -1880,7 +1915,8 @@ void Client::InputLoop()
                         getline(std::cin, message);
                         if (message == "0") break;
 
-                        if (grouplist_[groupid].mute_ == true)
+                        bool usermute = grouplist_[groupid].groupuserlist_[userid_].mute_;
+                        if (usermute == true)
                         {
                             std::cout << "你已被禁言,无法发送消息" << std::endl;
                             continue;
@@ -1912,6 +1948,11 @@ void Client::InputLoop()
 
                     waitingback_ = true;
                     GroupMember(js);
+
+                    for (auto it : grouplist_[groupid].groupuserlist_)
+                    {
+                        std::cout << it.first << "  " << it.second.username_ << "  " << it.second.role_ << std::endl;
+                    }
 
                     waitInPutReady();
                 }
@@ -1966,7 +2007,7 @@ void Client::InputLoop()
                     std::string savepath;
                     std::cout << "输入保存路径";
                     getline(std::cin, savepath);
-                    if (!(fs::exists(savepath) && fs::is_directory(savepath)))
+                    if (!(std::filesystem::exists(savepath) && std::filesystem::is_directory(savepath)))
                     {
                         std::cout << "不存在的文件夹";
                         continue;

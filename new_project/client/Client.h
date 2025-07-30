@@ -31,8 +31,6 @@ using std::placeholders::_2;
 using std::placeholders::_3;
 using std::placeholders::_4;
 
-namespace fs = std::filesystem;
-
 struct Friend {
     Friend(int id, std::string name, std::string email, bool online, bool block)
         : id_(id), name_(name), block_(block), online_(online){}
@@ -57,14 +55,24 @@ struct FriendApply {
 };
 
 // Member Administrator Owner
+struct GroupUser {
+    GroupUser(int userid, std::string username, std::string role, bool mute)
+        : userid_(userid), username_(username), role_(role), mute_(mute) {}
+    GroupUser() = default;
+    int userid_;
+    std::string username_;
+    std::string role_;
+    bool mute_;
+};
+
 struct Group {
-    Group(int id, std::string name, std::string role, bool mute)
-        : id_(id), name_(name), role_(role), mute_(mute) {}
+    Group(int id, std::string name, bool newapply)
+        : id_(id), name_(name), newapply_(newapply) {}
     Group() = default;
     int id_;
     std::string name_;
-    std::string role_;
-    bool mute_;
+    std::unordered_map<int, GroupUser> groupuserlist_;
+
     bool newmessage_ = false;
     bool newapply_ = false;
     std::string maxmsgtime_;
