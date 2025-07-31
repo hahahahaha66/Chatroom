@@ -108,6 +108,12 @@ inline void Client::notifyInputReady()
     cv_.notify_one();
 }
 
+template <typename Func>
+void RegisterHandlerSafe(Dispatcher& dispatcher, const std::string& type, Client& client, Func f) 
+{
+    dispatcher.registerHandler(type, std::bind(f, std::ref(client), _1, _2));
+}
+
 Client::Client(EventLoop& loop, uint16_t port, std::string ip, std::string name)
     : client_(&loop, InetAddress(port, ip), name), 
       ip_(ip), mainserverport_(port), loop_(&loop)
@@ -116,39 +122,39 @@ Client::Client(EventLoop& loop, uint16_t port, std::string ip, std::string name)
     client_.setMessageCallback(std::bind(&Client::OnMessage, this, _1, _2, _3));
     client_.setWriteCompleteCallback(std::bind(&Client::MessageCompleteCallback, this, _1));
 
-    dispatcher_.registerHander("RegisterBack", std::bind(&Client::RegisterBack, this, _1, _2));
-    dispatcher_.registerHander("LoginBack", std::bind(&Client::LoginBack, this, _1, _2));
-    dispatcher_.registerHander("DeleteAccountBack", std::bind(&Client::DeleteAccountBack, this, _1, _2));
+    RegisterHandlerSafe(dispatcher_, "RegisterBack", *this, &Client::RegisterBack);
+    RegisterHandlerSafe(dispatcher_, "LoginBack", *this, &Client::LoginBack);
+    RegisterHandlerSafe(dispatcher_, "DeleteAccountBack", *this, &Client::DeleteAccountBack);
 
-    dispatcher_.registerHander("FlushBack", std::bind(&Client::FlushBack, this, _1, _2));
-    dispatcher_.registerHander("SendMessageBack", std::bind(&Client::SendMessageBack, this, _1, _2));
-    dispatcher_.registerHander("RecvMessage", std::bind(&Client::RecvMessageBack, this, _1, _2));
-    dispatcher_.registerHander("GetChatHistoryBack", std::bind(&Client::GetChatHistoryBack, this, _1, _2));
-    dispatcher_.registerHander("GetGroupHistoryBack", std::bind(&Client::GetGroupHistoryBack, this, _1, _2));
-    dispatcher_.registerHander("ChanceInterFaceBack", std::bind(&Client::ChanceInterFaceBack, this, _1, _2));
+    RegisterHandlerSafe(dispatcher_, "FlushBack", *this, &Client::FlushBack);
+    RegisterHandlerSafe(dispatcher_, "SendMessageBack", *this, &Client::SendMessageBack);
+    RegisterHandlerSafe(dispatcher_, "RecvMessage", *this, &Client::RecvMessageBack);
+    RegisterHandlerSafe(dispatcher_, "GetChatHistoryBack", *this, &Client::GetChatHistoryBack);
+    RegisterHandlerSafe(dispatcher_, "GetGroupHistoryBack", *this, &Client::GetGroupHistoryBack);
+    RegisterHandlerSafe(dispatcher_, "ChanceInterFaceBack", *this, &Client::ChanceInterFaceBack);
 
-    dispatcher_.registerHander("SendFriendApplyBack", std::bind(&Client::SendFriendApplyBack, this, _1, _2));
-    dispatcher_.registerHander("ListFriendApplyBack", std::bind(&Client::ListFriendApplyBack, this, _1, _2));
-    dispatcher_.registerHander("ListSendFriendApplyBack", std::bind(&Client::ListSendFriendApplyBack, this, _1, _2));
-    dispatcher_.registerHander("ProceFriendApplyBack", std::bind(&Client::ProceFriendApplyBack, this, _1, _2));
-    dispatcher_.registerHander("ListFriendBack", std::bind(&Client::ListFriendBack, this, _1, _2));
-    dispatcher_.registerHander("BlockFriendBack", std::bind(&Client::BlockFriendBack, this, _1, _2));
-    dispatcher_.registerHander("DeleteFriendBack", std::bind(&Client::DeleteFriendBack, this, _1, _2));
+    RegisterHandlerSafe(dispatcher_, "SendFriendApplyBack", *this, &Client::SendFriendApplyBack);
+    RegisterHandlerSafe(dispatcher_, "ListFriendApplyBack", *this, &Client::ListFriendApplyBack);
+    RegisterHandlerSafe(dispatcher_, "ListSendFriendApplyBack", *this, &Client::ListSendFriendApplyBack);
+    RegisterHandlerSafe(dispatcher_, "ProceFriendApplyBack", *this, &Client::ProceFriendApplyBack);
+    RegisterHandlerSafe(dispatcher_, "ListFriendBack", *this, &Client::ListFriendBack);
+    RegisterHandlerSafe(dispatcher_, "BlockFriendBack", *this, &Client::BlockFriendBack);
+    RegisterHandlerSafe(dispatcher_, "DeleteFriendBack", *this, &Client::DeleteFriendBack);
 
-    dispatcher_.registerHander("CreateGroupBack", std::bind(&Client::CreateGroupBack, this, _1, _2));
-    dispatcher_.registerHander("SendGroupApplyBack", std::bind(&Client::SendGroupApplyBack, this, _1, _2));
-    dispatcher_.registerHander("ListGroupApplyBack", std::bind(&Client::ListGroupApplyBack, this, _1, _2));
-    dispatcher_.registerHander("ListSendGroupApplyBack", std::bind(&Client::ListSendGroupApplyBack, this, _1, _2));
-    dispatcher_.registerHander("ListGroupMemberBack", std::bind(&Client::GroupMemberBack, this, _1, _2));
-    dispatcher_.registerHander("ListGroupBack", std::bind(&Client::ListGroupBack, this, _1, _2));
-    dispatcher_.registerHander("QuitGrouprBack", std::bind(&Client::QuitGroupBack, this, _1, _2));
-    dispatcher_.registerHander("ProceGroupApplyBack", std::bind(&Client::ProceGroupApplyBack, this, _1, _2));
-    dispatcher_.registerHander("DeleteGroupBack", std::bind(&Client::DeleteGroupBack, this, _1, _2));
-    dispatcher_.registerHander("BlockGroupUserBack", std::bind(&Client::BlockGroupUserBack, this, _1, _2));
+    RegisterHandlerSafe(dispatcher_, "CreateGroupBack", *this, &Client::CreateGroupBack);
+    RegisterHandlerSafe(dispatcher_, "SendGroupApplyBack", *this, &Client::SendGroupApplyBack);
+    RegisterHandlerSafe(dispatcher_, "ListGroupApplyBack", *this, &Client::ListGroupApplyBack);
+    RegisterHandlerSafe(dispatcher_, "ListSendGroupApplyBack", *this, &Client::ListSendGroupApplyBack);
+    RegisterHandlerSafe(dispatcher_, "ListGroupMemberBack", *this, &Client::GroupMemberBack);
+    RegisterHandlerSafe(dispatcher_, "ListGroupBack", *this, &Client::ListGroupBack);
+    RegisterHandlerSafe(dispatcher_, "QuitGrouprBack", *this, &Client::QuitGroupBack);
+    RegisterHandlerSafe(dispatcher_, "ProceGroupApplyBack", *this, &Client::ProceGroupApplyBack);
+    RegisterHandlerSafe(dispatcher_, "DeleteGroupBack", *this, &Client::DeleteGroupBack);
+    RegisterHandlerSafe(dispatcher_, "BlockGroupUserBack", *this, &Client::BlockGroupUserBack);
 
-    dispatcher_.registerHander("GetFileServerPortBack", std::bind(&Client::GetFileServerPortBack, this, _1, _2));
-    dispatcher_.registerHander("ListFriendFileBack", std::bind(&Client::ListFriendFileBack, this, _1, _2));
-    dispatcher_.registerHander("ListGroupFileBack", std::bind(&Client::ListGroupFileBack, this, _1, _2));
+    RegisterHandlerSafe(dispatcher_, "GetFileServerPortBack", *this, &Client::GetFileServerPortBack);
+    RegisterHandlerSafe(dispatcher_, "ListFriendFileBack", *this, &Client::ListFriendFileBack);
+    RegisterHandlerSafe(dispatcher_, "ListGroupFileBack", *this, &Client::ListGroupFileBack);
 }
 
 void Client::ConnectionCallBack(const TcpConnectionPtr& conn)

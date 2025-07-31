@@ -1,5 +1,6 @@
 #include "Server.h"
 #include "../muduo/logging/Logging.h"
+#include "Service.h"
 #include <functional>
 
 Server::Server(EventLoop* loop,const InetAddress& listenAddr, const InetAddress& fileAddr, std::string name)
@@ -15,38 +16,38 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, const InetAddress&
     server_.setWriteCompleteCallback(std::bind(&Server::MessageCompleteCallback, this, _1));
     server_.setThreadInitCallback(std::bind(&Server::ThreadInitCallback, this, _1));
 
-    dispatcher_.registerHander("Register", std::bind(&Service::UserRegister, &service_, _1, _2));
-    dispatcher_.registerHander("Login", std::bind(&Service::UserLogin, &service_, _1, _2));
-    dispatcher_.registerHander("DeleteAccount", std::bind(&Service::DeleteAccount, &service_, _1, _2));
-    dispatcher_.registerHander("Flush", std::bind(&Service::Flush, &service_, _1, _2));
-    dispatcher_.registerHander("SendMessage", std::bind(&Service::MessageSend, &service_, _1, _2));
-    dispatcher_.registerHander("ChatHistory", std::bind(&Service::GetChatHistory, &service_, _1, _2));
-    dispatcher_.registerHander("GroupHistory", std::bind(&Service::GetGroupHistory, &service_, _1, _2));
-    dispatcher_.registerHander("ChanceInterFace", std::bind(&Service::ChanceInterFace, &service_, _1, _2));
+    RegisterHandlerSafe(dispatcher_, "Register", service_, &Service::UserRegister);
+    RegisterHandlerSafe(dispatcher_, "Login", service_, &Service::UserLogin);
+    RegisterHandlerSafe(dispatcher_, "DeleteAccount", service_, &Service::DeleteAccount);
+    RegisterHandlerSafe(dispatcher_, "Flush", service_, &Service::Flush);
+    RegisterHandlerSafe(dispatcher_, "SendMessage", service_, &Service::MessageSend);
+    RegisterHandlerSafe(dispatcher_, "ChatHistory", service_, &Service::GetChatHistory);
+    RegisterHandlerSafe(dispatcher_, "GroupHistory", service_, &Service::GetGroupHistory);
+    RegisterHandlerSafe(dispatcher_, "ChanceInterFace", service_, &Service::ChanceInterFace);
 
-    dispatcher_.registerHander("SendFriendApply", std::bind(&Service::SendFriendApply, &service_, _1, _2));
-    dispatcher_.registerHander("ListFriendApply", std::bind(&Service::ListFriendApply, &service_, _1, _2));
-    dispatcher_.registerHander("ListSendFriendApply", std::bind(&Service::ListSendFriendApply, &service_, _1, _2));
-    dispatcher_.registerHander("ProceFriendApply", std::bind(&Service::ProceFriendApply, &service_, _1, _2));
-    dispatcher_.registerHander("ListFriend", std::bind(&Service::ListFriend, &service_, _1, _2));
-    dispatcher_.registerHander("BlockFriend", std::bind(&Service::BlockFriend, &service_, _1, _2));
-    dispatcher_.registerHander("DeleteFriend", std::bind(&Service::DeleteFriend, &service_, _1, _2));
+    RegisterHandlerSafe(dispatcher_, "SendFriendApply", service_, &Service::SendFriendApply);
+    RegisterHandlerSafe(dispatcher_, "ListFriendApply", service_, &Service::ListFriendApply);
+    RegisterHandlerSafe(dispatcher_, "ListSendFriendApply", service_, &Service::ListSendFriendApply);
+    RegisterHandlerSafe(dispatcher_, "ProceFriendApply", service_, &Service::ProceFriendApply);
+    RegisterHandlerSafe(dispatcher_, "ListFriend", service_, &Service::ListFriend);
+    RegisterHandlerSafe(dispatcher_, "BlockFriend", service_, &Service::BlockFriend);
+    RegisterHandlerSafe(dispatcher_, "DeleteFriend", service_, &Service::BlockFriend);
 
-    dispatcher_.registerHander("CreateGroup", std::bind(&Service::CreateGroup, &service_, _1, _2));
-    dispatcher_.registerHander("SendGroupApply", std::bind(&Service::SendGroupApply, &service_, _1, _2));
-    dispatcher_.registerHander("ListGroupApply", std::bind(&Service::ListGroupApply, &service_, _1, _2));
-    dispatcher_.registerHander("ListSendGroupApply", std::bind(&Service::ListSendGroupApply, &service_, _1, _2));
-    dispatcher_.registerHander("ListGroupMember", std::bind(&Service::ListGroupMember, &service_, _1, _2));
-    dispatcher_.registerHander("ListGroup", std::bind(&Service::ListGroup, &service_, _1, _2));
-    dispatcher_.registerHander("QuitGroup", std::bind(&Service::QuitGroup, &service_, _1, _2));
-    dispatcher_.registerHander("ChangeUserRole", std::bind(&Service::ChangeUserRole, &service_, _1, _2));
-    dispatcher_.registerHander("ProceGroupApply", std::bind(&Service::ProceGroupApply, &service_, _1, _2));
-    dispatcher_.registerHander("DeleteGroup", std::bind(&Service::DeleteGroup, &service_, _1, _2));
-    dispatcher_.registerHander("BlockGroupUser", std::bind(&Service::BlockGroupUser, &service_, _1, _2));
+    RegisterHandlerSafe(dispatcher_, "CreateGroup", service_, &Service::CreateGroup);
+    RegisterHandlerSafe(dispatcher_, "SendGroupApply", service_, &Service::SendGroupApply);
+    RegisterHandlerSafe(dispatcher_, "ListGroupApply", service_, &Service::ListGroupApply);
+    RegisterHandlerSafe(dispatcher_, "ListSendGroupApply", service_, &Service::ListSendGroupApply);
+    RegisterHandlerSafe(dispatcher_, "ListGroupMember", service_, &Service::ListGroupMember);
+    RegisterHandlerSafe(dispatcher_, "ListGroup", service_, &Service::ListGroup);
+    RegisterHandlerSafe(dispatcher_, "QuitGroup", service_, &Service::QuitGroup);
+    RegisterHandlerSafe(dispatcher_, "ChangeUserRole", service_, &Service::ChangeUserRole);
+    RegisterHandlerSafe(dispatcher_, "ProceGroupApply", service_, &Service::ProceGroupApply);
+    RegisterHandlerSafe(dispatcher_, "DeleteGroup", service_, &Service::DeleteGroup);
+    RegisterHandlerSafe(dispatcher_, "BlockGroupUser", service_, &Service::BlockGroupUser);
 
-    dispatcher_.registerHander("AddFileToMessage", std::bind(&Service::AddFileToMessage, &service_, _1, _2));
-    dispatcher_.registerHander("ListFriendFile", std::bind(&Service::ListFriendFile, &service_, _1, _2));
-    dispatcher_.registerHander("ListGroupFile", std::bind(&Service::ListGroupFile, &service_, _1, _2));
+    RegisterHandlerSafe(dispatcher_, "AddFileToMessage", service_, &Service::AddFileToMessage);
+    RegisterHandlerSafe(dispatcher_, "ListFriendFile", service_, &Service::ListFriendFile);
+    RegisterHandlerSafe(dispatcher_, "ListGroupFile", service_, &Service::ListGroupFile);
 }
 
 void Server::start()

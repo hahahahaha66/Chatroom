@@ -24,6 +24,12 @@ private:
     void ThreadInitCallback(EventLoop* loop);
     void MessageCompleteCallback(const TcpConnectionPtr& conn);
 
+    template <typename Func>
+    void RegisterHandlerSafe(Dispatcher& dispatcher, const std::string& type, Service& service, Func f) 
+    {
+        dispatcher.registerHandler(type, std::bind(f, std::ref(service), _1, _2));
+    }
+
     TcpServer server_;
     FileServer fileserver_;
     Codec codec_;

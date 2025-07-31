@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <nlohmann/json.hpp>
 #include <unordered_map>
 #include <mutex>
@@ -29,45 +30,38 @@ public:
     }
 
     //注册一个命令对应的回调函数
-    void registerHander(std::string type, MessageHander hander) 
+    void registerHandler(std::string type, MessageHander handler) 
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        handers_[type] = std::move(hander);
+        handers_[type] = std::make_shared<MessageHander>(handler);
     }
 
     //触发不同命令的回调函数
     void dispatch(const std::string type, const TcpConnectionPtr conn, const json& js)
     {
-        MessageHander cb;
-
+        std::shared_ptr<MessageHander> cb;
         {
             std::lock_guard<std::mutex> lock(mutex_);
             auto it = handers_.find(type);
             LOG_DEBUG << type;
-            if (it != handers_.end())
-            {
-                cb = it->second;
-                LOG_DEBUG << "hander size: " << sizeof(cb);
-            }
-            else 
+            if (it == handers_.end())
             {
                 LOG_ERROR << "Unrecognized command format";
+                return;
             }
+            cb = it->second;
+            LOG_DEBUG << "hander size: " << sizeof(cb);
         }
-        
-        if (cb)
-        {
-            threadpool_.SubmitTask([=]() {
-                LOG_DEBUG << "threadpool push task";
-                LOG_DEBUG << "Decode message : type = " << type << ", json = " << js.dump();
-                cb(conn, js);
-            });
-        }
+        threadpool_.SubmitTask([cb, type, conn, js = std::move(js)]() {
+            LOG_DEBUG << "threadpool push task";
+            LOG_DEBUG << "Decode message : type = " << type << ", json = " << js.dump();
+            (*cb)(conn, js);
+        });
     }
 
 private:
     ThreadPool threadpool_;
-    std::unordered_map<std::string, MessageHander> handers_;
+    std::unordered_map<std::string, std::shared_ptr<MessageHander>> handers_;
     std::mutex mutex_;
 };
 
