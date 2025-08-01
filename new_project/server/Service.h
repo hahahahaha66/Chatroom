@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../muduo/net/tcp/TcpConnection.h"
+#include "../muduo/net/EventLoop.h"
 #include "../manager/IdGenerator.h"
 #include "../tool/Codec.h"
 #include "../tool/Json.h"
@@ -8,20 +9,24 @@
 #include "../database/MysqlResult.h"
 #include "../model/User.h"
 
+#include <hiredis/hiredis.h>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <sw/redis++/redis++.h>
+#include <sw/redis++/redis.h>
 #include <unordered_map>
 
 using json = nlohmann::json;
 
 class Service {
 public:
-    Service();
+    Service(EventLoop* loop);
     ~Service();
 
     // Database
     void ReadFromDataBase(const std::string& query, std::function<void(MysqlRow&)> rowhander);
     void InitIdsFromMySQL();
+    void FlushMessageToMySQL();
 
     // User
     void UserRegister(const TcpConnectionPtr& conn, const json& js);
@@ -59,6 +64,7 @@ public:
     void ChangeUserRole(const TcpConnectionPtr& conn, const json& js);
     void DeleteGroup(const TcpConnectionPtr& conn, const json& js);
     void BlockGroupUser(const TcpConnectionPtr& conn, const json& js);
+    void RemoveGroupUser(const TcpConnectionPtr& conn, const json& js);
 
     // File
     void AddFileToMessage(const TcpConnectionPtr& conn, const json& js);
@@ -69,12 +75,12 @@ public:
     std::string GetCurrentTimestamp();
     
 private:
-    std::atomic<bool> running_ = false;
+    EventLoop* loop_;
 
     IdGenerator gen_;
     Codec code_;
     DatabaseThreadPool databasethreadpool_;
+    sw::redis::Redis redis_;
 
     std::unordered_map<int, User> onlineuser_;
-
 };

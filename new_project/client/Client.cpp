@@ -74,8 +74,6 @@ void Client::start()
 
 void Client::stop()
 {   
-    running_ = false;
-    StopFlushFromServer();
     client_.disconnect();
     client_.getLoop()->quit();
 }
@@ -151,6 +149,7 @@ Client::Client(EventLoop& loop, uint16_t port, std::string ip, std::string name)
     RegisterHandlerSafe(dispatcher_, "ProceGroupApplyBack", *this, &Client::ProceGroupApplyBack);
     RegisterHandlerSafe(dispatcher_, "DeleteGroupBack", *this, &Client::DeleteGroupBack);
     RegisterHandlerSafe(dispatcher_, "BlockGroupUserBack", *this, &Client::BlockGroupUserBack);
+    RegisterHandlerSafe(dispatcher_, "RemoveGroupUserBack", *this, &Client::RemoveGroupUserBack);
 
     RegisterHandlerSafe(dispatcher_, "GetFileServerPortBack", *this, &Client::GetFileServerPortBack);
     RegisterHandlerSafe(dispatcher_, "ListFriendFileBack", *this, &Client::ListFriendFileBack);
@@ -233,7 +232,7 @@ void Client::LoginBack(const TcpConnectionPtr& conn, const json& js)
         currentState_ = "main_menu";
         userid_ = id;
         name_ = name;
-        StartFlushFromServer(5);
+        loop_->runEvery(2.0, std::bind(&Client::Flush, this));
     }
     else
     {
@@ -277,18 +276,6 @@ void Client::DeleteAccountBack(const TcpConnectionPtr& conn, const json& js)
         std::cout << "注销账户失败" << std::endl;
     }
     notifyInputReady();
-}
-
-void Client::StartFlushFromServer(int seconds)
-{
-    running_ = true;
-    flush_thread_ = std::thread([this, seconds]() {
-        while (running_)
-        {
-            std::this_thread::sleep_for(std::chrono::seconds(seconds));
-            Flush();
-        }
-    });
 }
 
 void Client::Flush()
@@ -377,12 +364,6 @@ void Client::FlushBack(const TcpConnectionPtr& conn, const json& js)
     {
         std::cout << "刷新失败" << std::endl;
     }
-}
-
-void Client::StopFlushFromServer()
-{
-    if (flush_thread_.joinable())
-        flush_thread_.join();
 }
 
 void Client::SendMessage(const json& js)
@@ -483,7 +464,7 @@ void Client::GetChatHistoryBack(const TcpConnectionPtr& conn, const json& js)
                     news = false;
                 }
                 std::string friendname = friendlist_[senderid].name_;
-                std::cout << friendname << ": " << content << "     "<< timestamp << std::endl;
+                std::cout << timestamp << " " << friendname << ": " << content << std::endl;
             }
         }
     }
@@ -508,6 +489,8 @@ void Client::GetGroupHistoryBack(const TcpConnectionPtr& conn, const json& js)
     if (end)
     {
         bool news = true;
+        int senderid;
+        int groupid;
         std::string sendername;
         std::string content;
         std::string status;
@@ -515,14 +498,15 @@ void Client::GetGroupHistoryBack(const TcpConnectionPtr& conn, const json& js)
 
         for (auto it : js["messages"])
         {
-            AssignIfPresent(it, "sendername", sendername);
+            AssignIfPresent(it, "senderid", senderid);
+            AssignIfPresent(js, "groupid", groupid);
             AssignIfPresent(it, "content", content);
             AssignIfPresent(it, "status", status);
             AssignIfPresent(it, "timestamp", timestamp);
 
-            if (sendername == name_)
+            if (senderid == userid_)
             {
-                std::cout << timestamp << " " << sendername << " " << content << std::endl;
+                std::cout << timestamp << " " << name_ << ": " << content << std::endl;
             }
             else  
             {
@@ -531,7 +515,8 @@ void Client::GetGroupHistoryBack(const TcpConnectionPtr& conn, const json& js)
                     std::cout << "以下为新消息" << std::endl;
                     news = false;
                 }
-                std::cout << timestamp << " " << sendername << " " << content << std::endl;
+                sendername = grouplist_[groupid].groupuserlist_[senderid].username_;
+                std::cout << timestamp << " " << sendername << ": " << content << std::endl;
             }
         }
     }
@@ -1090,6 +1075,28 @@ void Client::BlockGroupUserBack(const TcpConnectionPtr& conn, const json& js)
     notifyInputReady();
 }
 
+void Client::RemoveGroupUser(const json& js)
+{
+    this->send(codec_.encode(js, "RemoveGroupUser"));
+}
+
+void Client::RemoveGroupUserBack(const TcpConnectionPtr& conn, const json& js)
+{
+    bool end = false;
+    AssignIfPresent(js, "end", end);
+
+    if (end)
+    {
+        std::cout << "移除群聊成员成功" << std::endl;
+    }
+    else  
+    {
+        std::cout << "移除群聊成员失败" << std::endl;
+    }
+
+    notifyInputReady();
+}
+
 void Client::GetFileServerPort(const json& js)
 {
     this->send(codec_.encode(js, "GetFileServerPort"));
@@ -1588,16 +1595,6 @@ void Client::InputLoop()
                 }
             }
 
-            json js = {
-                {"userid", userid_},
-                {"interfaceid", friendid},
-                {"interface", "Private"}
-            };
-            waitingback_ = true;
-            ChanceInterFace(js);
-
-            waitInPutReady();
-
             ClearScreen();
 
             while (true)
@@ -1612,6 +1609,16 @@ void Client::InputLoop()
 
                 if (order == 1)
                 {
+                        json js = {
+                        {"userid", userid_},
+                        {"interfaceid", friendid},
+                        {"interface", "Private"}
+                    };
+                    waitingback_ = true;
+                    ChanceInterFace(js);
+
+                    waitInPutReady();
+
                     js = {
                         {"userid", userid_},
                         {"friendid", friendid},
@@ -1628,6 +1635,16 @@ void Client::InputLoop()
                         getline(std::cin, message);
                         if (message == "0") 
                         {
+                            json js = {
+                                {"userid", userid_},
+                                {"interfaceid", -1},
+                                {"interface", "Other"}
+                            };
+                            waitingback_ = true;
+                            ChanceInterFace(js);
+
+                            waitInPutReady();
+
                             ClearScreen();
                             break;
                         }
@@ -1714,6 +1731,7 @@ void Client::InputLoop()
                 else if (order == 4)
                 {
                     currentState_ = "main_menu";
+                    ClearScreen();
                     break;
                 }
                 else  
@@ -1829,10 +1847,16 @@ void Client::InputLoop()
                 currentState_ = "groupchat_menu";
                 continue;;
             }
-            else  
+            else if (order == 6)
             {
                 currentState_ = "main_menu";
+                ClearScreen();
                 continue;;
+            }
+            else
+            {
+                std::cout << "错误输入" << std::endl;
+                continue;
             }
         }
         else if (currentState_ == "groupchat_menu")
@@ -1881,19 +1905,30 @@ void Client::InputLoop()
                     std::cout << std::endl;
                     std::cout << "7. 处理群聊申请" << std::endl;
                     std::cout << "8. 处理成员禁言" << std::endl;
+                    std::cout << "9. 移除成员" << std::endl;
                 }
                 if (userrole == "Owner")
                 {
-                    std::cout << "9. 更改群聊成员权限" << std::endl;
-                    std::cout << "10. 解散群聊" << std::endl;
+                    std::cout << "10. 更改群聊成员权限" << std::endl;
+                    std::cout << "11. 解散群聊" << std::endl;
                 }
-                std::cout << "11. 返回上一界面" << std::endl;
+                std::cout << "12. 返回上一界面" << std::endl;
 
                 getline(std::cin, input);
                 if (!ReadNum(input, order)) continue;
 
                 if (order == 1)
                 {
+                     js = {
+                        {"userid", userid_},
+                        {"interfaceid", groupid},
+                        {"interface", "Group"}
+                    };
+                    waitingback_ = true;
+                    ChanceInterFace(js);
+
+                    waitInPutReady();
+
                     json js = {
                         {"userid", userid_},
                         {"groupid", groupid}
@@ -1904,22 +1939,26 @@ void Client::InputLoop()
 
                     waitInPutReady();
 
-                    js = {
-                        {"userid", userid_},
-                        {"interfaceid", groupid},
-                        {"interface", "Group"}
-                    };
-                    waitingback_ = true;
-                    ChanceInterFace(js);
-
-                    waitInPutReady();
-
                     while (true)
                     {
                         std::string message;
                         std::cout << "输入(输入0返回): " ;
                         getline(std::cin, message);
-                        if (message == "0") break;
+                        if (message == "0")
+                        {
+                            json js = {
+                                {"userid", userid_},
+                                {"interfaceid", -1},
+                                {"interface", "Other"}
+                            };
+                            waitingback_ = true;
+                            ChanceInterFace(js);
+
+                            waitInPutReady();
+
+                            ClearScreen();
+                            break;
+                        }
 
                         bool usermute = grouplist_[groupid].groupuserlist_[userid_].mute_;
                         if (usermute == true)
@@ -1943,8 +1982,6 @@ void Client::InputLoop()
 
                         waitInPutReady();
                     }
-
-                    ClearScreen();
                 }
                 else if (order == 2)
                 {
@@ -2095,6 +2132,34 @@ void Client::InputLoop()
                 else if (order == 9)
                 {
                     int userid;
+                    std::cout << "输入要移除的成员id" << std::endl;
+                    getline(std::cin, input);
+                    if (!ReadNum(input, userid)) continue;
+                    if (userid == userid_) 
+                    {
+                        std::cout << "不能移除自己" << std::endl;
+                        continue;
+                    }
+                    std::string role = grouplist_[groupid].groupuserlist_[userid].role_;
+                    if (role == "Owner")
+                    {
+                        std::cout << "不能移除群主" << std::endl;
+                        continue;
+                    }
+
+                    json js = {
+                        {"userid", userid},
+                        {"groupid", groupid}
+                    };
+
+                    waitingback_ = true;
+                    RemoveGroupUser(js);
+
+                    waitInPutReady();
+                }
+                else if (order == 10)
+                {
+                    int userid;
                     std::string role;
                     std::cout << "输入要改变的成员id: " << std::endl;
                     getline(std::cin, input);
@@ -2118,7 +2183,7 @@ void Client::InputLoop()
 
                     waitInPutReady();
                 }
-                else if (order == 10)
+                else if (order == 11)
                 {
                     json js = {
                         {"groupid", groupid}
@@ -2130,9 +2195,10 @@ void Client::InputLoop()
                     if (currentState_ == "group_menu")
                         break;
                 }
-                else if (order == 11)
+                else if (order == 12)
                 {
                     currentState_ = "group_menu";
+                    ClearScreen();
                     break;
                 }
                 else  

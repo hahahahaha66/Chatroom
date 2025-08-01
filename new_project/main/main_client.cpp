@@ -19,14 +19,13 @@ void Quit(int sig)
 
 int main ()
 {
-    // ProfilerStart("cpu_profile.prof");
+    ProfilerStart("cpu_profile.prof");
     EventLoop loop;
 
     g_handler = [&loop]() {
         loop.quit();
-        loop.wakeup();
     };
-    signal(SIGINT, Quit);
+    // signal(SIGINT, Quit);
 
     Client client(loop, 10101, "10.30.0.120", "ChatClient");
 

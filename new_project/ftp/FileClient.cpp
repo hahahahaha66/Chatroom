@@ -1,4 +1,5 @@
 #include "FileClient.h"
+#include <cstdint>
 
 FileUploader::FileUploader(EventLoop* loop, const std::string& serverip,
                  uint16_t serverport, const std::string& filename,
@@ -137,6 +138,8 @@ void FileUploader::SendFileData()
     }
 
     const size_t maxchunk= 128 * 1024;
+    uint64_t placeholder = filesize_ / 100;
+    int progress = 0;
     while (sent_ < filesize_)
     {
         off_t remaining = filesize_ - offset_;
@@ -144,20 +147,27 @@ void FileUploader::SendFileData()
 
         ssize_t n = ::sendfile(conn_->fd(), fd_, &offset_, tosend);
 
+        if ((sent_ / placeholder) > progress)
+        {
+            progress = sent_ / placeholder;
+            std::cout << "已发送大小: " << sent_ << "(" << progress << "%)" << std::endl;
+        }
+        
+        // LOG_INFO << "Try to send total size: " << filesize_;
+
         if (n > 0)
         {
             sent_ = offset_;
-            std::cout << filesize_ << " : " << sent_ << std::endl;
         }
         else if (n == 0)
         {
-            break;
+            continue;
         }
         else  
         {
              if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 // 内核发送缓冲区已满，下次再继续
-                return;
+                continue;
             }
             // 真正错误
             LOG_ERROR << "sendfile error: " << strerror(errno);
@@ -167,11 +177,11 @@ void FileUploader::SendFileData()
         }
 
         if (sent_ >= filesize_)
-            {
-                LOG_INFO << "Upload complete: " << filename_ << ",sent: " << sent_;
-                ::close(fd_);
-                conn_->shutdown();
-            }
+        {
+            LOG_INFO << "Upload complete: " << filename_ << ",sent: " << sent_;
+            ::close(fd_);
+            conn_->shutdown();
+        }
     }
 }
 

@@ -5,9 +5,10 @@
 
 Server::Server(EventLoop* loop,const InetAddress& listenAddr, const InetAddress& fileAddr, std::string name)
     : server_(loop, listenAddr, name), 
-      fileserver_(loop, fileAddr, "fileserver")
+      fileserver_(loop, fileAddr, "fileserver"),
+      service_(loop)
 {
-    MysqlConnectionPool::Instance().Init("localhost", 3306, "hahaha", "123456", "chatroom", 20);
+    MysqlConnectionPool::Instance().Init("localhost", 3306, "hahaha", "123456", "chatroom", 48);
 
     server_.setThreadNum(8);
 
@@ -44,6 +45,7 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, const InetAddress&
     RegisterHandlerSafe(dispatcher_, "ProceGroupApply", service_, &Service::ProceGroupApply);
     RegisterHandlerSafe(dispatcher_, "DeleteGroup", service_, &Service::DeleteGroup);
     RegisterHandlerSafe(dispatcher_, "BlockGroupUser", service_, &Service::BlockGroupUser);
+    RegisterHandlerSafe(dispatcher_, "RemoveGroupUser", service_, &Service::RemoveGroupUser);
 
     RegisterHandlerSafe(dispatcher_, "AddFileToMessage", service_, &Service::AddFileToMessage);
     RegisterHandlerSafe(dispatcher_, "ListFriendFile", service_, &Service::ListFriendFile);
@@ -94,7 +96,9 @@ void Server::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timestamp t
         return ;
     }
 
-    auto [type, js] = msgopt.value();
+    const auto& parsed = *msgopt;
+    const auto& type = std::get<0>(parsed);
+    const auto& js = std::get<1>(parsed);
 
     LOG_INFO << "Start Processing " << type;
 

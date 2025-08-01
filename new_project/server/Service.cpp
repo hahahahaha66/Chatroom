@@ -1,14 +1,18 @@
 #include "Service.h"
 #include "../muduo/logging/Logging.h"
 
+#include <cassert>
 #include <exception>
+#include <iterator>
 #include <mysql/mariadb_com.h>
 #include <mysql/mysql.h>
 #include <ostream>
 #include <sstream>
 #include <string>
+#include <sw/redis++/connection.h>
 #include <sw/redis++/shards.h>
 #include <unistd.h>
+#include <utility>
 
 std::string Service::Escape(const std::string& input) {
     std::string output;
@@ -139,13 +143,61 @@ void Service::InitIdsFromMySQL() {
 
         LOG_INFO << "已从 MySQL 初始化 Redis ID:groupapply=" << maxgroupapplyid;
     });
-
 }
 
-Service::Service()
+void Service::FlushMessageToMySQL()
+{
+    LOG_INFO << "FlushMessageToMySQL";
+
+    std::vector<std::string> messages;
+    redis_.lrange("messages", 0, -1, std::back_inserter(messages));
+
+    if (messages.empty()) return;
+
+    auto mysqlconn = MysqlConnectionPool::Instance().GetConnection();
+
+    for (const auto& msgstr : messages)
+    {
+        int id;
+        int senderid;
+        int receiverid;
+        std::string content;
+        std::string type;
+        std::string status;
+        std::string timestamp;
+        json js = json::parse(msgstr);
+        AssignIfPresent(js, "id", id);
+        AssignIfPresent(js, "senderid", senderid);
+        AssignIfPresent(js, "receiverid", receiverid);
+        AssignIfPresent(js, "content", content);
+        AssignIfPresent(js, "type", type);
+        AssignIfPresent(js, "status", status);
+        AssignIfPresent(js, "timestamp", timestamp);
+         std::ostringstream oss;
+        oss << "insert into messages (id, senderid, receiverid, content, type, status, timestamp) values ("
+            << id << ", " << senderid << ", " << receiverid << ", '" << content << "','"
+            << type  << "','" << status << "','" << timestamp << "');";
+
+        if (!mysqlconn->ExcuteUpdate(oss.str())) 
+        {
+            LOG_ERROR << "Failed to insert message into database, query: " << oss.str();
+            return;  // 添加 return
+        }
+    }
+    
+    redis_.del("messages");
+}
+
+Service::Service(EventLoop* loop) : redis_([] {
+        sw::redis::ConnectionOptions opts;
+        opts.host = "127.0.0.1";
+        opts.port = 6379;
+        return sw::redis::Redis(opts);
+    }()), loop_(loop)
 {
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     InitIdsFromMySQL();
+    loop_->runEvery(5.0, std::bind(&Service::FlushMessageToMySQL, this));
 }
 
 Service::~Service()
@@ -729,6 +781,8 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
     {
         try 
         {
+            std::vector<std::pair<TcpConnectionPtr, json>> messagestosend;
+
             if (type == "Group")
             {
                 std::string query = "select userid from groupusers where groupid = " + std::to_string(receiverid) + "; ";
@@ -761,7 +815,7 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
                             {"type", type},
                             {"timestamp", timestamp}
                             };
-                            reconn->send(code_.encode(j, "RecvMessage"));
+                            messagestosend.emplace_back(reconn, std::move(j));
                         }
                     }
                 }
@@ -807,7 +861,7 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
                         {"type", type},
                         {"timestamp", timestamp}
                         };
-                        reconn->send(code_.encode(j, "RecvMessage"));
+                        messagestosend.emplace_back(reconn, std::move(j));
                     }
                 }
             }
@@ -818,20 +872,34 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
                 return;
             }
 
-            std::ostringstream oss;
-            oss << "insert into messages (id, senderid, receiverid, content, type, status, timestamp) values ("
-                << msgid << ", " << senderid << ", " << receiverid << ", '" << content << "','"
-                << type  << "','" << status << "','" << timestamp << "');";
+            json j = {
+                {"id", msgid},
+                {"senderid", senderid},
+                {"receiverid", receiverid},
+                {"content", content},
+                {"type", type},
+                {"status", status},
+                {"timestamp", timestamp}
+            };
+            std::string key = "messages";
+            std::string value = j.dump();
+            redis_.rpush(key, value);
 
-            if (!mysqlconn.ExcuteUpdate(oss.str())) 
+            for (auto& pair : messagestosend)
             {
-                LOG_ERROR << "Failed to insert message into database, query: " << oss.str();
-                done(false);
-                return;  // 添加 return
+                TcpConnectionPtr reconn = pair.first;
+                json jsonmsg = std::move(pair.second);
+
+                EventLoop* loop = reconn->getLoop();
+                if (loop)
+                {
+                    loop->runInLoop([reconn, msg = std::move(jsonmsg), this]() mutable {
+                        reconn->send(code_.encode(msg, "RecvMessage"));
+                    });
+                }
             }
             
             done(true);
-            return;
         } catch(const std::exception& e)
         {
             LOG_ERROR << "Database error during message send: " << e.what();
@@ -911,6 +979,35 @@ void Service::GetChatHistory(const TcpConnectionPtr& conn, const json& js)
             };
             arr.push_back(message);
         }
+
+        std::vector<std::string> redismessages;
+        redis_.lrange("messages", 0, -1, std::back_inserter(redismessages));
+
+        for (const auto& str : redismessages)
+        {
+            int senderid;
+            int receiverid;
+            std::string content;
+            std::string status;
+            std::string timestamp;
+            json js = json::parse(str);
+            AssignIfPresent(js, "senderid", senderid);
+            AssignIfPresent(js, "receiverid", receiverid);
+            AssignIfPresent(js, "content", content);
+            AssignIfPresent(js, "status", status);
+            AssignIfPresent(js, "timestamp", timestamp);
+            if ((senderid == userid && receiverid == friendid) || (senderid == friendid && receiverid == userid))
+            {
+                json js = {
+                    {"senderid", senderid},
+                    {"content", content},
+                    {"status", status},
+                    {"timestamp", timestamp}
+                };
+                arr.push_back(js);
+            }
+        }
+        
         j["messages"] = arr;
         j["end"] = true;
         conn->send(code_.encode(j, "GetChatHistoryBack"));
@@ -954,7 +1051,6 @@ void Service::GetGroupHistory(const TcpConnectionPtr& conn, const json& js)
         json j;
         json arr = json::array();
         int senderid;
-        std::string sendername;
         std::string content;
         std::string status;
         std::string timestamp;
@@ -968,29 +1064,44 @@ void Service::GetGroupHistory(const TcpConnectionPtr& conn, const json& js)
             status = row.GetString("status");
             timestamp = row.GetString("timestamp");
 
-            std::string query = "select name from users where id = " + std::to_string(senderid);
-            MYSQL_RES* res = mysqlconn.ExcuteQuery(query);
-            if (!res) {
-                LOG_ERROR << "Getgrouphistory from name query failed ";
-                done(false);
-                return;
-            }
-            MysqlResult result(res);
-            if (!result.Next()) {
-                LOG_ERROR << "No user found with id: " << senderid;
-                done(false);
-                return;
-            }
-            sendername = result.GetRow().GetString("name");
-
             json message = {
-                {"sendername", sendername},
+                {"senderid", senderid},
+                {"groupid", groupid},
                 {"content", content},
                 {"status", status},
                 {"timestamp", timestamp}
             };
             arr.push_back(message);
         }
+
+        std::vector<std::string> redismessages;
+        redis_.lrange("messages", 0, -1, std::back_inserter(redismessages));
+
+        for (const auto& str : redismessages)
+        {
+            int senderid;
+            int receiverid;
+            std::string content;
+            std::string status;
+            std::string timestamp;
+            json js = json::parse(str);
+            AssignIfPresent(js, "senderid", senderid);
+            AssignIfPresent(js, "receiverid", receiverid);
+            AssignIfPresent(js, "content", content);
+            AssignIfPresent(js, "status", status);
+            AssignIfPresent(js, "timestamp", timestamp);
+            if (receiverid == groupid)
+            {
+                json js = {
+                    {"senderid", senderid},
+                    {"content", content},
+                    {"status", status},
+                    {"timestamp", timestamp}
+                };
+                arr.push_back(js);
+            }
+        }
+
         j["messages"] = arr;
         j["end"] = true;
         conn->send(code_.encode(j, "GetGroupHistoryBack"));
@@ -2313,6 +2424,41 @@ void Service::BlockGroupUser(const TcpConnectionPtr& conn, const json& js)
                 {"end", success}
             };
             conn->send(code_.encode(j, "BlockGroupUserBack"));
+        }
+    );
+}
+
+void Service::RemoveGroupUser(const TcpConnectionPtr& conn, const json& js)
+{
+    bool end = true;
+    int userid;
+    int groupid;
+    end &= AssignIfPresent(js, "userid", userid);
+    end &= AssignIfPresent(js, "groupid", groupid);
+    databasethreadpool_.EnqueueTask([this, userid, groupid](MysqlConnection& mysqlconn, DBCallback done) {
+        std::string query = "delete from groupusers where ( groupid = " + std::to_string(groupid)
+                            + " and userid = " + std::to_string(userid) + "); ";
+        if (mysqlconn.ExcuteUpdate(query))
+        {
+            done(true);
+            return;
+        }
+        else 
+        {
+            done(false);
+            return;
+        }
+
+    },[this, conn](bool success) {
+            if (success) {
+                LOG_DEBUG << "ReomveGroupUser success";
+            } else {
+                LOG_ERROR << "ReomoveGroupUser failed";
+            }
+            json j = {
+                {"end", success}
+            };
+            conn->send(code_.encode(j, "RemoveGroupUserBack"));
         }
     );
 }

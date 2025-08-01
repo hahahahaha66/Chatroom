@@ -141,7 +141,7 @@ void FileServer::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timesta
             {
                 task->received_ += n;
                 buffer->retrieve(n);
-                std::cout << task->filesize_ << " : " << task->received_ << std::endl;
+                // std::cout << task->filesize_ << " : " << task->received_ << std::endl;
             }
             else  
             {

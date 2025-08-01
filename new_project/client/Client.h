@@ -105,10 +105,8 @@ public:
     void DeleteAccountBack(const TcpConnectionPtr& conn, const json& js);
 
     // 刷新
-    void StartFlushFromServer(int seconds);
     void Flush();
     void FlushBack(const TcpConnectionPtr& conn, const json& js);
-    void StopFlushFromServer();
 
     // 消息
     void SendMessage(const json& js);
@@ -150,6 +148,7 @@ public:
     void ChangeUserRole(const json& js);
     void DeleteGroup(const json& js);
     void BlockGroupUser(const json& js);
+    void RemoveGroupUser(const json& js);
 
     void CreateGroupBack(const TcpConnectionPtr& conn, const json& js);
     void SendGroupApplyBack(const TcpConnectionPtr& conn, const json& js);
@@ -162,6 +161,7 @@ public:
     void ChangeUserRoleBack(const TcpConnectionPtr& conn, const json& js);
     void DeleteGroupBack(const TcpConnectionPtr& conn, const json& js);
     void BlockGroupUserBack(const TcpConnectionPtr& conn, const json& js);
+    void RemoveGroupUserBack(const TcpConnectionPtr& conn, const json& js);
 
     // 文件
     void GetFileServerPort(const json& js);
@@ -193,9 +193,7 @@ private:
     std::string currentState_ = "init_menu";
     std::mutex mutex_;
     std::condition_variable cv_;
-    std::thread flush_thread_;
-    bool running_;
-
+    
     TcpClient client_;
     Codec codec_;
     Dispatcher dispatcher_;

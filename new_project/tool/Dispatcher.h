@@ -33,13 +33,13 @@ public:
     void registerHandler(std::string type, MessageHander handler) 
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        handers_[type] = std::make_shared<MessageHander>(handler);
+        handers_[std::move(type)] = std::move(handler);
     }
 
     //触发不同命令的回调函数
-    void dispatch(const std::string type, const TcpConnectionPtr conn, const json& js)
+    void dispatch(const std::string& type, const TcpConnectionPtr conn, const json& js)
     {
-        std::shared_ptr<MessageHander> cb;
+        MessageHander cb;
         {
             std::lock_guard<std::mutex> lock(mutex_);
             auto it = handers_.find(type);
@@ -52,16 +52,17 @@ public:
             cb = it->second;
             LOG_DEBUG << "hander size: " << sizeof(cb);
         }
-        threadpool_.SubmitTask([cb, type, conn, js = std::move(js)]() {
+        auto jsPtr = std::make_shared<json>(js);
+        threadpool_.SubmitTask([cb = std::move(cb), type, conn, jsPtr]() {
             LOG_DEBUG << "threadpool push task";
-            LOG_DEBUG << "Decode message : type = " << type << ", json = " << js.dump();
-            (*cb)(conn, js);
+            LOG_DEBUG << "Dispatch type: " << type;
+            (cb)(conn, *jsPtr);
         });
     }
 
 private:
     ThreadPool threadpool_;
-    std::unordered_map<std::string, std::shared_ptr<MessageHander>> handers_;
+    std::unordered_map<std::string, MessageHander> handers_;
     std::mutex mutex_;
 };
 

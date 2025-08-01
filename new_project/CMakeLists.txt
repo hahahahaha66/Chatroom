@@ -54,6 +54,7 @@ target_link_libraries(server
     redis++                         # sw::redis++
     OpenSSL::Crypto 
     profiler
+    jemalloc
 )
 
 # ========= 客户端 =========
@@ -68,4 +69,5 @@ target_link_libraries(client
     mynet
     pthread
     profiler
+    jemalloc
 )
