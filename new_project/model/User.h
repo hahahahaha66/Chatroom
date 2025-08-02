@@ -7,7 +7,8 @@ class User
 {
 public:
     User(int id, const std::string& name, const std::string& password, const std::string& email)
-        : id_(id), name_(name), password_(password), email_(email), online_(false), userinterfaceid(0), userinterface_("") {}
+        : id_(id), name_(name), password_(password), email_(email), online_(false), 
+          istransferfiles_(false), userinterfaceid(0), timeout_(0), userinterface_("") {}
     User() = default;
 
     int GetId() const { return id_; }
@@ -24,6 +25,12 @@ public:
     void SetOnline(bool online) { online_ = online; }
     bool IsOnline() const { return online_; }
 
+    void SetTimeOut(int timeout) { timeout_ = timeout; }
+    void TimeOutIncrement() { timeout_++; }
+    int GetTimeOut() { return timeout_; }
+    void SetIsTransferFiles(bool status) { istransferfiles_ = status; }
+    int GetIsTransferFiles() { return istransferfiles_; }
+
 private:
     int id_;
     std::string name_;
@@ -32,5 +39,7 @@ private:
     std::string userinterface_;
     int userinterfaceid;
     bool online_;
+    bool istransferfiles_;
+    int timeout_;
     TcpConnectionPtr conn_;
 };

@@ -37,6 +37,7 @@ file(GLOB_RECURSE CLIENT_COMMON_SOURCES
 
 # ========= 服务端 =========
 find_package(OpenSSL REQUIRED)
+find_package(CURL REQUIRED)
 
 add_executable(server
     ${PROJECT_SOURCE_DIR}/main/main_server.cpp
@@ -55,6 +56,7 @@ target_link_libraries(server
     OpenSSL::Crypto 
     profiler
     jemalloc
+    PRIVATE CURL::libcurl
 )
 
 # ========= 客户端 =========

@@ -181,11 +181,23 @@ void Service::FlushMessageToMySQL()
         if (!mysqlconn->ExcuteUpdate(oss.str())) 
         {
             LOG_ERROR << "Failed to insert message into database, query: " << oss.str();
-            return;  // 添加 return
+            continue;  // 添加 return
         }
     }
     
     redis_.del("messages");
+}
+
+void Service::TimeoutDetection()
+{
+    for (auto& it : onlineuser_)
+    {
+        auto& user = it.second;
+        if (user.GetTimeOut() > 120 && !user.GetIsTransferFiles())
+        {
+            user.GetConn()->shutdown();
+        }
+    }
 }
 
 Service::Service(EventLoop* loop) : redis_([] {
@@ -198,6 +210,13 @@ Service::Service(EventLoop* loop) : redis_([] {
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     InitIdsFromMySQL();
     loop_->runEvery(5.0, std::bind(&Service::FlushMessageToMySQL, this));
+    loop_->runEvery(60.0, std::bind(&Service::TimeoutDetection, this));
+    loop_->runEvery(1.0, [this]() {
+        for (auto& it : onlineuser_)
+        {
+            it.second.TimeOutIncrement();
+        }
+    });
 }
 
 Service::~Service()
