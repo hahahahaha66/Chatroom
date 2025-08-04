@@ -223,7 +223,7 @@ Service::Service(EventLoop* loop) : redis_([] {
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     InitIdsFromMySQL();
     loop_->runEvery(5.0, std::bind(&Service::FlushMessageToMySQL, this));
-    loop_->runEvery(60.0, std::bind(&Service::TimeoutDetection, this));
+    loop_->runEvery(30.0, std::bind(&Service::TimeoutDetection, this));
     loop_->runEvery(1.0, [this]() {
         for (auto& it : onlineuser_)
         {
@@ -1420,7 +1420,7 @@ void Service::ProceFriendApply(const TcpConnectionPtr& conn, const json& js)
         oss << "update friendapplys set status = '" << status << "' "
             << "where targetid = " << targetid << " and fromid = "
             << fromid << ";";
-        std::cout << oss.str() << std::endl;
+
         if (!mysqlconn.ExcuteUpdate(oss.str()))
         {
             done(false);

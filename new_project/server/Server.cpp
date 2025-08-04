@@ -120,10 +120,11 @@ void Server::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timestamp t
         json j = {
             {"port", fileport}
         };
-        for (auto& user : service_.GetOnlineUserList())
+        for (auto& it : service_.GetOnlineUserList())
         {
-            if (user.second.GetConn() == conn)
-                user.second.SetIsTransferFiles(true);
+            auto& user = it.second;
+            if (user.GetConn() == conn)
+                user.SetIsTransferFiles(true);
         }
 
         conn->send(codec_.encode(j, "GetFileServerPortBack"));
@@ -131,15 +132,15 @@ void Server::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timestamp t
     }
     if (type != "Flush")
     {
-        for (auto& user : service_.GetOnlineUserList())
+        for (auto& it : service_.GetOnlineUserList())
         {
-            if (user.second.GetConn() == conn)
+            auto& user = it.second;
+            if (user.GetConn() == conn)
             {
-                user.second.SetIsTransferFiles(false);
-                user.second.SetTimeOut(0);
+                user.SetIsTransferFiles(false);
+                user.SetTimeOut(0);
             }
         }
     }
-
     dispatcher_.dispatch(type, conn, js);
 }

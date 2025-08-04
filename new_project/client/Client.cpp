@@ -74,6 +74,7 @@ void Client::start()
 
 void Client::stop()
 {   
+    exitflag_ = true;
     client_.disconnect();
     client_.getLoop()->quit();
 }
@@ -146,6 +147,7 @@ Client::Client(EventLoop& loop, uint16_t port, std::string ip, std::string name)
     RegisterHandlerSafe(dispatcher_, "ListGroupMemberBack", *this, &Client::GroupMemberBack);
     RegisterHandlerSafe(dispatcher_, "ListGroupBack", *this, &Client::ListGroupBack);
     RegisterHandlerSafe(dispatcher_, "QuitGrouprBack", *this, &Client::QuitGroupBack);
+    RegisterHandlerSafe(dispatcher_, "ChangeUserRoleBack", *this, &Client::ChangeUserRoleBack);
     RegisterHandlerSafe(dispatcher_, "ProceGroupApplyBack", *this, &Client::ProceGroupApplyBack);
     RegisterHandlerSafe(dispatcher_, "DeleteGroupBack", *this, &Client::DeleteGroupBack);
     RegisterHandlerSafe(dispatcher_, "BlockGroupUserBack", *this, &Client::BlockGroupUserBack);
@@ -1226,7 +1228,7 @@ void Client::DownloadFile(std::string filename, std::string savepath, std::strin
 
 void Client::InputLoop()
 {
-    while (true)
+    while (!exitflag_)
     {
         if (currentState_ == "init_menu")
         {
@@ -1331,8 +1333,6 @@ void Client::InputLoop()
                 if (email == email_)
                 {
                     std::cout << "邮箱为用户邮箱" << std::endl;
-                    warning_.simulatePanic();
-                    ClearScreen();
                     continue;
                 }
                 for (auto it : friendlist_)
@@ -1403,7 +1403,13 @@ void Client::InputLoop()
                 ListAllApply(js);
 
                 waitInPutReady();
-                for (auto it : friendsendapplylist_)
+                if (friendapplylist_.size() == 0)
+                {
+                    std::cout << "当前无待处理的好友申请" << std::endl;
+                    continue;
+                }
+
+                for (auto it : friendapplylist_)
                 {
                     if (it.second.status_ == "Pending")
                     {
@@ -1417,7 +1423,7 @@ void Client::InputLoop()
                     std::string input;
                     std::cout << "输入处理的申请用户id(输入0返回): ";
                     getline(std::cin, input);
-                    if (!ReadNum(input, fromid)) continue;
+                    if (!ReadNum(input, fromid)) break;
 
                     if (fromid == 0) break;
                     std::cout << "输入选择(Agree或Reject): ";
@@ -1466,7 +1472,7 @@ void Client::InputLoop()
                 if (friendlist_.find(friendid) == friendlist_.end())
                 {
                     std::cout << "未知好友id" << std::endl;
-                    continue;
+                    break;
                 }
                 else  
                 {
@@ -1520,12 +1526,12 @@ void Client::InputLoop()
                 int friendid;
                 std::cout << "输入要删除的好友id:";
                 getline(std::cin, input);
-                ReadNum(input, friendid);
+                if (!ReadNum(input, friendid)) continue;
 
                 if (friendlist_.find(friendid) == friendlist_.end())
                 {
                     std::cout << "未知好友id" << std::endl;
-                    continue;
+                    break;
                 }
 
                 json js = {
@@ -1553,7 +1559,7 @@ void Client::InputLoop()
                 if (input != password_)
                 {
                     std::cout << "密码输入错误" << std::endl;
-                    continue;
+                    break;
                 }
 
                 json js = {
@@ -1873,6 +1879,7 @@ void Client::InputLoop()
             if (grouplist_.find(groupid) == grouplist_.end())
             {
                 std::cout << "未知群聊id,请重新输入" << std::endl;
+                currentState_ = "group_menu";
                 continue;
             }
                 
@@ -1889,7 +1896,18 @@ void Client::InputLoop()
 
                 waitInPutReady();
 
-                std::string userrole = grouplist_[groupid].groupuserlist_[userid_].role_;
+                std::string userrole;
+                auto& userlist = grouplist_[groupid].groupuserlist_;
+                if (userlist.find(userid_) != userlist.end())
+                {
+                    userrole = userlist[userid_].role_;
+                }
+                else  
+                {
+                    currentState_ = "group_menu";
+                    continue;
+                }
+
 
                 std::cout << "1. 聊天";
                 if (grouplist_[groupid].newmessage_)
@@ -1948,21 +1966,17 @@ void Client::InputLoop()
                         getline(std::cin, message);
                         if (message == "0")
                         {
-                            json js = {
-                                {"userid", userid_},
-                                {"interfaceid", -1},
-                                {"interface", "Other"}
-                            };
-                            waitingback_ = true;
-                            ChanceInterFace(js);
-
-                            waitInPutReady();
-
                             ClearScreen();
                             break;
                         }
 
-                        bool usermute = grouplist_[groupid].groupuserlist_[userid_].mute_;
+                        if (userlist.find(userid_) == userlist.end())
+                        {
+                            currentState_ = "group_menu";
+                            break;
+                        }
+
+                        bool usermute = userlist[userid_].mute_;
                         if (usermute == true)
                         {
                             std::cout << "你已被禁言,无法发送消息" << std::endl;
@@ -2117,9 +2131,31 @@ void Client::InputLoop()
                     int userid;
                     bool block;
                     bool nowblock;
-                    std::cout << "输入要屏蔽的成员id:";
+                    std::cout << "输入要禁言的成员id:";
+
                     getline(std::cin, input);
                     ReadNum(input, userid);
+
+                    if (userid == userid_)
+                    {
+                        std::cout << "不能禁言自己" << std::endl;
+                        continue;
+                    }
+                    auto userlist = grouplist_[groupid].groupuserlist_;
+                    if (userlist.find(userid) == userlist.end())
+                    {
+                        std::cout << "错误成员id" << std::endl;
+                        continue;
+                    }
+                    std::string userrole = userlist[userid_].role_;
+                    if (userrole != "Owner")
+                    {
+                        if (userlist[userid].role_ != "Member")
+                        {
+                            std::cout << "权限不足" << std::endl;
+                            continue;
+                        }
+                    }
 
                     json js = {
                         {"groupid", groupid},
@@ -2141,11 +2177,20 @@ void Client::InputLoop()
                         std::cout << "不能移除自己" << std::endl;
                         continue;
                     }
-                    std::string role = grouplist_[groupid].groupuserlist_[userid].role_;
-                    if (role == "Owner")
+                    auto userlist = grouplist_[groupid].groupuserlist_;
+                    if (userlist.find(userid) == userlist.end())
                     {
-                        std::cout << "不能移除群主" << std::endl;
+                        std::cout << "错误成员id" << std::endl;
                         continue;
+                    }
+                    std::string userrole = userlist[userid_].role_;
+                    if (userrole != "Owner")
+                    {
+                        if (userlist[userid].role_ != "Member")
+                        {
+                            std::cout << "权限不足" << std::endl;
+                            continue;
+                        }
                     }
 
                     json js = {
@@ -2165,6 +2210,26 @@ void Client::InputLoop()
                     std::cout << "输入要改变的成员id: " << std::endl;
                     getline(std::cin, input);
                     if (!ReadNum(input, userid)) continue;
+                    if (userid == userid_) 
+                    {
+                        std::cout << "不能改变自己" << std::endl;
+                        continue;
+                    }
+                    auto userlist = grouplist_[groupid].groupuserlist_;
+                    if (userlist.find(userid) == userlist.end())
+                    {
+                        std::cout << "错误成员id" << std::endl;
+                        continue;
+                    }
+                    std::string userrole = userlist[userid_].role_;
+                    if (userrole != "Owner")
+                    {
+                        if (userlist[userid].role_ != "Member")
+                        {
+                            std::cout << "权限不足" << std::endl;
+                            continue;
+                        }
+                    }
                     std::cout << "输入改变后的角色(Member或Administrator): " << std::endl;
                     getline(std::cin, role);
                     if (!(role == "Member" || role == "Administrator"))

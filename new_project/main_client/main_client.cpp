@@ -22,11 +22,6 @@ int main ()
     ProfilerStart("cpu_profile.prof");
     EventLoop loop;
 
-    g_handler = [&loop]() {
-        loop.quit();
-    };
-    signal(SIGINT, Quit);
-
     Client client(loop, 10101, "10.30.0.120", "ChatClient");
 
     client.start();
@@ -35,7 +30,15 @@ int main ()
         client.InputLoop();
     });
 
+    g_handler = [&client, &th]() {
+        client.stop();
+        if (th.joinable())
+            th.join();
+    };
+    signal(SIGINT, Quit);
+
     loop.loop();
+    std::cout << "EventLoop 已退出" << std::endl;
     
     if (th.joinable())
         th.join();

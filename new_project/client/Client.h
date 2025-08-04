@@ -191,13 +191,13 @@ public:
 private:
     std::atomic<bool> waitingback_ = false;
     std::string currentState_ = "init_menu";
+    bool exitflag_ = false;
     std::mutex mutex_;
     std::condition_variable cv_;
     
     TcpClient client_;
     Codec codec_;
     Dispatcher dispatcher_;
-    Warning warning_;
     std::string ip_;
     uint16_t mainserverport_ = -1;
     uint16_t fileserverport_ = -1;

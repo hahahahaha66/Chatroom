@@ -52,8 +52,15 @@ bool MysqlConnection::ExcuteUpdate(const std::string& mysqlorder)
 {
     if (mysql_query(conn_, mysqlorder.c_str()))
     {
-        std::cerr << "Updata failed: " << mysql_error(conn_) << std::endl;
+        LOG_ERROR << "Updata failed: " << mysql_error(conn_);
         return false;
+    }
+
+    my_ulonglong affected = mysql_affected_rows(conn_);
+    if (affected == 0)
+    {
+        LOG_ERROR << "Update succeeded but no rows were affected.";
+        return false;  // 可根据你业务逻辑选择 true 或 false
     }
     return true;
 }
@@ -62,7 +69,7 @@ MYSQL_RES* MysqlConnection::ExcuteQuery(const std::string& mysqlorder)
 {
     if (mysql_query(conn_, mysqlorder.c_str()))
     {
-        std::cerr << "Query failed: " << mysql_error(conn_) << std::endl;
+        LOG_ERROR << "Query failed: " << mysql_error(conn_);
         return nullptr;
     }
     return mysql_store_result(conn_);
