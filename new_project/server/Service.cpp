@@ -206,7 +206,7 @@ void Service::TimeoutDetection()
     for (auto& it : onlineuser_)
     {
         auto& user = it.second;
-        if (user.GetTimeOut() > 120 && !user.GetIsTransferFiles())
+        if (user.GetTimeOut() > 600 && !user.GetIsTransferFiles())
         {
             user.GetConn()->shutdown();
         }
