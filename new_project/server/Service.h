@@ -85,4 +85,5 @@ private:
     sw::redis::Redis redis_;
 
     std::unordered_map<int, User> onlineuser_;
+    std::vector<std::string> messagecachelist_;
 };

@@ -67,7 +67,7 @@ void Server::MessageCompleteCallback(const TcpConnectionPtr& conn)
 {
     if (conn->connected())
     {
-        LOG_INFO << conn->getLoop() << " Loop and send messages to " << conn->peerAddress().toIpPort();
+        LOG_DEBUG << conn->getLoop() << " Loop and send messages to " << conn->peerAddress().toIpPort();
     }
 }
 
@@ -86,7 +86,7 @@ void Server::OnConnection(const TcpConnectionPtr& conn)
 
 void Server::OnMessage(const TcpConnectionPtr& conn, Buffer* buffer, Timestamp time) 
 {
-    LOG_INFO << "tryDecode: buffer size = " << buffer->readableBytes();
+    LOG_DEBUG << "tryDecode: buffer size = " << buffer->readableBytes();
 
     auto msgopt = codec_.tryDecode(buffer);
 

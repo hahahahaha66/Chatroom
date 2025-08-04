@@ -234,6 +234,7 @@ Service::Service(EventLoop* loop) : redis_([] {
 
 Service::~Service()
 {
+    FlushMessageToMySQL();
 }
 
 void Service::UserRegister(const TcpConnectionPtr& conn, const json& js)
@@ -791,7 +792,6 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
 {
     bool end = true;
     int senderid = 0;
-    std::string sendername;
     int receiverid = 0;
     std::string content;
     std::string type;
@@ -799,7 +799,6 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
     std::string timestamp = GetCurrentTimestamp();
 
     end &= AssignIfPresent(js, "senderid", senderid);
-    end &= AssignIfPresent(js, "sendername", sendername);
     end &= AssignIfPresent(js, "receiverid", receiverid);
     end &= AssignIfPresent(js, "content", content);
     end &= AssignIfPresent(js, "type", type);
@@ -809,7 +808,7 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
     int msgid = gen_.GetNextMsgId();
 
     databasethreadpool_.EnqueueTask(
-    [this, msgid, senderid, sendername, receiverid, content, type, status, timestamp](MysqlConnection& mysqlconn, DBCallback done)mutable 
+    [this, msgid, senderid, receiverid, content, type, status, timestamp](MysqlConnection& mysqlconn, DBCallback done)mutable 
     {
         try 
         {
@@ -842,7 +841,7 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
                         {   
                             json j = {
                             {"groupid", receiverid},
-                            {"sendername", sendername},
+                            {"senderid", senderid},
                             {"content", content},
                             {"type", type},
                             {"timestamp", timestamp}
@@ -888,7 +887,6 @@ void Service::MessageSend(const TcpConnectionPtr& conn, const json& js)
                     {
                         json j = {
                         {"friendid", senderid},
-                        {"sendername", sendername},
                         {"content", content},
                         {"type", type},
                         {"timestamp", timestamp}

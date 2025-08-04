@@ -388,13 +388,14 @@ void Client::SendMessageBack(const TcpConnectionPtr& conn, const json& js)
 
 void Client::RecvMessageBack(const TcpConnectionPtr& conn, const json& js)
 {
+    int senderid;
     std::string sendername;
     std::string content;
     std::string timestamp;
     std::string type;
     int id;
 
-    AssignIfPresent(js, "sendername", sendername);
+    AssignIfPresent(js, "senderid", senderid);
     AssignIfPresent(js, "content", content);
     AssignIfPresent(js, "timestamp", timestamp);     
 
@@ -402,6 +403,7 @@ void Client::RecvMessageBack(const TcpConnectionPtr& conn, const json& js)
     if (type == "Group")
     {
         AssignIfPresent(js, "groupid", id);
+        sendername = grouplist_[id].groupuserlist_[senderid].username_;
         if (IsEarlier(grouplist_[id].maxmsgtime_, timestamp))
         {
             grouplist_[id].maxmsgtime_ = timestamp;
@@ -411,6 +413,7 @@ void Client::RecvMessageBack(const TcpConnectionPtr& conn, const json& js)
     else  if (type == "Private")
     {
         AssignIfPresent(js, "friendid", id);
+        sendername = friendlist_[id].name_;
         if (IsEarlier(friendlist_[id].maxmsgtime_, timestamp))
         {
             friendlist_[id].maxmsgtime_ = timestamp;
@@ -1650,7 +1653,6 @@ void Client::InputLoop()
                         }
                         json js = {
                             {"senderid", userid_},
-                            {"sendername", name_},
                             {"receiverid", friendid},
                             {"content", message},
                             {"type", "Private"},
@@ -1969,7 +1971,6 @@ void Client::InputLoop()
 
                         json js = {
                             {"senderid", userid_},
-                            {"sendername", name_},
                             {"receiverid", groupid},
                             {"content", message},
                             {"type", "Group"},

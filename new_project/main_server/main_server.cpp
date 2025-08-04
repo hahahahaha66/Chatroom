@@ -1,7 +1,9 @@
-#include "../client/Client.h"
+#include "../server/Server.h"
+#include "../muduo/net/EventLoop.h"
+#include "../muduo/net/tcp/InetAddress.h"
 
-#include <gperftools/profiler.h>
 #include <csignal>
+#include <gperftools/profiler.h>
 
 namespace {
     std::function<void()> g_handler;  // 不暴露 loop，仅暴露行为
@@ -19,26 +21,21 @@ void Quit(int sig)
 
 int main ()
 {
-    ProfilerStart("cpu_profile.prof");
+    // ProfilerStart("cpu_profile.prof");
+
     EventLoop loop;
+    InetAddress chataddr(10101, "0.0.0.0");
+    InetAddress fileaddr(10102, "0.0.0.0");
 
     g_handler = [&loop]() {
         loop.quit();
     };
-    // signal(SIGINT, Quit);
+    signal(SIGINT, Quit);
 
-    Client client(loop, 10101, "10.30.0.120", "ChatClient");
+    Server server_(&loop, chataddr, fileaddr, "Chatroom");
 
-    client.start();
-
-    std::thread th([&client]() {
-        client.InputLoop();
-    });
-
+    server_.start();
     loop.loop();
-    
-    if (th.joinable())
-        th.join();
 
     return 0;
 }

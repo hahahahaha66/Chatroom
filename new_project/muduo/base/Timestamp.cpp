@@ -58,10 +58,3 @@ std::string Timestamp::toFormattedString(bool showMicroseconds) const
 
     return buf;
 }
-
-// int main() {
-//     Timestamp time;
-//     std::cout << time.now().toFormattedString() << std::endl;
-//     std::cout << time.now().toFormattedString(true) << std::endl;
-//     std::cout << time.now().toString() << std::endl;
-// }

@@ -84,7 +84,7 @@ void Logger::Impl::formatTime()
     char buf[32] = {0};
     snprintf(buf, sizeof(buf), "%06d ", microsecond);
 
-    stream_ << GeneralTemplate(ThreadInfo::t_time, 17) << GeneralTemplate(buf, 7);
+    stream_ << GeneralTemplate(ThreadInfo::t_time, 19) << '.' << GeneralTemplate(buf, 7);
 }
 
 void Logger::Impl::finish()
