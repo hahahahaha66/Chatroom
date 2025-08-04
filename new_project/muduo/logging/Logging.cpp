@@ -17,7 +17,7 @@ const char* getErrnoMsg(int saveErrno)
     return strerror_r(saveErrno, ThreadInfo::t_errnobuf, sizeof(ThreadInfo::t_errnobuf));
 }
 
-const char* getLevelName[Logger::LogLevel::LEVEL_COUNT]
+const char* const getLevelName[Logger::LogLevel::LEVEL_COUNT] = 
 {
     "TRACE",
     "DEBUG",
@@ -59,7 +59,7 @@ Logger::Impl::Impl(Logger::LogLevel level, int savedErrno, const char* file, int
     stream_ << GeneralTemplate(getLevelName[level], 6) << " ";  //写入日志等级
     if (savedErrno != 0)  //检查有无错误，有则输出
     {
-        stream_ << getErrnoMsg(savedErrno) << " (errno=" << savedErrno << ")6 nm";
+        stream_ << getErrnoMsg(savedErrno) << " (errno=" << savedErrno << ")";
     }
 }
 

@@ -53,6 +53,7 @@ public:
             LOG_DEBUG << "hander size: " << sizeof(cb);
         }
         auto jsPtr = std::make_shared<json>(js);
+
         threadpool_.SubmitTask([cb = std::move(cb), type, conn, jsPtr]() {
             LOG_DEBUG << "threadpool push task";
             LOG_DEBUG << "Dispatch type: " << type;

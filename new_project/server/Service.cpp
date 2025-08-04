@@ -154,17 +154,21 @@ void Service::FlushMessageToMySQL()
 
     if (messages.empty()) return;
 
+    int id;
+    int senderid;
+    int receiverid;
+    std::string content;
+    std::string type;
+    std::string status;
+    std::string timestamp;
+    int count = 0;
+    bool firstvalue = true;
+    std::ostringstream oss;
+    oss << "insert into messages (id, senderid, receiverid, content, type, status, timestamp) values ";
     auto mysqlconn = MysqlConnectionPool::Instance().GetConnection();
 
     for (const auto& msgstr : messages)
     {
-        int id;
-        int senderid;
-        int receiverid;
-        std::string content;
-        std::string type;
-        std::string status;
-        std::string timestamp;
         json js = json::parse(msgstr);
         AssignIfPresent(js, "id", id);
         AssignIfPresent(js, "senderid", senderid);
@@ -173,16 +177,25 @@ void Service::FlushMessageToMySQL()
         AssignIfPresent(js, "type", type);
         AssignIfPresent(js, "status", status);
         AssignIfPresent(js, "timestamp", timestamp);
-         std::ostringstream oss;
-        oss << "insert into messages (id, senderid, receiverid, content, type, status, timestamp) values ("
-            << id << ", " << senderid << ", " << receiverid << ", '" << content << "','"
-            << type  << "','" << status << "','" << timestamp << "');";
+         
+        if (firstvalue)
+            firstvalue = false;
+        else  
+            oss << ", ";
 
-        if (!mysqlconn->ExcuteUpdate(oss.str())) 
-        {
-            LOG_ERROR << "Failed to insert message into database, query: " << oss.str();
-            continue;  // 添加 return
-        }
+        oss << "(" << id << ", " << senderid << ", " << receiverid << ", '" << content << "', '"
+            << type << "', '" << status << "', '" << timestamp << "') ";
+        
+        count++;
+    }
+    oss << ";";
+    if (mysqlconn->ExcuteUpdate(oss.str())) 
+    {
+        LOG_INFO << "Success to insert messages count: " << count;
+    }
+    else
+    {
+        LOG_ERROR << "Failed to insert message into database";
     }
     
     redis_.del("messages");

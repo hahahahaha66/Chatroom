@@ -48,6 +48,7 @@ add_executable(server
 )
 
 target_link_libraries(server
+    PRIVATE 
     mynet
     pthread
     mysqlclient
@@ -56,7 +57,7 @@ target_link_libraries(server
     OpenSSL::Crypto 
     profiler
     jemalloc
-    PRIVATE CURL::libcurl
+    CURL::libcurl
 )
 
 # ========= 客户端 =========

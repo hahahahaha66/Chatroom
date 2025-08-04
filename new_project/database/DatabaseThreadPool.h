@@ -28,7 +28,7 @@ struct DatabaseTask {
 class DatabaseThreadPool  
 {
 public:
-    DatabaseThreadPool(size_t threadcount = 24);
+    DatabaseThreadPool(size_t threadcount = 36);
     ~DatabaseThreadPool();
 
     void EnqueueTask(std::function<void(MysqlConnection&, DBCallback)> task, DBCallback done);

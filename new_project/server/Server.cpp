@@ -10,7 +10,7 @@ Server::Server(EventLoop* loop,const InetAddress& listenAddr, const InetAddress&
 {
     MysqlConnectionPool::Instance().Init("localhost", 3306, "hahaha", "123456", "chatroom", 48);
 
-    server_.setThreadNum(8);
+    server_.setThreadNum(16);
 
     server_.setConnectionCallback(std::bind(&Server::OnConnection, this, _1));
     server_.setMessageCallback(std::bind(&Server::OnMessage, this, _1, _2, _3));
