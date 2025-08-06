@@ -3,12 +3,13 @@
 #include "../muduo/net/tcp/TcpConnection.h"
 #include <string>
 
-class User 
-{
-public:
-    User(int id, const std::string& name, const std::string& password, const std::string& email)
-        : id_(id), name_(name), password_(password), email_(email), online_(false), 
-          istransferfiles_(false), userinterfaceid(0), timeout_(0), userinterface_("") {}
+class User {
+  public:
+    User(int id, const std::string &name, const std::string &password,
+         const std::string &email)
+        : id_(id), name_(name), password_(password), email_(email),
+          online_(false), istransferfiles_(false), userinterfaceid(0),
+          timeout_(0), userinterface_("") {}
     User() = default;
 
     int GetId() const { return id_; }
@@ -31,7 +32,7 @@ public:
     void SetIsTransferFiles(bool status) { istransferfiles_ = status; }
     int GetIsTransferFiles() { return istransferfiles_; }
 
-private:
+  private:
     int id_;
     std::string name_;
     std::string password_;

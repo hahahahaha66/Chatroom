@@ -7,24 +7,23 @@
 #include <string>
 
 class MysqlConnection {
-public:
+  public:
     MysqlConnection();
     ~MysqlConnection();
 
-    bool Connect(const std::string& host, unsigned short port, const std::string& user,
-                 const std::string& password, const std::string& name);
-    
-    bool ExcuteUpdate(const std::string& mysqlorder);
-    MYSQL_RES* ExcuteQuery(const std::string& mysqlorder);
+    bool Connect(const std::string &host, unsigned short port,
+                 const std::string &user, const std::string &password,
+                 const std::string &name);
 
-    MYSQL* GetRaw();
+    bool ExcuteUpdate(const std::string &mysqlorder);
+    MYSQL_RES *ExcuteQuery(const std::string &mysqlorder);
+
+    MYSQL *GetRaw();
 
     void RefrushAliveTime();
     long long GetLastTime();
 
-    bool IsConnected() {
-        return mysql_ping(conn_) == 0;
-    }
+    bool IsConnected() { return mysql_ping(conn_) == 0; }
 
     bool Reconnect() {
         mysql_close(conn_);
@@ -32,11 +31,11 @@ public:
         return Connect(host_, port_, user_, password_, name_);
     }
 
-private:
+  private:
     std::string host_, user_, password_, name_;
     unsigned short port_;
 
-    MYSQL* conn_;
+    MYSQL *conn_;
     long long lastUsedTime_;
 };
 

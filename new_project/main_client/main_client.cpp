@@ -1,24 +1,22 @@
 #include "../client/Client.h"
 
-#include <gperftools/profiler.h>
 #include <csignal>
+#include <gperftools/profiler.h>
 
 namespace {
-    std::function<void()> g_handler;  // 不暴露 loop，仅暴露行为
+std::function<void()> g_handler; // 不暴露 loop，仅暴露行为
 }
 
-void Quit(int sig)
-{
+void Quit(int sig) {
     std::cout << "检测到信号Ctrl + C" << std::endl;
     ProfilerStop();
 
     if (g_handler) {
-        g_handler();  // 间接调用含有 loop 的 lambda
+        g_handler(); // 间接调用含有 loop 的 lambda
     }
 }
 
-int main ()
-{
+int main() {
     ProfilerStart("cpu_profile.prof");
     EventLoop loop;
 
@@ -26,20 +24,17 @@ int main ()
 
     client.start();
 
-    std::thread th([&client]() {
-        client.InputLoop();
-    });
+    std::thread th([&client]() { client.InputLoop(); });
 
     g_handler = [&client, &th]() {
         client.stop();
-        if (th.joinable())
-            th.join();
+        th.detach();
     };
     signal(SIGINT, Quit);
 
     loop.loop();
     std::cout << "EventLoop 已退出" << std::endl;
-    
+
     if (th.joinable())
         th.join();
 

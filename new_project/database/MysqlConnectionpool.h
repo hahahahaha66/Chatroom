@@ -1,30 +1,29 @@
 #ifndef MYSQLCONNECTIONPOOL_H
 #define MYSQLCONNECTIONPOOL_H
 
-#include "MysqlConnection.h"
 #include "../muduo/logging/Logging.h"
+#include "MysqlConnection.h"
 
-#include <mutex>
 #include <condition_variable>
-#include <queue>
 #include <memory>
+#include <mutex>
+#include <queue>
 #include <string>
 #include <thread>
 
 using MysqlConnPtr = std::shared_ptr<MysqlConnection>;
 
-class MysqlConnectionPool
-{
-public:
-    static MysqlConnectionPool& Instance();
+class MysqlConnectionPool {
+  public:
+    static MysqlConnectionPool &Instance();
 
-    void Init(const std::string& host, unsigned short port,
-              const std::string& user, const std::string& password,
-              const std::string& name, int maxsize);
+    void Init(const std::string &host, unsigned short port,
+              const std::string &user, const std::string &password,
+              const std::string &name, int maxsize);
 
     std::shared_ptr<MysqlConnection> GetConnection();
 
-private:
+  private:
     MysqlConnectionPool();
     ~MysqlConnectionPool();
 
@@ -39,7 +38,7 @@ private:
     unsigned short port_;
     int maxsize_;
 
-    std::queue<MysqlConnection*> connectionqueue_;
+    std::queue<MysqlConnection *> connectionqueue_;
     std::mutex mutex_;
     std::condition_variable cond_;
 

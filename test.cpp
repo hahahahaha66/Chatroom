@@ -54,7 +54,7 @@
 //                 stop();
 //                 break;
 //             }
-//             else  
+//             else
 //             {
 //                 std::cout << "输入错误" << std::endl;
 //             }
@@ -63,7 +63,7 @@
 //         {
 //             bool newapply = false;
 //             for (auto it : friendapplylist_)
-//             {   
+//             {
 //                 if (it.second.status_ == "Pending")
 //                 {
 //                     newapply = true;
@@ -82,17 +82,15 @@
 
 //             int order;
 //             std::string input;
-//             std::cout << "1. 添加好友          " << "6. 屏蔽好友" << std::endl;
-//             std::cout << "2. 查看好友列表      " << "7. 删除好友" << std::endl;
-//             std::cout << "3. 查看好友申请列表";
-//             if (newapply)
+//             std::cout << "1. 添加好友          " << "6. 屏蔽好友" <<
+//             std::endl; std::cout << "2. 查看好友列表      " << "7. 删除好友"
+//             << std::endl; std::cout << "3. 查看好友申请列表"; if (newapply)
 //                 PrintfRed('*');
 //             std::cout << "  " << "8. 好友界面" << std::endl;
 //             std::cout << "4. 处理好友申请      " << "9. 群聊" << std::endl;
-//             std::cout << "5. 查看被申请好友列表" << "10.注销账户"<< std::endl;
-//             std::cout << "11.退出" << std::endl;
-//             getline(std::cin, input);
-//             if (!ReadNum(input, order)) continue;
+//             std::cout << "5. 查看被申请好友列表" << "10.注销账户"<<
+//             std::endl; std::cout << "11.退出" << std::endl; getline(std::cin,
+//             input); if (!ReadNum(input, order)) continue;
 
 //             if (order == 1)
 //             {
@@ -116,10 +114,11 @@
 
 //                 for (auto it : friendsendapplylist_)
 //                 {
-//                     if (it.second.email_ == email && it.second.status_ == "Pending")
+//                     if (it.second.email_ == email && it.second.status_ ==
+//                     "Pending")
 //                     {
-//                         std::cout << "已发送的好友申请,待处理中" << std::endl;
-//                         continue;
+//                         std::cout << "已发送的好友申请,待处理中" <<
+//                         std::endl; continue;
 //                     }
 //                 }
 
@@ -143,8 +142,10 @@
 //                 waitInPutReady();
 //                 for (auto it : friendlist_)
 //                 {
-//                     std::cout << "id: "<< it.first << "名字: " << it.second.name_
-//                               << "在线: " << it.second.online_ << "屏蔽" << it.second.block_ ;
+//                     std::cout << "id: "<< it.first << "名字: " <<
+//                     it.second.name_
+//                               << "在线: " << it.second.online_ << "屏蔽" <<
+//                               it.second.block_ ;
 //                     if (it.second.new_ == true)
 //                         PrintfRed('*');
 //                     std::cout << std::endl;
@@ -161,7 +162,9 @@
 //                 waitInPutReady();
 //                 for (auto it : friendapplylist_)
 //                 {
-//                     std::cout << "id: " << it.first << " name: " << it.second.name_ << " status: " << it.second.status_ << std::endl;
+//                     std::cout << "id: " << it.first << " name: " <<
+//                     it.second.name_ << " status: " << it.second.status_ <<
+//                     std::endl;
 //                 }
 //             }
 //             else if (order == 4)
@@ -183,8 +186,9 @@
 //                 {
 //                     if (it.second.status_ == "Pending")
 //                     {
-//                         std::cout << "id: " << it.first << " name: " << it.second.name_ << std::endl;
-//                     }        
+//                         std::cout << "id: " << it.first << " name: " <<
+//                         it.second.name_ << std::endl;
+//                     }
 //                 }
 //                 while (true)
 //                 {
@@ -214,7 +218,7 @@
 //                     ProceFriendApply(js);
 //                     waitInPutReady();
 //                 }
-                
+
 //             }
 //             else if (order == 5)
 //             {
@@ -227,7 +231,9 @@
 //                 waitInPutReady();
 //                 for (auto it : friendsendapplylist_)
 //                 {
-//                         std::cout << "id: " << it.first << " name: " << it.second.name_ << " status: " << it.second.status_ << std::endl;
+//                         std::cout << "id: " << it.first << " name: " <<
+//                         it.second.name_ << " status: " << it.second.status_
+//                         << std::endl;
 //                 }
 //             }
 //             else if (order == 6)
@@ -244,7 +250,7 @@
 //                     std::cout << "未知好友id" << std::endl;
 //                     break;
 //                 }
-//                 else  
+//                 else
 //                 {
 //                     nowblock = friendlist_[friendid].block_;
 //                 }
@@ -252,12 +258,12 @@
 //                 std::cout << "当前好友状态: ";
 //                 if (nowblock)
 //                     std::cout << "屏蔽中" << std::endl;
-//                 else  
+//                 else
 //                     std::cout << "未屏蔽" << std::endl;
 
 //                 std::cout << "输入选择(true或false)(0退出):";
 //                 getline(std::cin, input);
-//                 if (input == "0") 
+//                 if (input == "0")
 //                 {
 //                     continue;
 //                 }
@@ -265,17 +271,17 @@
 //                 {
 //                     if (nowblock == true)
 //                         continue;
-//                     else  
+//                     else
 //                         block = true;
 //                 }
 //                 else if (input == "false")
 //                 {
 //                     if (nowblock == false)
 //                         continue;
-//                     else  
+//                     else
 //                         block = false;
 //                 }
-//                 else  
+//                 else
 //                 {
 //                     std::cout << "错误输入" << std::endl;
 //                     continue;
@@ -334,7 +340,7 @@
 
 //                 json js = {
 //                     {"userid", userid_}
-//                 };                
+//                 };
 //                 waitingback_ = true;
 //                 DeleteAccount(js);
 
@@ -364,8 +370,8 @@
 //             {
 //                 std::cout << "未知好友id,请重新输入" << std::endl;
 //                 continue;
-//             } 
-//             else  
+//             }
+//             else
 //             {
 //                 if (friendlist_[friendid].block_ == true)
 //                 {
@@ -412,7 +418,7 @@
 //                         std::string message;
 //                         std::cout << "输入(输入0返回): " ;
 //                         getline(std::cin, message);
-//                         if (message == "0") 
+//                         if (message == "0")
 //                         {
 //                             json js = {
 //                                 {"userid", userid_},
@@ -434,10 +440,9 @@
 //                             {"type", "Private"},
 //                             {"status", "Unread"},
 //                         };
-//                         friendlist_[friendid].maxmsgtime_ = GetCurrentTimestamp();
-//                         friendlist_[friendid].new_ = false;
-//                         waitingback_ = true;
-//                         SendMessage(js);
+//                         friendlist_[friendid].maxmsgtime_ =
+//                         GetCurrentTimestamp(); friendlist_[friendid].new_ =
+//                         false; waitingback_ = true; SendMessage(js);
 
 //                         waitInPutReady();
 //                     }
@@ -454,12 +459,12 @@
 //                     std::string temp = filepath + '/' + filename;
 //                     std::cout << temp << std::endl;
 //                     int tempfd = ::open(temp.c_str(), O_RDONLY);
-//                     if (tempfd < 0) 
+//                     if (tempfd < 0)
 //                     {
 //                         std::cout << "无法打开文件" << std::endl;
 //                         continue;
 //                     }
-//                     else  
+//                     else
 //                     {
 //                         ::close(tempfd);
 //                     }
@@ -477,8 +482,10 @@
 //                     waitInPutReady();
 //                     for (int i = 0; i < filelist_.size(); i++)
 //                     {
-//                         std::string sendname = friendlist_[filelist_[i].senderid_].name_;
-//                         std::cout << i+1 << " " << sendname << ": " << filelist_[i].filename_ << std::endl;
+//                         std::string sendname =
+//                         friendlist_[filelist_[i].senderid_].name_; std::cout
+//                         << i+1 << " " << sendname << ": " <<
+//                         filelist_[i].filename_ << std::endl;
 //                     }
 
 //                     int id;
@@ -497,7 +504,8 @@
 //                     std::string savepath;
 //                     std::cout << "输入保存路径";
 //                     getline(std::cin, savepath);
-//                     if (!(std::filesystem::exists(savepath) && std::filesystem::is_directory(savepath)))
+//                     if (!(std::filesystem::exists(savepath) &&
+//                     std::filesystem::is_directory(savepath)))
 //                     {
 //                         std::cout << "不存在的文件夹";
 //                         continue;
@@ -512,7 +520,7 @@
 //                     ClearScreen();
 //                     break;
 //                 }
-//                 else  
+//                 else
 //                 {
 //                     std::cout << "错误输入" << std::endl;
 //                     continue;
@@ -603,7 +611,7 @@
 //                 std::cout << "id  " << "  名字" << "        "  << std::endl;
 //                 for (auto it : grouplist_)
 //                 {
-//                     std::cout << it.first << " " << it.second.name_  << "   ";
+//                     std::cout << it.first << " " << it.second.name_  << " ";
 //                     if (it.second.newapply_ || it.second.newmessage_)
 //                         PrintfRed('*');
 //                     std::cout << std::endl;
@@ -652,9 +660,9 @@
 //                 currentState_ = "group_menu";
 //                 continue;
 //             }
-                
+
 //             ClearScreen();
-//             while (true) 
+//             while (true)
 //             {
 //                 json js = {
 //                     {"userid", userid_},
@@ -672,12 +680,11 @@
 //                 {
 //                     userrole = userlist[userid_].role_;
 //                 }
-//                 else  
+//                 else
 //                 {
 //                     currentState_ = "group_menu";
 //                     continue;
 //                 }
-
 
 //                 std::cout << "1. 聊天";
 //                 if (grouplist_[groupid].newmessage_)
@@ -749,8 +756,8 @@
 //                         bool usermute = userlist[userid_].mute_;
 //                         if (usermute == true)
 //                         {
-//                             std::cout << "你已被禁言,无法发送消息" << std::endl;
-//                             continue;
+//                             std::cout << "你已被禁言,无法发送消息" <<
+//                             std::endl; continue;
 //                         }
 
 //                         json js = {
@@ -760,7 +767,8 @@
 //                             {"type", "Group"},
 //                             {"status", "Unread"},
 //                         };
-//                         grouplist_[groupid].maxmsgtime_ = GetCurrentTimestamp();
+//                         grouplist_[groupid].maxmsgtime_ =
+//                         GetCurrentTimestamp();
 //                         grouplist_[groupid].newmessage_ = false;
 //                         waitingback_ = true;
 //                         SendMessage(js);
@@ -779,7 +787,8 @@
 
 //                     for (auto it : grouplist_[groupid].groupuserlist_)
 //                     {
-//                         std::cout << it.first << "  " << it.second.username_ << "  " << it.second.role_ << std::endl;
+//                         std::cout << it.first << "  " << it.second.username_
+//                         << "  " << it.second.role_ << std::endl;
 //                     }
 
 //                     waitInPutReady();
@@ -795,12 +804,12 @@
 //                     std::string temp = filepath + '/' + filename;
 //                     std::cout << temp << std::endl;
 //                     int tempfd = ::open(temp.c_str(), O_RDONLY);
-//                     if (tempfd < 0) 
+//                     if (tempfd < 0)
 //                     {
 //                         std::cout << "无法打开文件" << std::endl;
 //                         continue;
 //                     }
-//                     else  
+//                     else
 //                     {
 //                         ::close(tempfd);
 //                     }
@@ -817,7 +826,8 @@
 //                     waitInPutReady();
 //                     for (int i = 0; i < filelist_.size(); i++)
 //                     {
-//                         std::cout << i+1 << " " << filelist_[i].senderid_ << ": " << filelist_[i].filename_ << std::endl;
+//                         std::cout << i+1 << " " << filelist_[i].senderid_ <<
+//                         ": " << filelist_[i].filename_ << std::endl;
 //                     }
 
 //                     int id;
@@ -835,7 +845,8 @@
 //                     std::string savepath;
 //                     std::cout << "输入保存路径";
 //                     getline(std::cin, savepath);
-//                     if (!(std::filesystem::exists(savepath) && std::filesystem::is_directory(savepath)))
+//                     if (!(std::filesystem::exists(savepath) &&
+//                     std::filesystem::is_directory(savepath)))
 //                     {
 //                         std::cout << "不存在的文件夹";
 //                         continue;
@@ -942,7 +953,7 @@
 //                     std::cout << "输入要移除的成员id" << std::endl;
 //                     getline(std::cin, input);
 //                     if (!ReadNum(input, userid)) continue;
-//                     if (userid == userid_) 
+//                     if (userid == userid_)
 //                     {
 //                         std::cout << "不能移除自己" << std::endl;
 //                         continue;
@@ -980,7 +991,7 @@
 //                     std::cout << "输入要改变的成员id: " << std::endl;
 //                     getline(std::cin, input);
 //                     if (!ReadNum(input, userid)) continue;
-//                     if (userid == userid_) 
+//                     if (userid == userid_)
 //                     {
 //                         std::cout << "不能改变自己" << std::endl;
 //                         continue;
@@ -1000,9 +1011,9 @@
 //                             continue;
 //                         }
 //                     }
-//                     std::cout << "输入改变后的角色(Member或Administrator): " << std::endl;
-//                     getline(std::cin, role);
-//                     if (!(role == "Member" || role == "Administrator"))
+//                     std::cout << "输入改变后的角色(Member或Administrator): "
+//                     << std::endl; getline(std::cin, role); if (!(role ==
+//                     "Member" || role == "Administrator"))
 //                     {
 //                         std::cout << "输入错误" << std::endl;
 //                         continue;
@@ -1037,16 +1048,15 @@
 //                     ClearScreen();
 //                     break;
 //                 }
-//                 else  
+//                 else
 //                 {
 //                     std::cout << "错误指令,请重试" << std::endl;
 //                 }
 //             }
 //         }
-//         else  
+//         else
 //         {
 //             LOG_ERROR << "!!!!Wrong!!!!";
 //             return;
 //         }
 //     }
-

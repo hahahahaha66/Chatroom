@@ -4,23 +4,19 @@
 #include <functional>
 #include <thread>
 
-DatabaseThreadPool::DatabaseThreadPool(size_t threadcount) : isrunning_(true)
-{
-    for (size_t i = 0; i < threadcount; i++)
-    {
-        workers_.emplace_back([this, i] () { 
+DatabaseThreadPool::DatabaseThreadPool(size_t threadcount) : isrunning_(true) {
+    for (size_t i = 0; i < threadcount; i++) {
+        workers_.emplace_back([this, i]() {
             LOG_INFO << "Worker thread " << i << " started";
-            this->Worker(); 
+            this->Worker();
         });
     }
 }
 
-DatabaseThreadPool::~DatabaseThreadPool()
-{
-    Stop();
-}
+DatabaseThreadPool::~DatabaseThreadPool() { Stop(); }
 
-void DatabaseThreadPool::EnqueueTask(std::function<void(MysqlConnection&, DBCallback)> task, DBCallback done) {
+void DatabaseThreadPool::EnqueueTask(
+    std::function<void(MysqlConnection &, DBCallback)> task, DBCallback done) {
     LOG_DEBUG << "one database task add";
     {
         std::unique_lock<std::mutex> lock(mutex_);
@@ -37,8 +33,7 @@ void DatabaseThreadPool::EnqueueTask(std::function<void(MysqlConnection&, DBCall
     con_.notify_one();
 }
 
-void DatabaseThreadPool::Stop()
-{
+void DatabaseThreadPool::Stop() {
     {
         std::unique_lock<std::mutex> lock(mutex_);
         isrunning_ = false;
@@ -46,36 +41,33 @@ void DatabaseThreadPool::Stop()
 
     con_.notify_all();
 
-    for (auto& it : workers_)
-    {
+    for (auto &it : workers_) {
         if (it.joinable())
             it.join();
     }
 }
 
-void DatabaseThreadPool::Worker()
-{
+void DatabaseThreadPool::Worker() {
 
     LOG_DEBUG << "Database worker thread started";
 
-    while (true)
-    {
+    while (true) {
         DatabaseTask task(nullptr, nullptr);
         {
             std::unique_lock<std::mutex> lock(mutex_);
 
-            //只要任务队列中有任务，或者线程池已经不运行了，就让当前线程从 wait 状态唤醒
-            con_.wait(lock, [this]() {return !tasks_.empty() || !isrunning_; });
+            // 只要任务队列中有任务，或者线程池已经不运行了，就让当前线程从 wait
+            // 状态唤醒
+            con_.wait(lock,
+                      [this]() { return !tasks_.empty() || !isrunning_; });
 
-            if (!isrunning_ && tasks_.empty()) return ;
+            if (!isrunning_ && tasks_.empty())
+                return;
 
-            if (tasks_.empty()) 
-            {
+            if (tasks_.empty()) {
                 LOG_DEBUG << "Worker spurious wakeup, continuing";
                 continue;
-            }
-            else  
-            {
+            } else {
                 task = std::move(tasks_.front());
                 tasks_.pop();
                 LOG_DEBUG << "Task acquired, queue size: " << tasks_.size();
@@ -85,34 +77,32 @@ void DatabaseThreadPool::Worker()
         MysqlConnPtr conn;
         bool connection_success = false;
 
-        for (int attempt = 0; attempt < 3; ++attempt) 
-        {
+        for (int attempt = 0; attempt < 3; ++attempt) {
             conn = MysqlConnectionPool::Instance().GetConnection();
-            if (conn) 
-            {
+            if (conn) {
                 connection_success = true;
                 break;
             }
-            LOG_WARN << "Failed to get connection (attempt " << (attempt+1) << ")";
+            LOG_WARN << "Failed to get connection (attempt " << (attempt + 1)
+                     << ")";
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
         if (!connection_success) {
             LOG_ERROR << "Giving up after 3 connection attempts";
-            //任务失败
+            // 任务失败
             if (task.callback) {
                 try {
                     task.callback(false);
-                } catch (const std::exception& e) {
+                } catch (const std::exception &e) {
                     LOG_ERROR << "Callback execution failed: " << e.what();
                 }
             }
             continue;
-        }
-        else
-        {
+        } else {
             std::hash<std::thread::id> hash;
-            LOG_DEBUG << "Got connection, thread id: " << hash(std::this_thread::get_id());
+            LOG_DEBUG << "Got connection, thread id: "
+                      << hash(std::this_thread::get_id());
         }
 
         // 执行任务
@@ -123,7 +113,7 @@ void DatabaseThreadPool::Worker()
                     throw std::runtime_error("Reconnect failed");
                 }
             }
-            
+
             // 执行任务，传入连接和回调函数
             if (task.task) {
                 task.task(*conn, task.callback);
@@ -131,14 +121,14 @@ void DatabaseThreadPool::Worker()
                 // 如果任务为空但有回调，通知失败
                 task.callback(false);
             }
-            
-        } catch (const std::exception& e) {
+
+        } catch (const std::exception &e) {
             LOG_ERROR << "Database operation failed: " << e.what();
             // 任务执行失败，通知回调
             if (task.callback) {
                 try {
                     task.callback(false);
-                } catch (const std::exception& cb_e) {
+                } catch (const std::exception &cb_e) {
                     LOG_ERROR << "Callback execution failed: " << cb_e.what();
                 }
             }

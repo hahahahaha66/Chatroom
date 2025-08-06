@@ -8,9 +8,8 @@
 #include <thread>
 #include <vector>
 
-class ThreadPool 
-{
-public:
+class ThreadPool {
+  public:
     ThreadPool(size_t numthread = 16);
     ~ThreadPool();
 
@@ -18,7 +17,7 @@ public:
     void Stop();
     void SubmitTask(std::function<void()> task);
 
-private:
+  private:
     void Worker();
 
     std::vector<std::thread> workers_;
