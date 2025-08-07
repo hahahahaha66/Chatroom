@@ -53,6 +53,27 @@ bool Client::ReadNum(std::string input, int &result) {
     }
 }
 
+std::string Client::GetHiddenInput(const std::string& prompt = "输入密码: ") {
+    std::string password;
+    struct termios oldt, newt;
+
+    std::cout << prompt;
+    std::cout.flush();
+
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+
+    newt.c_lflag &= ~ECHO;
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+
+    std::getline(std::cin, password);
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    std::cout << std::endl;
+
+    return password;
+}
+
 void Client::PrintfRed(char a) { std::cout << "\033[1;31m" << a << "\033[0m"; }
 
 void Client::ClearScreen() { std::cout << "\033[2J\033[H"; }
@@ -96,7 +117,7 @@ void RegisterHandlerSafe(Dispatcher &dispatcher, const std::string &type,
 
 Client::Client(EventLoop &loop, uint16_t port, std::string ip, std::string name)
     : client_(&loop, InetAddress(port, ip), name), ip_(ip),
-      mainserverport_(port), loop_(&loop), dispatcher_(8), threadpool_(16) {
+      mainserverport_(port), loop_(&loop), dispatcher_(16), threadpool_(16) {
     client_.setConnectionCallback(
         std::bind(&Client::ConnectionCallBack, this, _1));
     client_.setMessageCallback(std::bind(&Client::OnMessage, this, _1, _2, _3));
@@ -189,18 +210,19 @@ void Client::ConnectionCallBack(const TcpConnectionPtr &conn) {
 
 void Client::OnMessage(const TcpConnectionPtr &conn, Buffer *buffer,
                        Timestamp time) {
-    auto msgopt = codec_.tryDecode(buffer);
+    while (true) {
+        auto msgopt = codec_.tryDecode(buffer);
 
-    if (!msgopt.has_value()) {
-        LOG_INFO << "Recv from " << conn->peerAddress().toIpPort() << " failed";
-        return;
-    }
+        if (!msgopt.has_value()) {
+            break;
+        }
 
-    auto [type, js] = msgopt.value();
+        auto [type, js] = msgopt.value();
 
-    // LOG_INFO << js.dump();
+        // LOG_INFO << type;
 
-    dispatcher_.dispatch(type, conn, js);
+        dispatcher_.dispatch(type, conn, js);
+    }                        
 }
 
 void Client::MessageCompleteCallback(const TcpConnectionPtr &conn) {
@@ -1154,8 +1176,7 @@ void Client::InputLoop() {
             if (order == 1) {
                 std::cout << "输入邮箱: ";
                 getline(std::cin, email_);
-                std::cout << "输入密码: ";
-                getline(std::cin, password_);
+                password_ = GetHiddenInput("输入密码: ");
 
                 json js = {{"email", email_}, {"password", password_}};
 
@@ -1169,8 +1190,7 @@ void Client::InputLoop() {
                 getline(std::cin, email_);
                 std::cout << "输入用户名: ";
                 getline(std::cin, name_);
-                std::cout << "输入密码: ";
-                getline(std::cin, password_);
+                password_ = GetHiddenInput("输入密码: ");
 
                 json js = {{"username", name_},
                            {"email", email_},
@@ -1606,8 +1626,7 @@ void Client::InputLoop() {
                 std::cout << "群聊数: " << grouplist_.size() << std::endl;
             } else if (order == 2) {
                 std::string newpassword;
-                std::cout << "输入新的账户密码(输入0返回): ";
-                getline(std::cin, newpassword);
+                newpassword = GetHiddenInput("输入新的账户密码(输入0返回): ");
                 if (newpassword == "0") {
                     ClearScreen();
                     continue;
@@ -1742,11 +1761,8 @@ void Client::InputLoop() {
                             {"status", "Unread"},
                         };
 
-                        // waitingback_ = true;
                         threadpool_.SubmitTask(
                             [this, js]() { SendMessage(js); });
-
-                        // waitInPutReady();
                     }
                     ClearScreen();
                 } else if (order == 2) {

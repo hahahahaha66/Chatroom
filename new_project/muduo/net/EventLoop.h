@@ -84,8 +84,7 @@ class EventLoop {
     std::atomic_bool quit_;                   // 是否退出事件循环
     std::atomic_bool callingPendingFunctors_; // 是否正在执行回调操作
 
-    const pid_t
-        threadId_; // EventLoop当前线程id，一个EventLoop绑定唯一一个线程id
+    const pid_t threadId_; // EventLoop当前线程id，一个EventLoop绑定唯一一个线程id
 
     Timestamp pollReturnTime_; // poller返回发生事件的channel的返回时间
 

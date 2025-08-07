@@ -113,50 +113,51 @@ void Server::OnConnection(const TcpConnectionPtr &conn) {
 
 void Server::OnMessage(const TcpConnectionPtr &conn, Buffer *buffer,
                        Timestamp time) {
-    LOG_DEBUG << "tryDecode: buffer size = " << buffer->readableBytes();
+    while (true) {
+        LOG_DEBUG << "tryDecode: buffer size = " << buffer->readableBytes();
 
-    auto msgopt = codec_.tryDecode(buffer);
+        auto msgopt = codec_.tryDecode(buffer);
 
-    if (!msgopt.has_value()) {
-        LOG_INFO << "Recv from " << conn->peerAddress().toIpPort() << " failed";
-        return;
-    }
-
-    const auto &parsed = *msgopt;
-    const auto &type = std::get<0>(parsed);
-    const auto &js = std::get<1>(parsed);
-
-    LOG_INFO << "Start Processing " << type;
-
-    if (type == "GetFileServerPort") {
-        uint16_t fileport;
-        std::string addr = fileserver_.GetServerPort();
-        size_t pos = addr.find(':');
-        if (pos != std::string::npos) {
-            std::string port_str = addr.substr(pos + 1);
-            fileport = stoi(port_str);
-        } else {
-            LOG_ERROR << "Invalid address format";
-        }
-        std::cout << fileport << std::endl;
-        json j = {{"port", fileport}};
-        for (auto &it : service_.GetOnlineUserList()) {
-            auto &user = it.second;
-            if (user.GetConn() == conn)
-                user.SetIsTransferFiles(true);
+        if (!msgopt.has_value()) {
+            break;
         }
 
-        conn->send(codec_.encode(j, "GetFileServerPortBack"));
-        return;
-    }
-    if (type != "Flush") {
-        for (auto &it : service_.GetOnlineUserList()) {
-            auto &user = it.second;
-            if (user.GetConn() == conn) {
-                user.SetIsTransferFiles(false);
-                user.SetTimeOut(0);
+        const auto &parsed = *msgopt;
+        const auto &type = std::get<0>(parsed);
+        const auto &js = std::get<1>(parsed);
+
+        LOG_INFO << "Start Processing " << type;
+
+        if (type == "GetFileServerPort") {
+            uint16_t fileport;
+            std::string addr = fileserver_.GetServerPort();
+            size_t pos = addr.find(':');
+            if (pos != std::string::npos) {
+                std::string port_str = addr.substr(pos + 1);
+                fileport = stoi(port_str);
+            } else {
+                LOG_ERROR << "Invalid address format";
+            }
+            std::cout << fileport << std::endl;
+            json j = {{"port", fileport}};
+            for (auto &it : service_.GetOnlineUserList()) {
+                auto &user = it.second;
+                if (user.GetConn() == conn)
+                    user.SetIsTransferFiles(true);
+            }
+
+            conn->send(codec_.encode(j, "GetFileServerPortBack"));
+            return;
+        }
+        if (type != "Flush") {
+            for (auto &it : service_.GetOnlineUserList()) {
+                auto &user = it.second;
+                if (user.GetConn() == conn) {
+                    user.SetIsTransferFiles(false);
+                    user.SetTimeOut(0);
+                }
             }
         }
+        dispatcher_.dispatch(type, conn, js);
     }
-    dispatcher_.dispatch(type, conn, js);
 }

@@ -11,7 +11,6 @@
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <unordered_map>
-// 服务端使用
 
 using json = nlohmann::json;
 using MessageHander =

@@ -18,6 +18,7 @@
 #include <sw/redis++/redis++.h>
 #include <sw/redis++/redis.h>
 #include <unordered_map>
+#include <mysql/mysql.h>
 
 using json = nlohmann::json;
 

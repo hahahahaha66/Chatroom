@@ -24,6 +24,7 @@
 #include <type_traits>
 #include <unistd.h>
 #include <unordered_map>
+#include <termios.h>
 
 using std::placeholders::_1;
 using std::placeholders::_2;
@@ -190,6 +191,7 @@ class Client {
     bool ReadNum(std::string input, int &result);
     void PrintfRed(char a);
     void ClearScreen();
+    std::string GetHiddenInput(const std::string& prompt);
 
     void start();
     void stop();

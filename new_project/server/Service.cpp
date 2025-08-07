@@ -17,13 +17,13 @@
 #include <utility>
 
 std::string Service::Escape(const std::string &input) {
-    std::string output;
-    for (char c : input) {
-        if (c == '\'' || c == '\"' || c == '\\')
-            output += '\\';
-        output += c;
-    }
-    return output;
+    auto mysqlconn = MysqlConnectionPool::Instance().GetConnection();
+    std::string escaped;
+    escaped.resize(input.length() * 2 + 1); // 最坏情况需要 2n+1 空间
+    auto len = mysql_real_escape_string(mysqlconn->GetMysql(), &escaped[0], input.c_str(), input.length());
+    escaped.resize(len); // 调整大小为实际转义后长度
+    return escaped;
+    return escaped;
 }
 
 std::string Service::GetCurrentTimestamp() {
@@ -218,7 +218,7 @@ void Service::FlushMessageToMySQL() {
                 oss << ", ";
 
             oss << "(" << id << ", " << senderid << ", " << receiverid << ", '"
-                << content << "', '" << type << "', '" << status << "', '"
+                << Escape(content) << "', '" << type << "', '" << status << "', '"
                 << timestamp << "') ";
 
             count++;
@@ -270,6 +270,7 @@ Service::Service(EventLoop *loop)
 }
 
 Service::~Service() {
+    FlushMessageToRedis();
     FlushMessageToMySQL();
     threadpool_.Stop();
 }
@@ -307,7 +308,7 @@ void Service::UserRegister(const TcpConnectionPtr &conn, const json &js) {
 
     std::ostringstream oss;
     oss << "insert into users (id, email, name, password) values (" << userid
-        << ", '" << email << "', '" << username << "', '" << password << "');";
+        << ", '" << Escape(email) << "', '" << Escape(username) << "', '" << Escape(password) << "');";
     std::string query = oss.str();
 
     databasethreadpool_.EnqueueTask(
@@ -349,7 +350,7 @@ void Service::UserLogin(const TcpConnectionPtr &conn, const json &js) {
         [this, email, password, conn](MysqlConnection &mysqlconn,
                                       DBCallback done) {
             std::string query =
-                "SELECT id, name, password FROM users WHERE email = '" + email +
+                "SELECT id, name, password FROM users WHERE email = '" + Escape(email) +
                 "'";
 
             LOG_DEBUG << "Executing login query for email: " << email;
@@ -451,7 +452,7 @@ void Service::DeleteAccount(const TcpConnectionPtr &conn, const json &js) {
         [this, userid](MysqlConnection &mysqlconn, DBCallback done) {
             std::string query;
             query = "select id from groups where owner = " +
-                    std::to_string(userid) + "; ";
+                    Escape(std::to_string(userid)) + "; ";
             MYSQL_RES *res = mysqlconn.ExcuteQuery(query);
             if (!res) {
                 LOG_ERROR << "Listfriend from name query failed ";
@@ -541,7 +542,7 @@ void Service::Flush(const TcpConnectionPtr &conn, const json &js) {
             // 更新好友
             std::string query =
                 "select friendid, block from friends where userid = " +
-                std::to_string(userid) + "; ";
+                Escape(std::to_string(userid)) + "; ";
             MYSQL_RES *res = mysqlconn.ExcuteQuery(query);
             if (!res) {
                 LOG_ERROR << "Listfriend query failed ";
@@ -563,7 +564,7 @@ void Service::Flush(const TcpConnectionPtr &conn, const json &js) {
                 block = friendrow.GetBool("block");
 
                 query = "select name, email from users where id = " +
-                        std::to_string(friendid);
+                        Escape(std::to_string(friendid));
                 res = mysqlconn.ExcuteQuery(query);
                 if (!res) {
                     LOG_ERROR << "Listfriend from name query failed ";
@@ -615,7 +616,7 @@ void Service::Flush(const TcpConnectionPtr &conn, const json &js) {
             // 更新好友申请
             query =
                 "select fromid, status from friendapplys where targetid = " +
-                std::to_string(userid);
+                Escape(std::to_string(userid));
             res = mysqlconn.ExcuteQuery(query);
             if (!res) {
                 LOG_ERROR << "Listfriendapply query failed ";
@@ -635,7 +636,7 @@ void Service::Flush(const TcpConnectionPtr &conn, const json &js) {
                 applystatus = row.GetString("status");
 
                 query = "select name, email from users where id = " +
-                        std::to_string(fromid);
+                        Escape(std::to_string(fromid));
                 res = mysqlconn.ExcuteQuery(query);
                 if (!res) {
                     LOG_ERROR << "Listfriendapply from name query failed ";
@@ -661,7 +662,7 @@ void Service::Flush(const TcpConnectionPtr &conn, const json &js) {
 
             // 更新群聊
             query = "select groupid from groupusers where userid = " +
-                    std::to_string(userid) + "; ";
+                    Escape(std::to_string(userid)) + "; ";
             res = mysqlconn.ExcuteQuery(query);
             if (!res) {
                 LOG_ERROR << "ListGroup from groupusers query failed ";
@@ -681,7 +682,7 @@ void Service::Flush(const TcpConnectionPtr &conn, const json &js) {
                 groupid = grouprow.GetInt("groupid");
 
                 query = "select * from groupusers where groupid = " +
-                        std::to_string(groupid) + "; ";
+                        Escape(std::to_string(groupid)) + "; ";
                 res = mysqlconn.ExcuteQuery(query);
                 if (!res) {
                     LOG_ERROR << "ListGroupUsers from groupusers query failed ";
@@ -702,7 +703,7 @@ void Service::Flush(const TcpConnectionPtr &conn, const json &js) {
                     role = row.GetString("role");
                     mute = row.GetBool("mute");
                     query = "select name from users where id = " +
-                            std::to_string(userid) + "; ";
+                            Escape(std::to_string(userid)) + "; ";
                     res = mysqlconn.ExcuteQuery(query);
                     if (!res) {
                         LOG_ERROR << "Username from users query failed ";
@@ -725,7 +726,7 @@ void Service::Flush(const TcpConnectionPtr &conn, const json &js) {
                 }
 
                 query = "select name from groups where id = " +
-                        std::to_string(groupid) + "; ";
+                        Escape(std::to_string(groupid)) + "; ";
                 res = mysqlconn.ExcuteQuery(query);
                 if (!res) {
                     LOG_ERROR << "ListGroup from name query failed ";
@@ -741,7 +742,7 @@ void Service::Flush(const TcpConnectionPtr &conn, const json &js) {
                 groupname = namerow.GetString("name");
 
                 query = "select status from groupapplys where groupid = " +
-                        std::to_string(groupid);
+                        Escape(std::to_string(groupid));
                 res = mysqlconn.ExcuteQuery(query);
                 if (!res) {
                     LOG_ERROR << "Listfriendapply query failed ";
@@ -763,7 +764,7 @@ void Service::Flush(const TcpConnectionPtr &conn, const json &js) {
                 query = "select max(timestamp) as latest_time from messages "
                         "where ( "
                         "type = 'Group' and receiverid = " +
-                        std::to_string(groupid) + "); ";
+                        Escape(std::to_string(groupid)) + "); ";
                 res = mysqlconn.ExcuteQuery(query);
                 if (!res) {
                     LOG_ERROR << "Listmessage from messages query failed ";
@@ -824,12 +825,10 @@ void Service::MessageSend(const TcpConnectionPtr &conn, const json &js) {
         if (type == "Group") {
             std::string query =
                 "select userid from groupusers where groupid = " +
-                std::to_string(receiverid) + "; ";
+                Escape(std::to_string(receiverid)) + "; ";
             MYSQL_RES *res = mysqlconn->ExcuteQuery(query);
             if (!res) {
-                LOG_ERROR << "Listfriendapply query failed ";
-                json j = {{"timestamp", timestamp}, {"end", false}};
-                // conn->send(code_.encode(j, "SendMessageBack"));
+                LOG_ERROR << "ListGroupUser query failed ";
                 return;
             }
 
@@ -874,34 +873,29 @@ void Service::MessageSend(const TcpConnectionPtr &conn, const json &js) {
             }
         } else if (type == "Private") {
             std::string query = "select block from friends where userid = " +
-                                std::to_string(receiverid) +
-                                " and friendid = " + std::to_string(senderid) +
+                                Escape(std::to_string(receiverid)) +
+                                " and friendid = " + Escape(std::to_string(senderid)) +
                                 "; ";
             MYSQL_RES *res = mysqlconn->ExcuteQuery(query);
             if (!res) {
                 LOG_ERROR << "Listfriendapply query failed ";
-                // json j = {{"timestamp", timestamp}, {"end", false}};
-                // conn->send(code_.encode(j, "SendMessageBack"));
                 return;
             }
 
             MysqlResult result(res);
             bool block = false;
             if (!result.Next()) {
-                // json j = {{"timestamp", timestamp}, {"end", false}};
-                // conn->send(code_.encode(j, "SendMessageBack"));
                 return;
             }
             MysqlRow row = result.GetRow();
             block = row.GetBool("block");
             if (block) {
-                // json j = {{"timestamp", timestamp}, {"end", false}};
-                // conn->send(code_.encode(j, "SendMessageBack"));
+                json j = {{"timestamp", timestamp}, {"end", false}};
+                conn->send(code_.encode(j, "SendMessageBack"));
                 return;
             }
 
             if (onlineuser_.find(receiverid) != onlineuser_.end()) {
-
                 if (onlineuser_[receiverid].GetUserInterFace() == "Private" &&
                     onlineuser_[receiverid].GetUserInterFaceId() == senderid) {
                     status = "Read";
@@ -929,11 +923,9 @@ void Service::MessageSend(const TcpConnectionPtr &conn, const json &js) {
                         });
                     }
                 }
-            }
+            }            
         } else {
             LOG_ERROR << "Message type wrong";
-            // json j = {{"timestamp", timestamp}, {"end", false}};
-            // conn->send(code_.encode(j, "SendMessageBack"));
             return;
         }
 
@@ -958,19 +950,13 @@ void Service::MessageSend(const TcpConnectionPtr &conn, const json &js) {
             if (loop) {
                 loop->runInLoop(
                     [reconn, msg = std::move(jsonmsg), this]() mutable {
-                        threadpool_.SubmitTask([this, reconn, msg]() {
                             reconn->send(code_.encode(msg, "RecvMessage"));
-                        });
                     });
             }
         }
 
-        // j = {{"timestamp", timestamp}, {"end", true}};
-        // conn->send(code_.encode(j, "SendMessageBack"));
     } catch (const std::exception &e) {
         LOG_ERROR << "Database error during message send: " << e.what();
-        // json j = {{"timestamp", timestamp}, {"end", false}};
-        // conn->send(code_.encode(j, "SendMessageBack"));
         return;
     }
 }
@@ -1039,6 +1025,30 @@ void Service::GetChatHistory(const TcpConnectionPtr &conn, const json &js) {
             redis_.lrange("messages", 0, -1, std::back_inserter(redismessages));
 
             for (const auto &str : redismessages) {
+                int senderid;
+                int receiverid;
+                std::string content;
+                std::string status;
+                std::string timestamp;
+                if (str.empty())
+                    continue;
+                json js = json::parse(str);
+                AssignIfPresent(js, "senderid", senderid);
+                AssignIfPresent(js, "receiverid", receiverid);
+                AssignIfPresent(js, "content", content);
+                AssignIfPresent(js, "status", status);
+                AssignIfPresent(js, "timestamp", timestamp);
+                if ((senderid == userid && receiverid == friendid) ||
+                    (senderid == friendid && receiverid == userid)) {
+                    json js = {{"senderid", senderid},
+                               {"content", content},
+                               {"status", status},
+                               {"timestamp", timestamp}};
+                    arr.push_back(js);
+                }
+            }
+
+            for (const auto &str : messagecachelist_) {
                 int senderid;
                 int receiverid;
                 std::string content;
@@ -1153,6 +1163,29 @@ void Service::GetGroupHistory(const TcpConnectionPtr &conn, const json &js) {
                 }
             }
 
+            for (const auto &str : messagecachelist_) {
+                int senderid;
+                int receiverid;
+                std::string content;
+                std::string status;
+                std::string timestamp;
+                if (str.empty())
+                    continue;
+                json js = json::parse(str);
+                AssignIfPresent(js, "senderid", senderid);
+                AssignIfPresent(js, "receiverid", receiverid);
+                AssignIfPresent(js, "content", content);
+                AssignIfPresent(js, "status", status);
+                AssignIfPresent(js, "timestamp", timestamp);
+                if (receiverid == groupid) {
+                    json js = {{"senderid", senderid},
+                               {"content", content},
+                               {"status", status},
+                               {"timestamp", timestamp}};
+                    arr.push_back(js);
+                }
+            }
+
             j["messages"] = arr;
             j["end"] = true;
             conn->send(code_.encode(j, "GetGroupHistoryBack"));
@@ -1209,7 +1242,7 @@ void Service::SendFriendApply(const TcpConnectionPtr &conn, const json &js) {
         [this, fromid, targetemail](MysqlConnection &mysqlconn,
                                     DBCallback done) {
             std::string query =
-                "select id from users where email = '" + targetemail + "';";
+                "select id from users where email = '" + Escape(targetemail) + "';";
             MYSQL_RES *res = mysqlconn.ExcuteQuery(query);
             if (!res) {
                 LOG_ERROR << "Sendfriendapply query failed for email: "
@@ -1294,7 +1327,7 @@ void Service::ListFriendApply(const TcpConnectionPtr &conn, const json &js) {
                 status = row.GetString("status");
 
                 std::string qu = "select name, email from users where id = " +
-                                 std::to_string(fromid);
+                                 Escape(std::to_string(fromid)) + "; ";
                 MYSQL_RES *re = mysqlconn.ExcuteQuery(qu);
                 if (!re) {
                     LOG_ERROR << "Listfriendapply from name query failed ";
@@ -1341,7 +1374,7 @@ void Service::ListSendFriendApply(const TcpConnectionPtr &conn,
         [this, conn, fromid](MysqlConnection &mysqlconn, DBCallback done) {
             std::ostringstream oss;
             oss << "select targetid, status from friendapplys where fromid = "
-                << fromid;
+                << fromid << "; ";
             MYSQL_RES *res = mysqlconn.ExcuteQuery(oss.str());
             if (!res) {
                 LOG_ERROR << "Listsendfriendapply query failed ";
@@ -1363,7 +1396,7 @@ void Service::ListSendFriendApply(const TcpConnectionPtr &conn,
                 status = row.GetString("status");
 
                 std::string qu = "select name, email from users where id = " +
-                                 std::to_string(targetid);
+                                 std::to_string(targetid) + "; ";
                 MYSQL_RES *re = mysqlconn.ExcuteQuery(qu);
                 if (!re) {
                     LOG_ERROR << "Listsendfriendapply fromname query failed ";
@@ -1435,7 +1468,7 @@ void Service::ProceFriendApply(const TcpConnectionPtr &conn, const json &js) {
         [this, conn, targetid, fromid, status](MysqlConnection &mysqlconn,
                                                DBCallback done) {
             std::ostringstream oss;
-            oss << "update friendapplys set status = '" << status << "' "
+            oss << "update friendapplys set status = '" << Escape(status) << "' "
                 << "where targetid = " << targetid << " and fromid = " << fromid
                 << ";";
 
@@ -1504,7 +1537,7 @@ void Service::ListFriend(const TcpConnectionPtr &conn, const json &js) {
         [this, conn, userid](MysqlConnection &mysqlconn, DBCallback done) {
             std::string query =
                 "select friendid, block from friends where userid = " +
-                std::to_string(userid);
+                Escape(std::to_string(userid)) + "; ";
             MYSQL_RES *res = mysqlconn.ExcuteQuery(query);
             if (!res) {
                 LOG_ERROR << "listfriend query failed for userid: " << userid;
@@ -1529,7 +1562,7 @@ void Service::ListFriend(const TcpConnectionPtr &conn, const json &js) {
                 std::string friendmsgtime;
 
                 std::string qu = "select name, email from users where id = " +
-                                 std::to_string(friendid);
+                                 Escape(std::to_string(friendid)) + "; ";
                 MYSQL_RES *re = mysqlconn.ExcuteQuery(qu);
                 if (!re) {
                     LOG_ERROR << "Listfriend from name query failed ";
@@ -1685,7 +1718,7 @@ void Service::CreateGroup(const TcpConnectionPtr &conn, const json &js) {
 
             std::ostringstream oss;
             oss << "insert into groups (id, name, owner) values ( " << groupid
-                << ", '" << groupname << "', " << ownerid << "); ";
+                << ", '" << Escape(groupname) << "', " << ownerid << "); ";
 
             if (!mysqlconn.ExcuteUpdate(oss.str())) {
                 done(false);
@@ -1729,7 +1762,7 @@ void Service::SendGroupApply(const TcpConnectionPtr &conn, const json &js) {
             int groupapplyid = gen_.GetNextGroupApplyId();
 
             std::string query =
-                "select id from groups where name = '" + groupname + "'; ";
+                "select id from groups where name = '" + Escape(groupname) + "'; ";
             MYSQL_RES *res = mysqlconn.ExcuteQuery(query);
             if (!res) {
                 LOG_ERROR << "Listgroup from group query failed ";
@@ -1846,7 +1879,7 @@ void Service::ProceGroupApply(const TcpConnectionPtr &conn, const json &js) {
         [this, conn, groupid, applyid, status](MysqlConnection &mysqlconn,
                                                DBCallback done) {
             std::ostringstream oss;
-            oss << "update groupapplys set status = '" << status << "' "
+            oss << "update groupapplys set status = '" << Escape(status) << "' "
                 << "where groupid = " << groupid << " and userid = " << applyid
                 << ";";
 
@@ -2032,7 +2065,7 @@ void Service::ListGroupMember(const TcpConnectionPtr &conn, const json &js) {
             groupname = namerow.GetString("name");
 
             query = "select status from groupapplys where groupid = " +
-                    std::to_string(groupid);
+                    std::to_string(groupid) + "; ";
             res = mysqlconn.ExcuteQuery(query);
             if (!res) {
                 LOG_ERROR << "Listfriendapply query failed ";
@@ -2286,7 +2319,7 @@ void Service::ChangeUserRole(const TcpConnectionPtr &conn, const json &js) {
         [this, groupid, userid, role](MysqlConnection &mysqlconn,
                                       DBCallback done) {
             std::ostringstream oss;
-            oss << "update groupusers set role = '" << role
+            oss << "update groupusers set role = '" << Escape(role)
                 << "' where groupid = " << groupid << " and userid = " << userid
                 << "; ";
             if (mysqlconn.ExcuteUpdate(oss.str())) {
@@ -2473,7 +2506,7 @@ void Service::AddFileToMessage(const TcpConnectionPtr &conn, const json &js) {
                    "type, "
                    "status, timestamp, isfile) values ("
                 << msgid << ", " << senderid << ", " << receiverid << ", '"
-                << content << "','" << type << "','" << status << "','"
+                << Escape(content) << "','" << type << "','" << status << "','"
                 << timestamp << "', " << true << "); ";
 
             if (!mysqlconn.ExcuteUpdate(oss.str())) {
@@ -2742,7 +2775,7 @@ void Service::ChancePassword(const TcpConnectionPtr &conn, const json &js) {
         [this, conn, userid, newpassword](MysqlConnection &mysqlconn,
                                           DBCallback done) {
             std::ostringstream oss;
-            oss << "update users set password = '" << newpassword
+            oss << "update users set password = '" << Escape(newpassword)
                 << "' where id = " << userid << "; ";
             if (mysqlconn.ExcuteUpdate(oss.str())) {
                 json j = {{"end", true}, {"newpassword", newpassword}};
@@ -2774,7 +2807,7 @@ void Service::ChanceUsername(const TcpConnectionPtr &conn, const json &js) {
         [this, conn, userid, newname](MysqlConnection &mysqlconn,
                                       DBCallback done) {
             std::ostringstream oss;
-            oss << "update users set name = '" << newname
+            oss << "update users set name = '" << Escape(newname)
                 << "' where id = " << userid << "; ";
             if (mysqlconn.ExcuteUpdate(oss.str())) {
                 json j = {{"end", true}, {"newname", newname}};

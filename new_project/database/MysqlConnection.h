@@ -31,6 +31,8 @@ class MysqlConnection {
         return Connect(host_, port_, user_, password_, name_);
     }
 
+    MYSQL *GetMysql() { return conn_; }
+
   private:
     std::string host_, user_, password_, name_;
     unsigned short port_;
