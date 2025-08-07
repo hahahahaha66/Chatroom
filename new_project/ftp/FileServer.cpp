@@ -125,8 +125,6 @@ void FileServer::OnMessage(const TcpConnectionPtr &conn, Buffer *buffer,
             if (n > 0) {
                 task->received_ += n;
                 buffer->retrieve(n);
-                // std::cout << task->filesize_ << " : " << task->received_ <<
-                // std::endl;
             } else {
                 LOG_ERROR << "Write failed for file: " << task->filename_;
                 ::close(task->fd_);
@@ -377,11 +375,11 @@ void FileServer::SendFileData(const TcpConnectionPtr &conn) {
             task->sent_ = task->offset_;
             std::cout << task->filesize_ << " : " << task->sent_ << std::endl;
         } else if (n == 0) {
-            break;
+            continue;
         } else {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 // 内核发送缓冲区已满，下次再继续
-                return;
+                continue;
             }
             // 真正错误
             LOG_ERROR << "sendfile error: " << strerror(errno);

@@ -136,13 +136,15 @@ void EventLoop::doPendingFunctors() {
     callingPendingFunctors_ = true;
 
     {
-        std::unique_lock<std::mutex> mutex_;
+        std::unique_lock<std::mutex> lock(mutex_);
         functors.swap(pendingFunctors_);
     }
 
     // 循环处理任务队列中的任务
     for (const Functor &functor : functors) {
-        functor();
+        if (functor) {
+            functor();
+        }
     }
 
     callingPendingFunctors_ = false;

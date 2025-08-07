@@ -11,7 +11,7 @@ std::function<void()> g_handler; // 不暴露 loop，仅暴露行为
 
 void Quit(int sig) {
     std::cout << "检测到信号Ctrl + C" << std::endl;
-    // ProfilerStop();
+    ProfilerStop();
 
     if (g_handler) {
         g_handler(); // 间接调用含有 loop 的 lambda
@@ -19,7 +19,7 @@ void Quit(int sig) {
 }
 
 int main() {
-    // ProfilerStart("cpu_profile.prof");
+    ProfilerStart("cpu_profile.prof");
 
     EventLoop loop;
     InetAddress chataddr(10101, "0.0.0.0");

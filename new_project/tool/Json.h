@@ -27,7 +27,13 @@ template <typename T>
 bool AssignIfPresent(const json &j, const std::string &key, T &out) {
     if (j.is_string()) {
         try {
-            json pared = json::parse(j.get<std::string>());
+            std::string content = j.get<std::string>();
+            if (content.empty()) {
+                LOG_ERROR << "尝试解析空字符串为 JSON,key: " << key;
+                return false;
+            }
+
+            json pared = json::parse(content);
             return AssignIfPresent(pared, key, out);
         } catch (...) {
             return false;

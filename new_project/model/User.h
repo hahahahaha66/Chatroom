@@ -9,7 +9,7 @@ class User {
          const std::string &email)
         : id_(id), name_(name), password_(password), email_(email),
           online_(false), istransferfiles_(false), userinterfaceid(0),
-          timeout_(0), userinterface_("") {}
+          notificationcooldown_(0), timeout_(0), userinterface_("") {}
     User() = default;
 
     int GetId() const { return id_; }
@@ -32,6 +32,9 @@ class User {
     void SetIsTransferFiles(bool status) { istransferfiles_ = status; }
     int GetIsTransferFiles() { return istransferfiles_; }
 
+    void SetNotificationCooldown(int num) { notificationcooldown_ = num; }
+    int GetNotificationCooldown() { return notificationcooldown_; }
+
   private:
     int id_;
     std::string name_;
@@ -41,6 +44,7 @@ class User {
     int userinterfaceid;
     bool online_;
     bool istransferfiles_;
+    int notificationcooldown_;
     int timeout_;
     TcpConnectionPtr conn_;
 };

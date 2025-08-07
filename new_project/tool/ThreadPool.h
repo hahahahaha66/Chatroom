@@ -10,7 +10,7 @@
 
 class ThreadPool {
   public:
-    ThreadPool(size_t numthread = 16);
+    ThreadPool(size_t numthread);
     ~ThreadPool();
 
     void Start();

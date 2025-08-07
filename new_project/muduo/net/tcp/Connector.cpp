@@ -157,7 +157,7 @@ int Connector::getSocketError(int sockfd) {
 }
 
 void Connector::handleWrite() {
-    LOG_INFO << "Connector::handlewriet " << state_;
+    LOG_DEBUG << "Connector::handlewriet " << state_;
 
     if (state_ == kConnecting) {
         int sockfd = removeAndResetChannel();

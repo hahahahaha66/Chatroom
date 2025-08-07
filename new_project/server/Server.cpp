@@ -47,7 +47,7 @@ Server::Server(EventLoop *loop, const InetAddress &listenAddr,
     RegisterHandlerSafe(dispatcher_, "BlockFriend", service_,
                         &Service::BlockFriend);
     RegisterHandlerSafe(dispatcher_, "DeleteFriend", service_,
-                        &Service::BlockFriend);
+                        &Service::DeleteFriend);
 
     RegisterHandlerSafe(dispatcher_, "CreateGroup", service_,
                         &Service::CreateGroup);
@@ -83,7 +83,7 @@ Server::Server(EventLoop *loop, const InetAddress &listenAddr,
 
     RegisterHandlerSafe(dispatcher_, "ChancePassword", service_,
                         &Service::ChancePassword);
-    RegisterHandlerSafe(dispatcher_, "ChanceUsername", service_,
+    RegisterHandlerSafe(dispatcher_, "ChanceUserName", service_,
                         &Service::ChanceUsername);
 }
 

@@ -8,6 +8,7 @@
 #include "../tool/Codec.h"
 #include "../tool/Dispatcher.h"
 #include "../tool/Json.h"
+#include "../tool/ThreadPool.h"
 
 #include <algorithm>
 #include <atomic>
@@ -119,6 +120,7 @@ class Client {
     void GetGroupHistoryBack(const TcpConnectionPtr &conn, const json &js);
     void ChanceInterFace(const json &js);
     void ChanceInterFaceBack(const TcpConnectionPtr &conn, const json &js);
+    void NoticeMessage(const TcpConnectionPtr &conn, const json &js);
 
     // 好友
     void ListAllApply(const json &js);
@@ -220,6 +222,7 @@ class Client {
     std::string name_;
     std::string password_;
 
+    ThreadPool threadpool_;
     std::unordered_map<int, Friend> friendlist_;
     std::unordered_multimap<int, FriendApply> friendapplylist_;
     std::unordered_multimap<int, FriendApply> friendsendapplylist_;

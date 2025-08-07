@@ -19,7 +19,9 @@ using MessageHander =
 
 class Dispatcher {
   public:
-    Dispatcher() { threadpool_.Start(); }
+    Dispatcher(int threadsize = 32) : threadpool_(threadsize) {
+        threadpool_.Start();
+    }
 
     ~Dispatcher() { threadpool_.Stop(); }
 
@@ -43,6 +45,11 @@ class Dispatcher {
             }
             cb = it->second;
             LOG_DEBUG << "hander size: " << sizeof(cb);
+        }
+
+        if (!cb) {
+            LOG_ERROR << "Callback function is null for type: " << type;
+            return;
         }
         auto jsPtr = std::make_shared<json>(js);
 

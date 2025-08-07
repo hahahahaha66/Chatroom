@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../database/DatabaseThreadPool.h"
+#include "../database/MysqlConnectionpool.h"
 #include "../database/MysqlResult.h"
 #include "../manager/IdGenerator.h"
 #include "../model/User.h"
@@ -8,9 +9,11 @@
 #include "../muduo/net/tcp/TcpConnection.h"
 #include "../tool/Codec.h"
 #include "../tool/Json.h"
+#include "../tool/ThreadPool.h"
 
 #include <hiredis/hiredis.h>
 #include <memory>
+#include <mutex>
 #include <nlohmann/json.hpp>
 #include <sw/redis++/redis++.h>
 #include <sw/redis++/redis.h>
@@ -27,6 +30,7 @@ class Service {
     void ReadFromDataBase(const std::string &query,
                           std::function<void(MysqlRow &)> rowhander);
     void InitIdsFromMySQL();
+    void FlushMessageToRedis();
     void FlushMessageToMySQL();
 
     // User
@@ -80,15 +84,18 @@ class Service {
 
     std::string Escape(const std::string &input);
     std::string GetCurrentTimestamp();
+    void CooldownTimeDecrement();
 
   private:
     EventLoop *loop_;
 
     IdGenerator gen_;
     Codec code_;
+    ThreadPool threadpool_;
     DatabaseThreadPool databasethreadpool_;
     sw::redis::Redis redis_;
 
+    std::mutex mutex_;
     std::unordered_map<int, User> onlineuser_;
     std::vector<std::string> messagecachelist_;
 };

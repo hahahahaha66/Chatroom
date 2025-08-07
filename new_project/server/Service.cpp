@@ -4,12 +4,14 @@
 #include <cassert>
 #include <exception>
 #include <iterator>
+#include <mutex>
 #include <mysql/mariadb_com.h>
 #include <mysql/mysql.h>
 #include <ostream>
 #include <sstream>
 #include <string>
 #include <sw/redis++/connection.h>
+#include <sw/redis++/errors.h>
 #include <sw/redis++/shards.h>
 #include <unistd.h>
 #include <utility>
@@ -155,6 +157,27 @@ void Service::InitIdsFromMySQL() {
                      });
 }
 
+void Service::FlushMessageToRedis() {
+    LOG_INFO << "FlushMessageToRedis";
+    try {
+        auto pipe = redis_.pipeline();
+
+        for (auto &msgstr : messagecachelist_) {
+            if (msgstr.empty())
+                continue;
+            std::string key = "messages";
+            std::string value = msgstr;
+            pipe.rpush(key, value);
+        }
+        pipe.exec();
+
+        std::vector<std::string> newmessagecachelist;
+        messagecachelist_ = std::move(newmessagecachelist);
+    } catch (const sw::redis::Error &err) {
+        LOG_ERROR << "Redis error: " << err.what();
+    }
+}
+
 void Service::FlushMessageToMySQL() {
     LOG_INFO << "FlushMessageToMySQL";
 
@@ -179,25 +202,29 @@ void Service::FlushMessageToMySQL() {
     auto mysqlconn = MysqlConnectionPool::Instance().GetConnection();
 
     for (const auto &msgstr : messages) {
-        json js = json::parse(msgstr);
-        AssignIfPresent(js, "id", id);
-        AssignIfPresent(js, "senderid", senderid);
-        AssignIfPresent(js, "receiverid", receiverid);
-        AssignIfPresent(js, "content", content);
-        AssignIfPresent(js, "type", type);
-        AssignIfPresent(js, "status", status);
-        AssignIfPresent(js, "timestamp", timestamp);
+        try {
+            json js = json::parse(msgstr);
+            AssignIfPresent(js, "id", id);
+            AssignIfPresent(js, "senderid", senderid);
+            AssignIfPresent(js, "receiverid", receiverid);
+            AssignIfPresent(js, "content", content);
+            AssignIfPresent(js, "type", type);
+            AssignIfPresent(js, "status", status);
+            AssignIfPresent(js, "timestamp", timestamp);
 
-        if (firstvalue)
-            firstvalue = false;
-        else
-            oss << ", ";
+            if (firstvalue)
+                firstvalue = false;
+            else
+                oss << ", ";
 
-        oss << "(" << id << ", " << senderid << ", " << receiverid << ", '"
-            << content << "', '" << type << "', '" << status << "', '"
-            << timestamp << "') ";
+            oss << "(" << id << ", " << senderid << ", " << receiverid << ", '"
+                << content << "', '" << type << "', '" << status << "', '"
+                << timestamp << "') ";
 
-        count++;
+            count++;
+        } catch (const nlohmann::json::parse_error &e) {
+            LOG_ERROR << "JSON failed: " << e.what() << ", content: " << msgstr;
+        }
     }
     oss << ";";
     if (mysqlconn->ExcuteUpdate(oss.str())) {
@@ -225,19 +252,27 @@ Service::Service(EventLoop *loop)
           opts.port = 6379;
           return sw::redis::Redis(opts);
       }()),
-      loop_(loop) {
+      loop_(loop), threadpool_(16) {
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     InitIdsFromMySQL();
-    loop_->runEvery(5.0, std::bind(&Service::FlushMessageToMySQL, this));
+    threadpool_.Start();
+    loop_->runEvery(5.0, std::bind(&Service::FlushMessageToRedis, this));
+    loop_->runEvery(10.0, std::bind(&Service::FlushMessageToMySQL, this));
     loop_->runEvery(30.0, std::bind(&Service::TimeoutDetection, this));
     loop_->runEvery(1.0, [this]() {
         for (auto &it : onlineuser_) {
             it.second.TimeOutIncrement();
+            if (it.second.GetNotificationCooldown() > 0)
+                it.second.SetNotificationCooldown(
+                    it.second.GetNotificationCooldown() - 1);
         }
     });
 }
 
-Service::~Service() { FlushMessageToMySQL(); }
+Service::~Service() {
+    FlushMessageToMySQL();
+    threadpool_.Stop();
+}
 
 void Service::UserRegister(const TcpConnectionPtr &conn, const json &js) {
     bool end = true;
@@ -782,134 +817,162 @@ void Service::MessageSend(const TcpConnectionPtr &conn, const json &js) {
 
     // 添加到redis,获取自增id
     int msgid = gen_.GetNextMsgId();
+    auto mysqlconn = MysqlConnectionPool::Instance().GetConnection();
 
-    databasethreadpool_.EnqueueTask(
-        [this, msgid, senderid, receiverid, content, type, status,
-         timestamp](MysqlConnection &mysqlconn, DBCallback done) mutable {
-            try {
-                std::vector<std::pair<TcpConnectionPtr, json>> messagestosend;
+    try {
+        std::vector<std::pair<TcpConnectionPtr, json>> messagestosend;
+        if (type == "Group") {
+            std::string query =
+                "select userid from groupusers where groupid = " +
+                std::to_string(receiverid) + "; ";
+            MYSQL_RES *res = mysqlconn->ExcuteQuery(query);
+            if (!res) {
+                LOG_ERROR << "Listfriendapply query failed ";
+                json j = {{"timestamp", timestamp}, {"end", false}};
+                // conn->send(code_.encode(j, "SendMessageBack"));
+                return;
+            }
 
-                if (type == "Group") {
-                    std::string query =
-                        "select userid from groupusers where groupid = " +
-                        std::to_string(receiverid) + "; ";
-                    MYSQL_RES *res = mysqlconn.ExcuteQuery(query);
-                    if (!res) {
-                        LOG_ERROR << "Listfriendapply query failed ";
-                        done(false);
-                        return;
-                    }
+            MysqlResult result(res);
+            int userid;
 
-                    MysqlResult result(res);
-                    int userid;
-
-                    while (result.Next()) {
-                        MysqlRow row = result.GetRow();
-                        userid = row.GetInt("userid");
-                        if (userid == senderid)
-                            continue;
-                        if (onlineuser_.find(userid) != onlineuser_.end() &&
-                            onlineuser_[userid].GetUserInterFace() == "Group" &&
-                            onlineuser_[userid].GetUserInterFaceId() ==
-                                receiverid) {
-                            auto reconn = onlineuser_[userid].GetConn();
-                            if (reconn) {
-                                json j = {{"groupid", receiverid},
-                                          {"senderid", senderid},
-                                          {"content", content},
-                                          {"type", type},
-                                          {"timestamp", timestamp}};
-                                messagestosend.emplace_back(reconn,
-                                                            std::move(j));
-                            }
-                        }
-                    }
-                } else if (type == "Private") {
-                    std::string query =
-                        "select block from friends where userid = " +
-                        std::to_string(receiverid) +
-                        " and friendid = " + std::to_string(senderid) + "; ";
-                    MYSQL_RES *res = mysqlconn.ExcuteQuery(query);
-                    if (!res) {
-                        LOG_ERROR << "Listfriendapply query failed ";
-                        done(false);
-                        return;
-                    }
-
-                    MysqlResult result(res);
-                    bool block = false;
-                    if (!result.Next()) {
-                        done(false);
-                        return;
-                    }
-                    MysqlRow row = result.GetRow();
-                    block = row.GetBool("block");
-                    if (block) {
-                        done(false);
-                        return;
-                    }
-
-                    if (onlineuser_.find(receiverid) != onlineuser_.end() &&
-                        onlineuser_[receiverid].GetUserInterFace() ==
-                            "Private" &&
-                        onlineuser_[receiverid].GetUserInterFaceId() ==
-                            senderid) {
-                        status = "Read";
-                        auto reconn = onlineuser_[receiverid].GetConn();
+            while (result.Next()) {
+                MysqlRow row = result.GetRow();
+                userid = row.GetInt("userid");
+                if (userid == senderid)
+                    continue;
+                if (onlineuser_.find(userid) != onlineuser_.end()) {
+                    if (onlineuser_[userid].GetUserInterFace() == "Group" &&
+                        onlineuser_[userid].GetUserInterFaceId() ==
+                            receiverid) {
+                        auto reconn = onlineuser_[userid].GetConn();
                         if (reconn) {
-                            json j = {{"friendid", senderid},
+                            json j = {{"groupid", receiverid},
+                                      {"senderid", senderid},
                                       {"content", content},
                                       {"type", type},
                                       {"timestamp", timestamp}};
                             messagestosend.emplace_back(reconn, std::move(j));
                         }
-                    }
-                } else {
-                    LOG_ERROR << "Message type wrong";
-                    done(false);
-                    return;
-                }
-
-                json j = {{"id", msgid},
-                          {"senderid", senderid},
-                          {"receiverid", receiverid},
-                          {"content", content},
-                          {"type", type},
-                          {"status", status},
-                          {"timestamp", timestamp}};
-                std::string key = "messages";
-                std::string value = j.dump();
-                redis_.rpush(key, value);
-
-                for (auto &pair : messagestosend) {
-                    TcpConnectionPtr reconn = pair.first;
-                    json jsonmsg = std::move(pair.second);
-
-                    EventLoop *loop = reconn->getLoop();
-                    if (loop) {
-                        loop->runInLoop(
-                            [reconn, msg = std::move(jsonmsg), this]() mutable {
-                                reconn->send(code_.encode(msg, "RecvMessage"));
+                    } else if (onlineuser_[userid].GetNotificationCooldown() ==
+                                   0 &&
+                               onlineuser_[userid].GetUserInterFace() ==
+                                   "Notice") {
+                        auto reconn = onlineuser_[userid].GetConn();
+                        if (reconn) {
+                            onlineuser_[userid].SetNotificationCooldown(5);
+                            json j = {
+                                {"senderid", receiverid},
+                                {"type", type},
+                            };
+                            threadpool_.SubmitTask([this, reconn, j]() {
+                                reconn->send(code_.encode(j, "NoticeMessage"));
                             });
+                        }
                     }
                 }
-
-                done(true);
-            } catch (const std::exception &e) {
-                LOG_ERROR << "Database error during message send: " << e.what();
-                done(false);
+            }
+        } else if (type == "Private") {
+            std::string query = "select block from friends where userid = " +
+                                std::to_string(receiverid) +
+                                " and friendid = " + std::to_string(senderid) +
+                                "; ";
+            MYSQL_RES *res = mysqlconn->ExcuteQuery(query);
+            if (!res) {
+                LOG_ERROR << "Listfriendapply query failed ";
+                // json j = {{"timestamp", timestamp}, {"end", false}};
+                // conn->send(code_.encode(j, "SendMessageBack"));
                 return;
             }
-        },
-        [this, conn, timestamp](bool success) mutable {
-            if (success) {
-                LOG_DEBUG << "Message Send Database Operation Success";
-            } else {
-                LOG_ERROR << "Message Send Database Operation Success";
+
+            MysqlResult result(res);
+            bool block = false;
+            if (!result.Next()) {
+                // json j = {{"timestamp", timestamp}, {"end", false}};
+                // conn->send(code_.encode(j, "SendMessageBack"));
+                return;
             }
-            json j = {{"timestamp", timestamp}, {"end", success}};
-            conn->send(code_.encode(j, "SendMessageBack"));
-        });
+            MysqlRow row = result.GetRow();
+            block = row.GetBool("block");
+            if (block) {
+                // json j = {{"timestamp", timestamp}, {"end", false}};
+                // conn->send(code_.encode(j, "SendMessageBack"));
+                return;
+            }
+
+            if (onlineuser_.find(receiverid) != onlineuser_.end()) {
+
+                if (onlineuser_[receiverid].GetUserInterFace() == "Private" &&
+                    onlineuser_[receiverid].GetUserInterFaceId() == senderid) {
+                    status = "Read";
+                    auto reconn = onlineuser_[receiverid].GetConn();
+                    if (reconn) {
+                        json j = {{"friendid", senderid},
+                                  {"content", content},
+                                  {"type", type},
+                                  {"timestamp", timestamp}};
+                        messagestosend.emplace_back(reconn, std::move(j));
+                    }
+                } else if (onlineuser_[receiverid].GetNotificationCooldown() ==
+                               0 &&
+                           onlineuser_[receiverid].GetUserInterFace() ==
+                               "Notice") {
+                    auto reconn = onlineuser_[receiverid].GetConn();
+                    if (reconn) {
+                        onlineuser_[receiverid].SetNotificationCooldown(5);
+                        json j = {
+                            {"senderid", senderid},
+                            {"type", type},
+                        };
+                        threadpool_.SubmitTask([this, reconn, j]() {
+                            reconn->send(code_.encode(j, "NoticeMessage"));
+                        });
+                    }
+                }
+            }
+        } else {
+            LOG_ERROR << "Message type wrong";
+            // json j = {{"timestamp", timestamp}, {"end", false}};
+            // conn->send(code_.encode(j, "SendMessageBack"));
+            return;
+        }
+
+        json j = {{"id", msgid},
+                  {"senderid", senderid},
+                  {"receiverid", receiverid},
+                  {"content", content},
+                  {"type", type},
+                  {"status", status},
+                  {"timestamp", timestamp}};
+        std::string value = j.dump();
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            messagecachelist_.push_back(std::move(value));
+        }
+
+        for (auto &pair : messagestosend) {
+            TcpConnectionPtr reconn = pair.first;
+            json jsonmsg = std::move(pair.second);
+
+            EventLoop *loop = reconn->getLoop();
+            if (loop) {
+                loop->runInLoop(
+                    [reconn, msg = std::move(jsonmsg), this]() mutable {
+                        threadpool_.SubmitTask([this, reconn, msg]() {
+                            reconn->send(code_.encode(msg, "RecvMessage"));
+                        });
+                    });
+            }
+        }
+
+        // j = {{"timestamp", timestamp}, {"end", true}};
+        // conn->send(code_.encode(j, "SendMessageBack"));
+    } catch (const std::exception &e) {
+        LOG_ERROR << "Database error during message send: " << e.what();
+        // json j = {{"timestamp", timestamp}, {"end", false}};
+        // conn->send(code_.encode(j, "SendMessageBack"));
+        return;
+    }
 }
 
 void Service::GetChatHistory(const TcpConnectionPtr &conn, const json &js) {
@@ -981,6 +1044,8 @@ void Service::GetChatHistory(const TcpConnectionPtr &conn, const json &js) {
                 std::string content;
                 std::string status;
                 std::string timestamp;
+                if (str.empty())
+                    continue;
                 json js = json::parse(str);
                 AssignIfPresent(js, "senderid", senderid);
                 AssignIfPresent(js, "receiverid", receiverid);
@@ -1071,6 +1136,8 @@ void Service::GetGroupHistory(const TcpConnectionPtr &conn, const json &js) {
                 std::string content;
                 std::string status;
                 std::string timestamp;
+                if (str.empty())
+                    continue;
                 json js = json::parse(str);
                 AssignIfPresent(js, "senderid", senderid);
                 AssignIfPresent(js, "receiverid", receiverid);
@@ -1170,13 +1237,20 @@ void Service::SendFriendApply(const TcpConnectionPtr &conn, const json &js) {
                 << "Pending"
                 << "'); ";
 
-            if (mysqlconn.ExcuteUpdate(oss.str())) {
-                done(true);
-                return;
-            } else {
+            if (!mysqlconn.ExcuteUpdate(oss.str())) {
                 done(false);
                 return;
             }
+
+            if (onlineuser_[targetid].IsOnline() &&
+                onlineuser_[targetid].GetNotificationCooldown() == 0 &&
+                onlineuser_[targetid].GetUserInterFace() == "Notice") {
+                json js = {{"type", "Apply"}};
+                onlineuser_[targetid].SetNotificationCooldown(5);
+                auto reconn = onlineuser_[targetid].GetConn();
+                reconn->send(code_.encode(js, "NoticeMessage"));
+            }
+            done(true);
         },
         [this, conn](bool success) {
             if (success) {
@@ -1566,16 +1640,16 @@ void Service::DeleteFriend(const TcpConnectionPtr &conn, const json &js) {
     databasethreadpool_.EnqueueTask(
         [this, userid, friendid](MysqlConnection &mysqlconn, DBCallback done) {
             std::string query =
-                "delete friends where userid = " + std::to_string(userid) +
+                "delete from friends where userid = " + std::to_string(userid) +
                 " and friendid = " + std::to_string(friendid) + "; ";
             if (!(mysqlconn.ExcuteUpdate(query))) {
                 done(false);
                 return;
             }
 
-            query =
-                "delete friends where userid = " + std::to_string(friendid) +
-                " and friendid = " + std::to_string(userid) + "; ";
+            query = "delete from friends where userid = " +
+                    std::to_string(friendid) +
+                    " and friendid = " + std::to_string(userid) + "; ";
             if (mysqlconn.ExcuteUpdate(query)) {
                 done(true);
                 return;
@@ -1590,10 +1664,10 @@ void Service::DeleteFriend(const TcpConnectionPtr &conn, const json &js) {
             LOG_DEBUG << "DeleteFriends Success";
             else {
                 LOG_ERROR << "DeleteFriends Failed";
-                json j;
-                j["end"] = false;
-                conn->send(code_.encode(j, "DeleteFriendBack"));
             }
+            json j;
+            j["end"] = success;
+            conn->send(code_.encode(j, "DeleteFriendBack"));
         });
 }
 
@@ -2658,19 +2732,21 @@ void Service::ListGroupFile(const TcpConnectionPtr &conn, const json &js) {
         });
 }
 
-void Service::ChancePassword(const TcpConnectionPtr &conn, const json &js)
-{
+void Service::ChancePassword(const TcpConnectionPtr &conn, const json &js) {
     bool end = true;
     int userid;
     std::string newpassword;
     end &= AssignIfPresent(js, "userid", userid);
     end &= AssignIfPresent(js, "newpassword", newpassword);
     databasethreadpool_.EnqueueTask(
-        [this, conn, userid, newpassword](MysqlConnection &mysqlconn, DBCallback done) {
+        [this, conn, userid, newpassword](MysqlConnection &mysqlconn,
+                                          DBCallback done) {
             std::ostringstream oss;
-            oss << "update users set password = '" << newpassword << "' where userid = " << userid << "; ";
+            oss << "update users set password = '" << newpassword
+                << "' where id = " << userid << "; ";
             if (mysqlconn.ExcuteUpdate(oss.str())) {
-                done(true);
+                json j = {{"end", true}, {"newpassword", newpassword}};
+                conn->send(code_.encode(j, "ChancePasswordBack"));
                 return;
             } else {
                 done(false);
@@ -2688,19 +2764,22 @@ void Service::ChancePassword(const TcpConnectionPtr &conn, const json &js)
         });
 }
 
-void Service::ChanceUsername(const TcpConnectionPtr &conn, const json &js)
-{
+void Service::ChanceUsername(const TcpConnectionPtr &conn, const json &js) {
     bool end = true;
     int userid;
     std::string newname;
     end &= AssignIfPresent(js, "userid", userid);
     end &= AssignIfPresent(js, "newname", newname);
     databasethreadpool_.EnqueueTask(
-        [this, conn, userid, newname](MysqlConnection &mysqlconn, DBCallback done) {
+        [this, conn, userid, newname](MysqlConnection &mysqlconn,
+                                      DBCallback done) {
             std::ostringstream oss;
-            oss << "update users set name = '" << newname << "' where userid = " << userid << "; ";
+            oss << "update users set name = '" << newname
+                << "' where id = " << userid << "; ";
             if (mysqlconn.ExcuteUpdate(oss.str())) {
-                done(true);
+                json j = {{"end", true}, {"newname", newname}};
+                conn->send(code_.encode(j, "ChanceUserNameBack"));
+                return;
                 return;
             } else {
                 done(false);
@@ -2713,7 +2792,7 @@ void Service::ChanceUsername(const TcpConnectionPtr &conn, const json &js)
             } else {
                 LOG_ERROR << "ChanceUsername failed";
                 json j = {{"end", success}};
-                conn->send(code_.encode(j, "ChanceUsernameBack"));
+                conn->send(code_.encode(j, "ChanceUserNameBack"));
             }
         });
 }

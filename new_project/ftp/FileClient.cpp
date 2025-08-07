@@ -46,12 +46,10 @@ void FileUploader::SendHeader() {
             {"receiverid", receiverid_},
             {"type", type_}};
     std::string msg = codec_.encode(js, "Upload");
-    std::cout << js.dump() << std::endl;
 
     if (conn_ && conn_->connected()) {
         conn_->send(msg);
-        LOG_INFO << "Header sent for file: " << filename_
-                 << ", size: " << filesize_;
+        LOG_INFO << "发送文件: " << filename_ << ", 大小: " << filesize_;
     }
 }
 
@@ -65,7 +63,8 @@ void FileUploader::OnMessage(const TcpConnectionPtr &conn, Buffer *buffer,
                              Timestamp time) {
     auto msgopt = codec_.tryDecode(buffer);
     if (!msgopt.has_value()) {
-        LOG_INFO << "Recv from " << conn->peerAddress().toIpPort() << " failed";
+        LOG_ERROR << "Recv from " << conn->peerAddress().toIpPort()
+                  << " failed";
         return;
     }
     auto [type, js] = msgopt.value();
@@ -74,7 +73,7 @@ void FileUploader::OnMessage(const TcpConnectionPtr &conn, Buffer *buffer,
     if (type == "UploadJsonBack") {
         AssignIfPresent(js, "end", end);
         if (end) {
-            LOG_INFO << "UploadJsonBack success";
+            LOG_DEBUG << "UploadJsonBack success";
             if (!filedatastarted_) {
                 filedatastarted_ = true;
                 SendFileData();
@@ -86,7 +85,7 @@ void FileUploader::OnMessage(const TcpConnectionPtr &conn, Buffer *buffer,
     } else if (type == "AddFileToMessage") {
         AssignIfPresent(js, "end", end);
         if (end) {
-            LOG_INFO << "AddFileToMessage success";
+            LOG_DEBUG << "AddFileToMessage success";
         } else {
             LOG_ERROR << "AddFileToMessage failed";
             conn->shutdown();
@@ -126,8 +125,6 @@ void FileUploader::SendFileData() {
                       << std::endl;
         }
 
-        // LOG_INFO << "Try to send total size: " << filesize_;
-
         if (n > 0) {
             sent_ = offset_;
         } else if (n == 0) {
@@ -145,7 +142,7 @@ void FileUploader::SendFileData() {
         }
 
         if (sent_ >= filesize_) {
-            LOG_INFO << "Upload complete: " << filename_ << ",sent: " << sent_;
+            std::cout << "上传完成: " << filename_ << ", 发送大小: " << sent_;
             ::close(fd_);
             conn_->shutdown();
         }
@@ -175,7 +172,7 @@ void FileDownloader::OnConnection(const TcpConnectionPtr &conn) {
         conn_ = conn;
         SendDownloadRequest();
     } else {
-        LOG_INFO << "Disconnected from file server";
+        LOG_DEBUG << "Disconnected from file server";
     }
 }
 
@@ -193,8 +190,8 @@ void FileDownloader::OnMessage(const TcpConnectionPtr &conn, Buffer *buffer,
     if (!gotheader_) {
         auto msgopt = codec_.tryDecode(buffer);
         if (!msgopt.has_value()) {
-            LOG_INFO << "Recv from " << conn->peerAddress().toIpPort()
-                     << " failed";
+            LOG_ERROR << "Recv from " << conn->peerAddress().toIpPort()
+                      << " failed";
             return;
         }
         auto [type, js] = msgopt.value();
@@ -214,9 +211,9 @@ void FileDownloader::OnMessage(const TcpConnectionPtr &conn, Buffer *buffer,
                     conn->shutdown();
                     return;
                 }
-                std::cout << "Start receiving file: " << filename_
-                          << ", size: " << filesize_ << std::endl;
-                LOG_INFO << "DownloadJsonBack success";
+                std::cout << "开始下载文件: " << filename_
+                          << ", 大小: " << filesize_ << std::endl;
+                LOG_DEBUG << "DownloadJsonBack success";
             } else {
                 LOG_ERROR << "DownloadJsonBack failed";
                 conn->shutdown();
@@ -230,6 +227,8 @@ void FileDownloader::OnMessage(const TcpConnectionPtr &conn, Buffer *buffer,
     }
 
     // 正式读取文件内容
+    uint64_t placeholder = filesize_ / 100;
+    int progress = received_ / placeholder;
     while (gotheader_ && buffer->readableBytes() > 0 && received_ < filesize_) {
         const char *data = buffer->peek();
         size_t len = buffer->readableBytes();
@@ -241,11 +240,16 @@ void FileDownloader::OnMessage(const TcpConnectionPtr &conn, Buffer *buffer,
         size_t towrite = std::min(len, remaining);
 
         ssize_t n = ::write(fd_, data, towrite);
+
         if (n > 0) {
             received_ += n;
             buffer->retrieve(n);
-            std::cout << "every write: " << n << std::endl;
-            std::cout << filesize_ << " : " << received_ << std::endl;
+
+            if ((received_ / placeholder) > progress) {
+                progress = received_ / placeholder;
+                std::cout << "已接受大小: " << received_ << "(" << progress
+                          << "%)" << std::endl;
+            }
         } else {
             LOG_ERROR << "Write failed for file: " << filename_;
             ::close(fd_);
@@ -254,8 +258,8 @@ void FileDownloader::OnMessage(const TcpConnectionPtr &conn, Buffer *buffer,
         }
 
         if (received_ >= filesize_) {
-            LOG_INFO << "Download complete: " << filename_
-                     << ", received: " << received_;
+            LOG_INFO << "下载完成: " << filename_
+                     << ", 接收大小: " << received_;
             ::close(fd_);
             conn->shutdown();
             return;

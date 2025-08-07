@@ -31,13 +31,13 @@ TcpClient::TcpClient(EventLoop *loop, const InetAddress &serverAddr,
       nextConnId_(1) {
     connector_->setNewConnectionCallback(
         std::bind(&TcpClient::newConnection, this, std::placeholders::_1));
-    LOG_INFO << "TcpClinet::TcpLient[" << name_ << "] - connector "
-             << static_cast<const void *>(connector_.get());
+    LOG_DEBUG << "TcpClinet::TcpLient[" << name_ << "] - connector "
+              << static_cast<const void *>(connector_.get());
 }
 
 TcpClient::~TcpClient() {
-    LOG_INFO << "TcpClient::~TcpClient[" << name_ << "] - connector "
-             << static_cast<const void *>(connector_.get());
+    LOG_DEBUG << "TcpClient::~TcpClient[" << name_ << "] - connector "
+              << static_cast<const void *>(connector_.get());
     TcpConnectionPtr conn;
     bool unique = false;
     {
@@ -62,8 +62,8 @@ TcpClient::~TcpClient() {
 }
 
 void TcpClient::connect() {
-    LOG_INFO << "TcpClient::connect[" << name_ << "] - connecting to"
-             << connector_->serverAddress().toIpPort();
+    LOG_DEBUG << "TcpClient::connect[" << name_ << "] - connecting to"
+              << connector_->serverAddress().toIpPort();
     connect_ = true;
     connector_->start();
 }
