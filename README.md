@@ -23,26 +23,26 @@ yay -S nlohmann-json
 
 ### 编译
 ```bash
-// 先到/new_project/muduo下
+# 先到/new_project/muduo下
 mkdir build && cd build
 cmake ..
 make -j
 ```
 客户端
 ```bash
-// 到/new_project/main_client下
+# 到/new_project/main_client下
 mkdir build && cd build
 cmake ..
 make -j
-// 运行./client
+# 运行./client
 ```
 服务器
 ```bash
-// 到/new_project/main_server下
+# 到/new_project/main_server下
 mkdir build && cd build
 cmake ..
 make -j
-// 运行./server
+# 运行./server
 ```
 
 ## 功能特性
