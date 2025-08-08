@@ -33,6 +33,8 @@ Server::Server(EventLoop *loop, const InetAddress &listenAddr,
                         &Service::GetGroupHistory);
     RegisterHandlerSafe(dispatcher_, "ChanceInterFace", service_,
                         &Service::ChanceInterFace);
+    RegisterHandlerSafe(dispatcher_, "SendVerifyCode", service_,
+                        &Service::SendVerifyCode);
 
     RegisterHandlerSafe(dispatcher_, "SendFriendApply", service_,
                         &Service::SendFriendApply);
@@ -95,9 +97,20 @@ void Server::start() {
 void Server::ThreadInitCallback(EventLoop *loop) {}
 
 void Server::MessageCompleteCallback(const TcpConnectionPtr &conn) {
-    if (conn->connected()) {
-        LOG_DEBUG << conn->getLoop() << " Loop and send messages to "
-                  << conn->peerAddress().toIpPort();
+    if (service_.GetSendQueue().find(conn) != service_.GetSendQueue().end()) {
+        auto &ctx = service_.GetSendQueue()[conn];
+        if (ctx->sending){
+            EventLoop *loop = conn->getLoop();
+            loop->runInLoop([this, conn, &ctx]() {
+                    ctx->pendingmessages.pop();
+                    if (!ctx->pendingmessages.empty()) {
+                        std::string front = ctx->pendingmessages.front();
+                        conn->send(front);
+                    } else {
+                        ctx->sending = false;
+                    }
+            });
+       }
     }
 }
 
@@ -108,6 +121,7 @@ void Server::OnConnection(const TcpConnectionPtr &conn) {
         LOG_INFO << "Connection disconnected: "
                  << conn->peerAddress().toIpPort();
         service_.RemoveUserConnect(conn);
+        
     }
 }
 

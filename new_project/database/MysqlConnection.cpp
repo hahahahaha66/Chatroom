@@ -1,7 +1,6 @@
 #include "MysqlConnection.h"
 
 #include <chrono>
-#include <iostream>
 #include <mysql/mysql.h>
 
 using namespace std::chrono;

@@ -20,52 +20,58 @@ std::string Codec::encode(const json &js, const std::string &type) {
 }
 
 std::optional<std::tuple<std::string, json>> Codec::tryDecode(Buffer *buf) {
-    if (buf->readableBytes() < sizeof(uint32_t) * 2)
-        return std::nullopt;
+    while (true) {
+        if (buf->readableBytes() < sizeof(uint32_t) * 2)
+            return std::nullopt;
 
-    const char *data = buf->peek();
+        const char *data = buf->peek();
 
-    // 读取总字数
-    uint32_t totallen = 0;
-    std::memcpy(&totallen, data, sizeof(uint32_t));
+        // 读取总字数
+        uint32_t totallen = 0;
+        std::memcpy(&totallen, data, sizeof(uint32_t));
 
-    if (totallen < sizeof(uint32_t) || totallen > 100 * 1024 * 1024) {
-        LOG_WARN << "Invalid total length: " << totallen;
-        buf->retrieve(sizeof(uint32_t));
-        return std::nullopt;
-    }
+        if (totallen < sizeof(uint32_t) || totallen > 1000 * 1024 * 1024) {
+            LOG_WARN << "Invalid total length: " << totallen << ", readable = " << buf->readableBytes();
+            buf->retrieve(1);
+            continue;
+        }
 
-    if (buf->readableBytes() < sizeof(uint32_t) + totallen)
-        return std::nullopt;
+        if (buf->readableBytes() < sizeof(uint32_t) + totallen)
+            return std::nullopt;
 
-    const char *ptr = data + sizeof(uint32_t);
+        const char *ptr = data + sizeof(uint32_t);
 
-    // 读取类型字数
-    uint32_t typelen = 0;
-    std::memcpy(&typelen, ptr, sizeof(uint32_t));
+        // 读取类型字数
+        uint32_t typelen = 0;
+        std::memcpy(&typelen, ptr, sizeof(uint32_t));
 
-    if (typelen == 0 || typelen > 256) {
-        buf->retrieve(sizeof(uint32_t));
-        return std::nullopt;
-    }
+        if (typelen == 0 || typelen > 256) {
+            LOG_WARN << "Invalid typelen: " << typelen;
+            buf->retrieve(1);
+            continue;
+        }
 
-    ptr += sizeof(uint32_t);
-    const char *type_start = ptr;
-    ptr += typelen;
+        ptr += sizeof(uint32_t);
+        const char *type_start = ptr;
+        ptr += typelen;
 
-    const char *json_start = ptr;
-    size_t json_len = totallen - sizeof(uint32_t) - typelen;
+        const char *json_start = ptr;
+        size_t json_len = totallen - sizeof(uint32_t) - typelen;
 
-    buf->retrieve(sizeof(uint32_t) + totallen);
+        // 校验 json 是否超出 buf
+        if ((size_t)(json_start + json_len - data) > buf->readableBytes()) {
+            // 数据不够，等待更多内容
+            return std::nullopt;
+        }
 
-    try {
-        json js = json::parse(json_start, json_start + json_len);
-        // LOG_INFO << "Decode message : type = " << type << ", json = " <<
-        // js.dump();
-        return std::make_tuple(std::string(type_start, typelen), std::move(js));
-    } catch (...) {
-        LOG_ERROR << "JSON parse failed";
-        buf->retrieve(sizeof(uint32_t) + totallen);
-        return std::nullopt;
+        try {
+            json js = json::parse(json_start, json_start + json_len);
+            buf->retrieve(sizeof(uint32_t) + totallen);
+            return std::make_tuple(std::string(type_start, typelen), std::move(js));
+        } catch (const std::exception &e) {
+            LOG_ERROR << "JSON parse failed" << e.what();
+            buf->retrieve(1);
+            return std::nullopt;
+        }
     }
 }

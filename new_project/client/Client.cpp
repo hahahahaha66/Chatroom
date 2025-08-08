@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <memory>
 #include <openssl/asn1.h>
+#include <ostream>
 #include <string>
 #include <unordered_map>
 
@@ -117,14 +118,14 @@ void RegisterHandlerSafe(Dispatcher &dispatcher, const std::string &type,
 
 Client::Client(EventLoop &loop, uint16_t port, std::string ip, std::string name)
     : client_(&loop, InetAddress(port, ip), name), ip_(ip),
-      mainserverport_(port), loop_(&loop), dispatcher_(16), threadpool_(16) {
+      mainserverport_(port), loop_(&loop), dispatcher_(16) {
     client_.setConnectionCallback(
         std::bind(&Client::ConnectionCallBack, this, _1));
     client_.setMessageCallback(std::bind(&Client::OnMessage, this, _1, _2, _3));
     client_.setWriteCompleteCallback(
         std::bind(&Client::MessageCompleteCallback, this, _1));
 
-    threadpool_.Start();
+    // threadpool_.Start();
 
     RegisterHandlerSafe(dispatcher_, "RegisterBack", *this,
                         &Client::RegisterBack);
@@ -145,6 +146,8 @@ Client::Client(EventLoop &loop, uint16_t port, std::string ip, std::string name)
                         &Client::ChanceInterFaceBack);
     RegisterHandlerSafe(dispatcher_, "NoticeMessage", *this,
                         &Client::NoticeMessage);
+    RegisterHandlerSafe(dispatcher_, "SendVerifyCodeBack", *this,
+                        &Client::SendVerifyCodeBack);
 
     RegisterHandlerSafe(dispatcher_, "SendFriendApplyBack", *this,
                         &Client::SendFriendApplyBack);
@@ -393,7 +396,6 @@ void Client::SendMessageBack(const TcpConnectionPtr &conn, const json &js) {
     } else {
         std::cout << "发送失败" << std::endl;
     }
-    notifyInputReady();
 }
 
 void Client::RecvMessageBack(const TcpConnectionPtr &conn, const json &js) {
@@ -454,7 +456,7 @@ void Client::GetChatHistoryBack(const TcpConnectionPtr &conn, const json &js) {
             AssignIfPresent(it, "timestamp", timestamp);
 
             if (senderid == userid_) {
-                std::cout << "用户: " << content << "时间: " << timestamp
+                std::cout << timestamp << " " << "用户: " << content << "时间: "
                           << std::endl;
             } else {
                 if (news && status == "Unread") {
@@ -552,6 +554,26 @@ void Client::NoticeMessage(const TcpConnectionPtr &conn, const json &js) {
     } else {
         std::cout << "格式错误" << std::endl;
     }
+}
+
+void Client::SendVerifyCode(const json &js)
+{
+    this->send(codec_.encode(js, "SendVerifyCode"));
+}
+
+void Client::SendVerifyCodeBack(const TcpConnectionPtr &conn, const json &js)
+{
+    bool end = false;
+
+    AssignIfPresent(js, "end", end);
+
+    if (end == true) {
+        std::cout << "发送验证码成功" << std::endl;
+    } else {
+        std::cout << "发送验证码失败" << std::endl;
+    }
+
+    notifyInputReady();
 }
 
 void Client::SendApply(const json &js) {
@@ -769,6 +791,10 @@ void Client::ListGroupApplyBack(const TcpConnectionPtr &conn, const json &js) {
         int applyid;
         std::string applyname;
         std::string status;
+        if (js["groupapplys"].empty()) {
+            std::cout << "当前无群聊申请" << std::endl;
+        }
+
         for (auto it : js["groupapplys"]) {
             AssignIfPresent(it, "userid", applyid);
             AssignIfPresent(it, "username", applyname);
@@ -815,6 +841,9 @@ void Client::ListSendGroupApplyBack(const TcpConnectionPtr &conn,
         int groupid;
         std::string groupname;
         std::string status;
+        if (js["groupsendapplys"].empty()) {
+            std::cout << "当前无发送的群聊申请" << std::endl;
+        }
         for (auto it : js["groupsendapplys"]) {
             AssignIfPresent(it, "groupid", groupid);
             AssignIfPresent(it, "groupname", groupname);
@@ -1192,9 +1221,33 @@ void Client::InputLoop() {
                 getline(std::cin, name_);
                 password_ = GetHiddenInput("输入密码: ");
 
-                json js = {{"username", name_},
+                // 邮箱判断
+
+                json js = {
+                    {"email", email_}
+                };
+                
+                waitingback_ = true;
+                SendVerifyCode(js);
+
+                waitInPutReady();
+
+                std::string input;
+                int verifycode = -1;
+                while (true) {
+                    std::cout << "输入六位验证码(退出输入0): ";
+                    getline(std::cin, input);
+                    if (ReadNum(input, verifycode))
+                        break;
+                    else  
+                        continue;
+                }
+                if (verifycode == 0) continue;
+                
+                js = {{"username", name_},
                            {"email", email_},
-                           {"password", password_}};
+                           {"password", password_},
+                           {"verifycode", verifycode}};
 
                 waitingback_ = true;
                 Register(js);
@@ -1306,6 +1359,7 @@ void Client::InputLoop() {
             if (!ReadNum(input, order))
                 continue;
 
+            ClearScreen();
             if (order == 1) {
                 json js = {{"userid", userid_}};
                 waitingback_ = true;
@@ -1323,8 +1377,9 @@ void Client::InputLoop() {
                 }
             } else if (order == 2) {
                 std::string email;
-                std::cout << "输入要添加的好友email:";
+                std::cout << "输入要添加的好友email(输入0退出):";
                 getline(std::cin, email);
+                if (email == "0") continue;
 
                 if (email == email_) {
                     std::cout << "邮箱为用户邮箱" << std::endl;
@@ -1402,6 +1457,10 @@ void Client::InputLoop() {
                 ListAllSendApply(js);
 
                 waitInPutReady();
+                if (friendsendapplylist_.size() == 0) {
+                    std::cout << "当前无发送的好友申请" << std::endl;
+                    continue;
+                }
                 for (auto it : friendsendapplylist_) {
                     std::cout << "id: " << it.first
                               << " name: " << it.second.name_
@@ -1526,6 +1585,7 @@ void Client::InputLoop() {
             if (!ReadNum(input, order))
                 continue;
 
+            ClearScreen();
             if (order == 1) {
                 if (grouplist_.size() == 0) {
                     std::cout << "当前无群聊" << std::endl;
@@ -1738,7 +1798,6 @@ void Client::InputLoop() {
                     friendlist_[friendid].new_ = false;
                     while (true) {
                         std::string message;
-                        std::cout << "输入(输入0返回): ";
                         getline(std::cin, message);
                         if (message == "0") {
                             friendlist_[friendid].maxmsgtime_ =
@@ -1761,8 +1820,10 @@ void Client::InputLoop() {
                             {"status", "Unread"},
                         };
 
-                        threadpool_.SubmitTask(
-                            [this, js]() { SendMessage(js); });
+                        // waitingback_ = true;
+                        SendMessage(js); ;
+
+                        // waitInPutReady();
                     }
                     ClearScreen();
                 } else if (order == 2) {
@@ -1835,9 +1896,9 @@ void Client::InputLoop() {
             ListGroup(js);
 
             waitInPutReady();
-            std::cout << "id  " << "  名字" << "        " << std::endl;
+            std::cout << "id  " << "  名字" << "        "<< "身份" << std::endl;
             for (auto it : grouplist_) {
-                std::cout << it.first << " " << it.second.name_ << "   ";
+                std::cout << it.first << " " << it.second.name_ << "      " << it.second.groupuserlist_[userid_].role_;
                 if (it.second.newapply_ || it.second.newmessage_)
                     PrintfRed('*');
                 std::cout << std::endl;
@@ -1885,8 +1946,8 @@ void Client::InputLoop() {
                 std::cout << "5. 退出群聊" << std::endl;
                 if (userrole == "Administrator" || userrole == "Owner") {
                     std::cout << "6. 群聊申请";
-                    if (grouplist_[groupid].newapply_)
-                        PrintfRed('*');
+                    // if (grouplist_[groupid].newapply_)
+                    //     PrintfRed('*');
                     std::cout << std::endl;
                     std::cout << "7. 处理成员禁言" << std::endl;
                     std::cout << "8. 移除成员" << std::endl;
@@ -1920,7 +1981,6 @@ void Client::InputLoop() {
 
                     while (true) {
                         std::string message;
-                        std::cout << "输入(输入0返回): ";
                         getline(std::cin, message);
                         if (message == "0") {
                             grouplist_[groupid].maxmsgtime_ =
@@ -1945,8 +2005,10 @@ void Client::InputLoop() {
                             {"content", message},  {"type", "Group"},
                             {"status", "Unread"},
                         };
-                        threadpool_.SubmitTask(
-                            [this, js]() { SendMessage(js); });
+                        // waitingback_ = true;
+                        SendMessage(js);;
+
+                        // waitInPutReady();
                     }
                 } else if (order == 2) {
                     json js = {{"groupid", groupid}};
@@ -2029,6 +2091,12 @@ void Client::InputLoop() {
                     QuitGroup(js);
 
                     waitInPutReady();
+                    if (grouplist_[groupid].groupuserlist_[userid_].role_ == "Owner") {
+                        waitingback_ = true;
+                        DeleteGroup(js);
+
+                        waitInPutReady();
+                    }
                     currentState_ = "MessageCenter";
                     break;
                 } else if (order == 6) {
@@ -2071,7 +2139,6 @@ void Client::InputLoop() {
                         std::cout << it.first << "  " << it.second.username_
                                   << "  " << it.second.role_ << std::endl;
                     }
-
                     waitInPutReady();
 
                     int userid;

@@ -4,6 +4,7 @@
 #include <cassert>
 #include <exception>
 #include <iterator>
+#include <memory>
 #include <mutex>
 #include <mysql/mariadb_com.h>
 #include <mysql/mysql.h>
@@ -245,6 +246,96 @@ void Service::TimeoutDetection() {
     }
 }
 
+int Service::RandomDigitNumber() {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    std::uniform_int_distribution<> distrib(100000, 999999);
+
+    return distrib(gen);
+}
+
+size_t payload_source(void *ptr, size_t size, size_t nmemb, void *userp) {
+    std::string *payload = static_cast<std::string*>(userp);
+    if (payload->empty()) return 0;
+    
+    size_t copy_size = std::min(size * nmemb, payload->size());
+    memcpy(ptr, payload->data(), copy_size);
+    
+    *payload = payload->substr(copy_size);
+    
+    return copy_size;
+}
+
+bool Service::SendEmail(std::string &toemail, std::string &title, std::string &body)
+{
+    CURLcode res = CURLE_OK;
+    CURL *curl = curl_easy_init();
+    if (!curl) {
+        LOG_ERROR << "curl_easy_init failed";
+        return false;
+    }
+
+    // curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L); // 打印调试日志
+
+    // SMTP 服务器地址及端口（SSL）
+    curl_easy_setopt(curl, CURLOPT_URL, "smtps://smtp.qq.com:465");
+    curl_easy_setopt(curl, CURLOPT_USE_SSL, CURLUSESSL_ALL);
+
+    // 发件邮箱用户名和授权码（注意替换成你自己的）
+    curl_easy_setopt(curl, CURLOPT_USERNAME, "323602912@qq.com");
+    curl_easy_setopt(curl, CURLOPT_PASSWORD, "wfpmagfsbhfqcaie");
+    curl_easy_setopt(curl, CURLOPT_LOGIN_OPTIONS, "AUTH=LOGIN");
+
+    // 构造邮件头和内容
+    std::string from = "From: <323602912@qq.com>\r\n";
+    std::string to = "To: <" + toemail + ">\r\n";
+
+    // Content-Type 设为 HTML 方便邮件内容显示格式
+    std::string content_type = "Content-Type: text/html; charset=utf-8\r\n";
+
+    // 标题，注意 SMTP 规范需要 Subject 头
+    std::string subject = "Subject: " + title + "\r\n";
+
+    // 邮件正文，直接传入的 body，已经是 HTML 格式字符串
+    // 这里用两个空行分隔头和正文是必须的
+    std::string payload_text = from + to + content_type + subject + "\r\n" + body;
+
+    // 设置发件人
+    curl_easy_setopt(curl, CURLOPT_MAIL_FROM, "323602912@qq.com");
+
+    // 设置收件人列表
+    struct curl_slist* recipients = NULL;
+    recipients = curl_slist_append(recipients, toemail.c_str());
+    curl_easy_setopt(curl, CURLOPT_MAIL_RCPT, recipients);
+
+    // 下面这个函数负责按需读取邮件内容，需实现
+    curl_easy_setopt(curl, CURLOPT_READFUNCTION, payload_source);
+
+    // 传入邮件内容指针（payload_text 需要在外部被正确读取）
+    curl_easy_setopt(curl, CURLOPT_READDATA, &payload_text);
+
+    // 以上传模式发送邮件内容
+    curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
+
+    // 这里邮件头已经加进 payload_text 了，实际不需要单独设置 CURLOPT_HTTPHEADER
+    // curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers); // 可以省略
+
+    // 执行发送操作
+    res = curl_easy_perform(curl);
+
+    // 释放资源
+    curl_slist_free_all(recipients);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) {
+        LOG_ERROR << "发送邮件失败: " << curl_easy_strerror(res);
+        return false;
+    }
+
+    return true;
+}
+
 Service::Service(EventLoop *loop)
     : redis_([] {
           sw::redis::ConnectionOptions opts;
@@ -278,6 +369,7 @@ Service::~Service() {
 void Service::UserRegister(const TcpConnectionPtr &conn, const json &js) {
     bool end = true;
 
+    int verifycode;
     std::string username;
     std::string password;
     std::string email;
@@ -285,6 +377,7 @@ void Service::UserRegister(const TcpConnectionPtr &conn, const json &js) {
     end &= AssignIfPresent(js, "username", username);
     end &= AssignIfPresent(js, "password", password);
     end &= AssignIfPresent(js, "email", email);
+    end &= AssignIfPresent(js, "verifycode", verifycode);
 
     if (!end) {
         LOG_ERROR << "Missing required fields in user registration";
@@ -304,30 +397,42 @@ void Service::UserRegister(const TcpConnectionPtr &conn, const json &js) {
         return;
     }
 
-    int userid = gen_.GetNextUserId();
+    auto it = tempverificode_.find(email);
+    if (it != tempverificode_.end() && it->second == verifycode)
+    {
+        int userid = gen_.GetNextUserId();
 
-    std::ostringstream oss;
-    oss << "insert into users (id, email, name, password) values (" << userid
-        << ", '" << Escape(email) << "', '" << Escape(username) << "', '" << Escape(password) << "');";
-    std::string query = oss.str();
+        std::ostringstream oss;
+        oss << "insert into users (id, email, name, password) values (" << userid
+            << ", '" << Escape(email) << "', '" << Escape(username) << "', '" << Escape(password) << "');";
+        std::string query = oss.str();
 
-    databasethreadpool_.EnqueueTask(
-        [this, query](MysqlConnection &conn, DBCallback done) {
-            if (conn.ExcuteUpdate(query))
-                done(true);
-            else
-                done(false);
-        },
-        [this, conn](bool success) mutable {
-            if (success) {
-                LOG_DEBUG << "Register Success";
-            } else {
-                LOG_ERROR << "Register Failed";
-            }
+        databasethreadpool_.EnqueueTask(
+            [this, query](MysqlConnection &conn, DBCallback done) {
+                if (conn.ExcuteUpdate(query))
+                    done(true);
+                else
+                    done(false);
+            },
+            [this, conn](bool success) mutable {
+                if (success) {
+                    LOG_DEBUG << "Register Success";
+                } else {
+                    LOG_ERROR << "Register Failed";
+                }
 
-            json j = {{"end", success}};
-            conn->send(code_.encode(j, "RegisterBack"));
-        });
+                json j = {{"end", success}};
+                conn->send(code_.encode(j, "RegisterBack"));
+            });
+    }
+    else {
+        LOG_ERROR << "Error verifycode";
+        json j = {
+            {"end", false},
+        };
+        conn->send(code_.encode(j, "RegisterBack"));
+        return;
+    }
 }
 
 void Service::UserLogin(const TcpConnectionPtr &conn, const json &js) {
@@ -397,6 +502,8 @@ void Service::UserLogin(const TcpConnectionPtr &conn, const json &js) {
                         onlineuser_[userid].SetOnline(userid);
                         onlineuser_[userid].SetConn(conn);
 
+                        std::queue<std::string> newpendingmessages;
+                        sendqueue_.emplace(conn, std::make_shared<ConnectionContext>(std::move(newpendingmessages), false));
                         json success_response = {
                             {"end", true}, {"id", userid}, {"name", username}};
                         conn->send(code_.encode(success_response, "LoginBack"));
@@ -523,6 +630,7 @@ void Service::RemoveUserConnect(const TcpConnectionPtr &conn) {
     for (auto it : onlineuser_) {
         if (it.second.GetConn() == conn) {
             onlineuser_.erase(it.first);
+            sendqueue_.erase(conn);
             break;
         }
     }
@@ -829,6 +937,8 @@ void Service::MessageSend(const TcpConnectionPtr &conn, const json &js) {
             MYSQL_RES *res = mysqlconn->ExcuteQuery(query);
             if (!res) {
                 LOG_ERROR << "ListGroupUser query failed ";
+                json j = {{"timestamp", timestamp}, {"end", false}};
+                conn->send(code_.encode(j, "SendMessageBack"));
                 return;
             }
 
@@ -879,6 +989,8 @@ void Service::MessageSend(const TcpConnectionPtr &conn, const json &js) {
             MYSQL_RES *res = mysqlconn->ExcuteQuery(query);
             if (!res) {
                 LOG_ERROR << "Listfriendapply query failed ";
+                json j = {{"timestamp", timestamp}, {"end", false}};
+                conn->send(code_.encode(j, "SendMessageBack"));
                 return;
             }
 
@@ -944,19 +1056,28 @@ void Service::MessageSend(const TcpConnectionPtr &conn, const json &js) {
 
         for (auto &pair : messagestosend) {
             TcpConnectionPtr reconn = pair.first;
-            json jsonmsg = std::move(pair.second);
+            auto &ctx = sendqueue_[reconn];
+            std::string msg = code_.encode(pair.second, "RecvMessage");
 
             EventLoop *loop = reconn->getLoop();
             if (loop) {
                 loop->runInLoop(
-                    [reconn, msg = std::move(jsonmsg), this]() mutable {
-                            reconn->send(code_.encode(msg, "RecvMessage"));
+                    [reconn, msg = std::move(msg), ctx]() mutable {
+                            ctx->pendingmessages.push(std::move(msg));
+
+                            if (!ctx->sending) {
+                                ctx->sending = true;
+                                std::string front = ctx->pendingmessages.front();
+                                reconn->send(front);
+                            }
                     });
             }
         }
 
     } catch (const std::exception &e) {
         LOG_ERROR << "Database error during message send: " << e.what();
+        json j = {{"timestamp", timestamp}, {"end", false}};
+        conn->send(code_.encode(j, "SendMessageBack"));
         return;
     }
 }
@@ -1228,6 +1349,43 @@ void Service::ChanceInterFace(const TcpConnectionPtr &conn, const json &js) {
         json j;
         j["end"] = false;
         conn->send(code_.encode(j, "ChanceInterFaceBack"));
+    }
+}
+
+void Service::SendVerifyCode(const TcpConnectionPtr &conn, const json &js) {
+    bool end = true;
+    std::string toemail;
+    end &= AssignIfPresent(js, "email", toemail);
+
+    std::string title = "聊天室验证码";
+    int code = RandomDigitNumber();
+    std::string body = "你的验证码是: " + std::to_string(code) + "\n五分钟内有效,请勿泄漏";
+
+    if (tempverificode_.find(toemail) != tempverificode_.end())
+    {
+        LOG_ERROR << "SendVerifyCode Failed";
+        json j;
+        j["end"] = false;
+        conn->send(code_.encode(j, "SendVerifyCodeBack"));
+    }
+
+    end = SendEmail(toemail, title, body);
+
+    tempverificode_.emplace(toemail, code);
+    conn->getLoop()->runAfter(300, [this, toemail]() {
+        tempverificode_.erase(toemail);
+    });
+
+    if (end) {
+        LOG_DEBUG << "SendVerifyCode Success";
+        json j;
+        j["end"] = true;
+        conn->send(code_.encode(j, "SendVerifyCodeBack"));
+    } else {
+        LOG_ERROR << "SendVerifyCode Failed";
+        json j;
+        j["end"] = false;
+        conn->send(code_.encode(j, "SendVerifyCodeBack"));
     }
 }
 

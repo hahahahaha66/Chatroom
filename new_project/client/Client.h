@@ -4,7 +4,6 @@
 #include "../muduo/net/EventLoop.h"
 #include "../muduo/net/tcp/InetAddress.h"
 #include "../muduo/net/tcp/TcpClient.h"
-#include "../test.cpp"
 #include "../tool/Codec.h"
 #include "../tool/Dispatcher.h"
 #include "../tool/Json.h"
@@ -122,6 +121,8 @@ class Client {
     void ChanceInterFace(const json &js);
     void ChanceInterFaceBack(const TcpConnectionPtr &conn, const json &js);
     void NoticeMessage(const TcpConnectionPtr &conn, const json &js);
+    void SendVerifyCode(const json &js);
+    void SendVerifyCodeBack(const TcpConnectionPtr &conn, const json &js);
 
     // 好友
     void ListAllApply(const json &js);
@@ -224,7 +225,7 @@ class Client {
     std::string name_;
     std::string password_;
 
-    ThreadPool threadpool_;
+    // ThreadPool threadpool_;
     std::unordered_map<int, Friend> friendlist_;
     std::unordered_multimap<int, FriendApply> friendapplylist_;
     std::unordered_multimap<int, FriendApply> friendsendapplylist_;
