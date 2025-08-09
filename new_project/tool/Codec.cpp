@@ -31,7 +31,8 @@ std::optional<std::tuple<std::string, json>> Codec::tryDecode(Buffer *buf) {
         std::memcpy(&totallen, data, sizeof(uint32_t));
 
         if (totallen < sizeof(uint32_t) || totallen > 1000 * 1024 * 1024) {
-            LOG_WARN << "Invalid total length: " << totallen << ", readable = " << buf->readableBytes();
+            LOG_WARN << "Invalid total length: " << totallen
+                     << ", readable = " << buf->readableBytes();
             buf->retrieve(1);
             continue;
         }
@@ -67,7 +68,8 @@ std::optional<std::tuple<std::string, json>> Codec::tryDecode(Buffer *buf) {
         try {
             json js = json::parse(json_start, json_start + json_len);
             buf->retrieve(sizeof(uint32_t) + totallen);
-            return std::make_tuple(std::string(type_start, typelen), std::move(js));
+            return std::make_tuple(std::string(type_start, typelen),
+                                   std::move(js));
         } catch (const std::exception &e) {
             LOG_ERROR << "JSON parse failed" << e.what();
             buf->retrieve(1);

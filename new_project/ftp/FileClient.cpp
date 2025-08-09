@@ -109,7 +109,7 @@ void FileUploader::SendFileData() {
         return;
     }
 
-    const size_t maxchunk = 128 * 1024;
+    const size_t maxchunk = 4 * 1024 * 1024;
     uint64_t placeholder = filesize_ / 100;
     int progress = 0;
     while (sent_ < filesize_) {

@@ -363,7 +363,7 @@ void FileServer::SendFileData(const TcpConnectionPtr &conn) {
     if (task->paused_)
         return;
 
-    const size_t maxchunk = 128 * 1024;
+    const size_t maxchunk = 4 * 1024 * 1024;
     while (task->sent_ < task->filesize_) {
         off_t remaining = task->filesize_ - task->offset_;
         size_t tosend =

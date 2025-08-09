@@ -50,6 +50,8 @@ Server::Server(EventLoop *loop, const InetAddress &listenAddr,
                         &Service::BlockFriend);
     RegisterHandlerSafe(dispatcher_, "DeleteFriend", service_,
                         &Service::DeleteFriend);
+    RegisterHandlerSafe(dispatcher_, "CheckFriendBlock", service_,
+                        &Service::CheckFriendBlock);
 
     RegisterHandlerSafe(dispatcher_, "CreateGroup", service_,
                         &Service::CreateGroup);
@@ -75,6 +77,8 @@ Server::Server(EventLoop *loop, const InetAddress &listenAddr,
                         &Service::BlockGroupUser);
     RegisterHandlerSafe(dispatcher_, "RemoveGroupUser", service_,
                         &Service::RemoveGroupUser);
+    RegisterHandlerSafe(dispatcher_, "AddFriendToGroup", service_,
+                        &Service::AddFriendToGroup);
 
     RegisterHandlerSafe(dispatcher_, "AddFileToMessage", service_,
                         &Service::AddFileToMessage);
@@ -99,18 +103,18 @@ void Server::ThreadInitCallback(EventLoop *loop) {}
 void Server::MessageCompleteCallback(const TcpConnectionPtr &conn) {
     if (service_.GetSendQueue().find(conn) != service_.GetSendQueue().end()) {
         auto &ctx = service_.GetSendQueue()[conn];
-        if (ctx->sending){
+        if (ctx->sending) {
             EventLoop *loop = conn->getLoop();
             loop->runInLoop([this, conn, &ctx]() {
-                    ctx->pendingmessages.pop();
-                    if (!ctx->pendingmessages.empty()) {
-                        std::string front = ctx->pendingmessages.front();
-                        conn->send(front);
-                    } else {
-                        ctx->sending = false;
-                    }
+                ctx->pendingmessages.pop();
+                if (!ctx->pendingmessages.empty()) {
+                    std::string front = ctx->pendingmessages.front();
+                    conn->send(front);
+                } else {
+                    ctx->sending = false;
+                }
             });
-       }
+        }
     }
 }
 
@@ -121,7 +125,6 @@ void Server::OnConnection(const TcpConnectionPtr &conn) {
         LOG_INFO << "Connection disconnected: "
                  << conn->peerAddress().toIpPort();
         service_.RemoveUserConnect(conn);
-        
     }
 }
 

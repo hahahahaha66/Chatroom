@@ -19,11 +19,11 @@
 #include <iostream>
 #include <ostream>
 #include <sys/types.h>
+#include <termios.h>
 #include <thread>
 #include <type_traits>
 #include <unistd.h>
 #include <unordered_map>
-#include <termios.h>
 
 using std::placeholders::_1;
 using std::placeholders::_2;
@@ -131,6 +131,7 @@ class Client {
     void ListFriend(const json &js);
     void BlockFriend(const json &js);
     void DeleteFriend(const json &js);
+    void CheckFriendBlock(const json &js);
 
     void SendFriendApplyBack(const TcpConnectionPtr &conn, const json &js);
     void ListFriendApplyBack(const TcpConnectionPtr &conn, const json &js);
@@ -139,6 +140,7 @@ class Client {
     void ListFriendBack(const TcpConnectionPtr &conn, const json &js);
     void BlockFriendBack(const TcpConnectionPtr &conn, const json &js);
     void DeleteFriendBack(const TcpConnectionPtr &conn, const json &js);
+    void CheckFriendBlockBack(const TcpConnectionPtr &conn, const json &js);
 
     // 群聊
     void CreateGroup(const json &js);
@@ -153,6 +155,7 @@ class Client {
     void DeleteGroup(const json &js);
     void BlockGroupUser(const json &js);
     void RemoveGroupUser(const json &js);
+    void AddFriendToGroup(const json &js);
 
     void CreateGroupBack(const TcpConnectionPtr &conn, const json &js);
     void SendGroupApplyBack(const TcpConnectionPtr &conn, const json &js);
@@ -166,6 +169,7 @@ class Client {
     void DeleteGroupBack(const TcpConnectionPtr &conn, const json &js);
     void BlockGroupUserBack(const TcpConnectionPtr &conn, const json &js);
     void RemoveGroupUserBack(const TcpConnectionPtr &conn, const json &js);
+    void AddFriendToGroupBack(const TcpConnectionPtr &conn, const json &js);
 
     // 文件
     void GetFileServerPort(const json &js);
@@ -192,7 +196,7 @@ class Client {
     bool ReadNum(std::string input, int &result);
     void PrintfRed(char a);
     void ClearScreen();
-    std::string GetHiddenInput(const std::string& prompt);
+    std::string GetHiddenInput(const std::string &prompt);
 
     void start();
     void stop();
@@ -208,6 +212,7 @@ class Client {
     bool exitflag_ = false;
     std::mutex mutex_;
     std::condition_variable cv_;
+    bool tempbool = false;
 
     TcpClient client_;
     Codec codec_;

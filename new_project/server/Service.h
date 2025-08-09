@@ -11,26 +11,37 @@
 #include "../tool/Json.h"
 #include "../tool/ThreadPool.h"
 
+#include <curl/curl.h>
 #include <hiredis/hiredis.h>
 #include <memory>
 #include <mutex>
+#include <mysql/mysql.h>
 #include <nlohmann/json.hpp>
 #include <queue>
 #include <string>
 #include <sw/redis++/redis++.h>
 #include <sw/redis++/redis.h>
 #include <unordered_map>
-#include <mysql/mysql.h>
-#include <curl/curl.h>
 
 using json = nlohmann::json;
 
 class ConnectionContext {
-public:
-  ConnectionContext(std::queue<std::string>&& queue, bool sending)
-    : pendingmessages(queue), sending(sending) {};
-  std::queue<std::string> pendingmessages;
-  bool sending = false;
+  public:
+    ConnectionContext(std::queue<std::string> &&queue, bool sending)
+        : pendingmessages(queue), sending(sending) {};
+    std::queue<std::string> pendingmessages;
+    bool sending = false;
+};
+
+struct Message {
+    Message(int &senderid, std::string &content, std::string &status,
+            std::string &timestamp)
+        : senderid(senderid), content(content), status(status),
+          timestamp(timestamp) {}
+    int senderid;
+    std::string content;
+    std::string status;
+    std::string timestamp;
 };
 
 class Service {
@@ -51,7 +62,10 @@ class Service {
     void DeleteAccount(const TcpConnectionPtr &conn, const json &js);
     void RemoveUserConnect(const TcpConnectionPtr &conn);
     std::unordered_map<int, User> &GetOnlineUserList() { return onlineuser_; }
-    std::unordered_map<TcpConnectionPtr, std::shared_ptr<ConnectionContext>> &GetSendQueue() { return sendqueue_; }
+    std::unordered_map<TcpConnectionPtr, std::shared_ptr<ConnectionContext>> &
+    GetSendQueue() {
+        return sendqueue_;
+    }
     void TimeoutDetection();
 
     // flush
@@ -72,6 +86,7 @@ class Service {
     void ListFriend(const TcpConnectionPtr &conn, const json &js);
     void BlockFriend(const TcpConnectionPtr &conn, const json &js);
     void DeleteFriend(const TcpConnectionPtr &conn, const json &js);
+    void CheckFriendBlock(const TcpConnectionPtr &conn, const json &js);
 
     // Group
     void CreateGroup(const TcpConnectionPtr &conn, const json &js);
@@ -86,6 +101,7 @@ class Service {
     void DeleteGroup(const TcpConnectionPtr &conn, const json &js);
     void BlockGroupUser(const TcpConnectionPtr &conn, const json &js);
     void RemoveGroupUser(const TcpConnectionPtr &conn, const json &js);
+    void AddFriendToGroup(const TcpConnectionPtr &conn, const json &js);
 
     // File
     void AddFileToMessage(const TcpConnectionPtr &conn, const json &js);
@@ -112,7 +128,8 @@ class Service {
     sw::redis::Redis redis_;
 
     std::mutex mutex_;
-    std::unordered_map<TcpConnectionPtr, std::shared_ptr<ConnectionContext>> sendqueue_;
+    std::unordered_map<TcpConnectionPtr, std::shared_ptr<ConnectionContext>>
+        sendqueue_;
     std::unordered_map<int, User> onlineuser_;
     std::vector<std::string> messagecachelist_;
     std::unordered_map<std::string, int> tempverificode_;
