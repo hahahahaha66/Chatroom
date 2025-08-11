@@ -88,9 +88,8 @@ void Client::stop() {
 }
 
 void Client::send(const std::string &msg) {
-    client_.getLoop()->runInLoop([this, msg]() {
-            client_.connection()->send(msg);
-        });
+    client_.getLoop()->runInLoop(
+        [this, msg]() { client_.connection()->send(msg); });
 }
 
 inline void Client::waitInPutReady() {
@@ -222,7 +221,7 @@ void Client::OnMessage(const TcpConnectionPtr &conn, Buffer *buffer,
 
         const auto &parsed = *msgopt;
         const auto &type = std::get<0>(parsed);
-        const auto &js = std::get<1>(parsed);   
+        const auto &js = std::get<1>(parsed);
 
         // LOG_INFO << type;
 

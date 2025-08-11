@@ -104,7 +104,7 @@ void Server::MessageCompleteCallback(const TcpConnectionPtr &conn) {
     auto &list = service_.GetMessageSendList();
     if (list.find(conn) != list.end()) {
         auto &ctx = list[conn];
-            auto ctxptr = std::make_shared<SendContext>(ctx);
+        auto ctxptr = std::make_shared<SendContext>(ctx);
         if (ctx.sending) {
             EventLoop *loop = conn->getLoop();
             loop->runInLoop([this, conn, ctxptr]() {

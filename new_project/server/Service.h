@@ -27,7 +27,7 @@ using json = nlohmann::json;
 
 struct SendContext {
     std::queue<std::string> pendingMessages;
-    bool sending = false;  
+    bool sending = false;
 };
 
 struct Message {
@@ -59,7 +59,9 @@ class Service {
     void DeleteAccount(const TcpConnectionPtr &conn, const json &js);
     void RemoveUserConnect(const TcpConnectionPtr &conn);
     std::unordered_map<int, User> &GetOnlineUserList() { return onlineuser_; }
-    std::unordered_map<TcpConnectionPtr, SendContext> &GetMessageSendList() { return messagesendlist_; }
+    std::unordered_map<TcpConnectionPtr, SendContext> &GetMessageSendList() {
+        return messagesendlist_;
+    }
     void TimeoutDetection();
 
     // flush
