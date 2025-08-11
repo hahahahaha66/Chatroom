@@ -335,7 +335,8 @@ void Client::RetrievePassword(const json &js) {
     this->send(codec_.encode(js, "RetrievePassword"));
 }
 
-void Client::RetrievePasswordBack(const TcpConnectionPtr &conn, const json &js) {
+void Client::RetrievePasswordBack(const TcpConnectionPtr &conn,
+                                  const json &js) {
     bool end = false;
     AssignIfPresent(js, "end", end);
     if (end) {
@@ -355,7 +356,6 @@ void Client::RetrievePasswordBack(const TcpConnectionPtr &conn, const json &js) 
     }
     notifyInputReady();
 }
-
 
 void Client::Flush() {
     json js = {{"userid", userid_}};
@@ -502,7 +502,6 @@ void Client::GetChatHistory(const json &js) {
 void Client::GetChatHistoryBack(const TcpConnectionPtr &conn, const json &js) {
     bool end = false;
     AssignIfPresent(js, "end", end);
-    std::cout << "-----------" << std::endl;
 
     if (end) {
         bool news = true;
@@ -701,7 +700,7 @@ void Client::ListSendFriendApplyBack(const TcpConnectionPtr &conn,
         std::string email;
         std::unordered_multimap<int, FriendApply> newfriendsendapplylist_;
         for (auto it : js["friendsendapplys"]) {
-            AssignIfPresent(it, "target", targetid);
+            AssignIfPresent(it, "targetid", targetid);
             AssignIfPresent(it, "targetname", targetname);
             AssignIfPresent(it, "status", status);
             AssignIfPresent(it, "email", email);
@@ -781,9 +780,9 @@ void Client::BlockFriendBack(const TcpConnectionPtr &conn, const json &js) {
     AssignIfPresent(js, "end", end);
 
     if (end) {
-        std::cout << "阻塞好友成功" << std::endl;
+        std::cout << "操作成功" << std::endl;
     } else {
-        std::cout << "阻塞好友失败" << std::endl;
+        std::cout << "操作失败" << std::endl;
     }
 
     notifyInputReady();
@@ -1573,6 +1572,7 @@ void Client::InputLoop() {
                 for (auto it : friendsendapplylist_) {
                     std::cout << "id: " << it.first
                               << " name: " << it.second.name_
+                              << " email: " << it.second.email_
                               << " status: " << it.second.status_ << std::endl;
                 }
             } else if (order == 5) {
@@ -1867,11 +1867,6 @@ void Client::InputLoop() {
                 continue;
             } else {
                 ClearScreen();
-                if (friendlist_[friendid].block_ == true) {
-                    std::cout << "好友已被屏蔽" << std::endl;
-                    currentState_ = "MessageCenter";
-                    continue;
-                }
             }
 
             ClearScreen();
@@ -1887,6 +1882,7 @@ void Client::InputLoop() {
                     continue;
 
                 if (order == 1) {
+                    ClearScreen();
                     json js = {{"userid", userid_},
                                {"interfaceid", friendid},
                                {"interface", "Private"}};
@@ -1909,21 +1905,6 @@ void Client::InputLoop() {
                         std::string message;
                         getline(std::cin, message);
 
-                        if (friendlist_.find(friendid) == friendlist_.end()) {
-                            json js = {{"userid", userid_},
-                                       {"interfaceid", -1},
-                                       {"interface", "Other"}};
-                            waitingback_ = true;
-                            ChanceInterFace(js);
-
-                            waitInPutReady();
-
-                            ClearScreen();
-                            std::cout << "对方已不是你的好友" << std::endl;
-                            currentState_ = "MessageCenter";
-                            break;
-                        }
-
                         if (message == "0") {
                             friendlist_[friendid].maxmsgtime_ =
                                 GetCurrentTimestamp();
@@ -1937,6 +1918,26 @@ void Client::InputLoop() {
                             waitInPutReady();
 
                             ClearScreen();
+                            break;
+                        }
+
+                        if (friendlist_[friendid].block_ == true) {
+                            std::cout << "好友已被屏蔽" << std::endl;
+                            continue;
+                        }
+
+                        if (friendlist_.find(friendid) == friendlist_.end()) {
+                            json js = {{"userid", userid_},
+                                       {"interfaceid", -1},
+                                       {"interface", "Other"}};
+                            waitingback_ = true;
+                            ChanceInterFace(js);
+
+                            waitInPutReady();
+
+                            ClearScreen();
+                            std::cout << "对方已不是你的好友" << std::endl;
+                            currentState_ = "MessageCenter";
                             break;
                         }
 
@@ -1960,6 +1961,11 @@ void Client::InputLoop() {
                     CheckFriendBlock(js);
 
                     waitInPutReady();
+
+                    if (friendlist_[friendid].block_ == true) {
+                        std::cout << "好友已被屏蔽" << std::endl;
+                        continue;
+                    }
 
                     if (tempbool) {
                         continue;

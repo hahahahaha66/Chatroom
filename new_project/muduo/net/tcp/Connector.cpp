@@ -201,8 +201,8 @@ void Connector::retry(int sockfd) {
     setStates(kDisconnected);
     if (connect_) {
         LOG_DEBUG << "Connector::retry - Retry connecting to"
-                 << serverAddr_.toIpPort() << " in " << retryDelayMs_
-                 << " milliseconds.  ";
+                  << serverAddr_.toIpPort() << " in " << retryDelayMs_
+                  << " milliseconds.  ";
         loop_->runAfter(retryDelayMs_ / 1000.0,
                         std::bind(&Connector::startInLoop, shared_from_this()));
         retryDelayMs_ =

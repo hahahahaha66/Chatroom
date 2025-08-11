@@ -11,14 +11,14 @@
 客户端使用
 
 ```bash
-sudo pacman -S cmake gperftools jsoncpp
+sudo pacman -S cmake gperftools jemalloc jsoncpp
 yay -S nlohmann-json
 
 ```
 服务器使用
 ```bash
-sudo pacman -S cmake mysql redis++ gperftools jsoncpp
-yay -S nlohmann-json
+sudo pacman -S mariadb hiredis openssl gperftools jemalloc curl
+yay -S redis-plus-plus nlohmann-json
 ```
 
 ### 编译
@@ -63,6 +63,16 @@ make -j
 - **Codec**：基于 “包头 + JSON” 的编解码器
 - **线程池 / 连接池**：高并发处理能力
 - **缓存同步机制**：定期将 Redis 缓存写入 MySQL
+
+### 客户端设计
+
+- **Dispatcher**：消息类型分发器
+- **Codec**：基于 “包头 + JSON” 的编解码器
+- 使用双线程，一个处理输出，一个处理输入
+
+### 文件传输设计
+
+- **零拷贝**：使用sendfile减少CPU拷贝，提高传输效率
 
 ### 通信协议
 

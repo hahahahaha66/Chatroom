@@ -46,7 +46,6 @@ bool MysqlConnection::ExcuteUpdate(const std::string &mysqlorder) {
         LOG_ERROR << "Updata failed: " << mysql_error(conn_);
         return false;
     }
-
     my_ulonglong affected = mysql_affected_rows(conn_);
     if (affected == 0) {
         LOG_ERROR << "Update succeeded but no rows were affected.";

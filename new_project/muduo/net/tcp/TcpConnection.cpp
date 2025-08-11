@@ -34,7 +34,7 @@ TcpConnection::TcpConnection(EventLoop *loop, const std::string &nameArg,
 
 TcpConnection::~TcpConnection() {
     LOG_DEBUG << "TcpConnection::dtor[" << name_.data() << "] at fd "
-             << channel_->fd() << " states= " << static_cast<int>(state_);
+              << channel_->fd() << " states= " << static_cast<int>(state_);
 }
 
 void TcpConnection::send(const std::string &buf) {
