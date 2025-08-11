@@ -33,7 +33,7 @@ TcpConnection::TcpConnection(EventLoop *loop, const std::string &nameArg,
 }
 
 TcpConnection::~TcpConnection() {
-    LOG_INFO << "TcpConnection::dtor[" << name_.data() << "] at fd "
+    LOG_DEBUG << "TcpConnection::dtor[" << name_.data() << "] at fd "
              << channel_->fd() << " states= " << static_cast<int>(state_);
 }
 

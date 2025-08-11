@@ -54,7 +54,7 @@ void EventLoop::loop() {
     looping_ = true; // 在事件循环中
     quit_ = false;   // 不处于退出状态
 
-    LOG_INFO << "EventLoop " << this << " start looping";
+    LOG_DEBUG << "EventLoop " << this << " start looping";
 
     while (!quit_) // 循环接收任务
     {

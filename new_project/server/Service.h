@@ -57,6 +57,7 @@ class Service {
     void UserRegister(const TcpConnectionPtr &conn, const json &js);
     void UserLogin(const TcpConnectionPtr &conn, const json &js);
     void DeleteAccount(const TcpConnectionPtr &conn, const json &js);
+    void RetrievePassword(const TcpConnectionPtr &conn, const json &js);
     void RemoveUserConnect(const TcpConnectionPtr &conn);
     std::unordered_map<int, User> &GetOnlineUserList() { return onlineuser_; }
     std::unordered_map<TcpConnectionPtr, SendContext> &GetMessageSendList() {

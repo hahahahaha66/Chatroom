@@ -200,7 +200,7 @@ void Connector::retry(int sockfd) {
     ::close(sockfd);
     setStates(kDisconnected);
     if (connect_) {
-        LOG_INFO << "Connector::retry - Retry connecting to"
+        LOG_DEBUG << "Connector::retry - Retry connecting to"
                  << serverAddr_.toIpPort() << " in " << retryDelayMs_
                  << " milliseconds.  ";
         loop_->runAfter(retryDelayMs_ / 1000.0,

@@ -9,6 +9,7 @@
 #include <mutex>
 #include <mysql/mariadb_com.h>
 #include <mysql/mysql.h>
+#include <openssl/cryptoerr_legacy.h>
 #include <ostream>
 #include <sstream>
 #include <string>
@@ -640,6 +641,66 @@ void Service::DeleteAccount(const TcpConnectionPtr &conn, const json &js) {
             }
             json j = {{"end", success}};
             conn->send(code_.encode(j, "DeleteAccountBack"));
+        });
+}
+
+void Service::RetrievePassword(const TcpConnectionPtr &conn, const json &js) {
+    bool end = true;
+    std::string email;
+    end &= AssignIfPresent(js, "email", email);
+
+    databasethreadpool_.EnqueueTask(
+        [this, conn, &email](MysqlConnection &mysqlconn,
+                                   DBCallback done) {
+            std::string query = "select * from users where email = '" + email + "'; ";
+            MYSQL_RES *res = mysqlconn.ExcuteQuery(query);
+            if (!res) {
+                LOG_ERROR << "Database wrong" << email;
+                done(false);
+                return;
+            }
+
+            MysqlResult result(res);
+            if (!result.Next()) {
+                LOG_ERROR << "Find User from users email" << email;
+                json j = {
+                    {"result", "no"},
+                    {"end", false},
+                };
+                conn->send(code_.encode(j, "RetrievePasswordBack"));
+                return;
+            } 
+            std::string password = result.GetRow().GetString("password");
+            std::string title = "聊天室的密码找回";
+            std::string body = "邮箱: " + email + "\n" + "密码: " + password +"\n";
+            bool end = SendEmail(email, title, body);
+            if (end) {
+                done(true);
+                return;
+            } else {
+                LOG_ERROR << "Send email failed to: " << email;
+                json j = {
+                    {"result", "send"},
+                    {"end", false},
+                };
+                conn->send(code_.encode(j, "RetrievePasswordBack"));
+                return;
+            }
+        },
+        [this, conn](bool success) {
+            if (success) {
+                LOG_DEBUG << "RetrievePassword Success";
+                json j = {{"end", success}};
+                conn->send(code_.encode(j, "RetrievePassword"));
+            } else {
+                LOG_ERROR << "RetrievePassword Failed";
+                json j = {
+                    {"end", success},
+                    {"result", "database"}
+
+                };
+                conn->send(code_.encode(j, "RetrievePassword"));
+            }
         });
 }
 

@@ -24,6 +24,9 @@ Server::Server(EventLoop *loop, const InetAddress &listenAddr,
     RegisterHandlerSafe(dispatcher_, "Login", service_, &Service::UserLogin);
     RegisterHandlerSafe(dispatcher_, "DeleteAccount", service_,
                         &Service::DeleteAccount);
+    RegisterHandlerSafe(dispatcher_, "RetrievePassword", service_,
+                        &Service::RetrievePassword);
+
     RegisterHandlerSafe(dispatcher_, "Flush", service_, &Service::Flush);
     RegisterHandlerSafe(dispatcher_, "SendMessage", service_,
                         &Service::MessageSend);

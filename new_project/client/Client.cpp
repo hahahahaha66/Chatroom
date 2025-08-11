@@ -127,6 +127,8 @@ Client::Client(EventLoop &loop, uint16_t port, std::string ip, std::string name)
     RegisterHandlerSafe(dispatcher_, "LoginBack", *this, &Client::LoginBack);
     RegisterHandlerSafe(dispatcher_, "DeleteAccountBack", *this,
                         &Client::DeleteAccountBack);
+    RegisterHandlerSafe(dispatcher_, "RetrievePassword", *this,
+                        &Client::RetrievePasswordBack);
 
     RegisterHandlerSafe(dispatcher_, "FlushBack", *this, &Client::FlushBack);
     RegisterHandlerSafe(dispatcher_, "SendMessageBack", *this,
@@ -328,6 +330,32 @@ void Client::DeleteAccountBack(const TcpConnectionPtr &conn, const json &js) {
     }
     notifyInputReady();
 }
+
+void Client::RetrievePassword(const json &js) {
+    this->send(codec_.encode(js, "RetrievePassword"));
+}
+
+void Client::RetrievePasswordBack(const TcpConnectionPtr &conn, const json &js) {
+    bool end = false;
+    AssignIfPresent(js, "end", end);
+    if (end) {
+        std::cout << "发送成功" << std::endl;
+    } else {
+        std::string result;
+        AssignIfPresent(js, "result", result);
+        if (result == "no") {
+            std::cout << "发送失败,不存在的邮箱账户" << std::endl;
+        } else if (result == "send") {
+            std::cout << "发送失败,邮件发送失败" << std::endl;
+        } else if (result == "database") {
+            std::cout << "发送失败,数据库查询失败" << std::endl;
+        } else {
+            std::cout << "发送失败" << std::endl;
+        }
+    }
+    notifyInputReady();
+}
+
 
 void Client::Flush() {
     json js = {{"userid", userid_}};
@@ -1266,7 +1294,8 @@ void Client::InputLoop() {
             std::string input;
             std::cout << "1. 登陆" << std::endl;
             std::cout << "2. 注册" << std::endl;
-            std::cout << "3. 退出" << std::endl;
+            std::cout << "3. 密码找回" << std::endl;
+            std::cout << "4. 退出" << std::endl;
             getline(std::cin, input);
             if (!ReadNum(input, order))
                 continue;
@@ -1322,6 +1351,17 @@ void Client::InputLoop() {
 
                 waitInPutReady();
             } else if (order == 3) {
+                std::cout << "输入要找回密码的邮箱: ";
+                getline(std::cin, email_);
+
+                json js = {{"email", email_}};
+
+                waitingback_ = true;
+                RetrievePassword(js);
+
+                waitInPutReady();
+
+            } else if (order == 4) {
                 std::cout << "正在退出..." << std::endl;
                 stop();
                 break;
@@ -1918,7 +1958,6 @@ void Client::InputLoop() {
 
                     waitingback_ = true;
                     CheckFriendBlock(js);
-                    ;
 
                     waitInPutReady();
 

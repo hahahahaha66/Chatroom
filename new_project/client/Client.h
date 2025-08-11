@@ -104,6 +104,8 @@ class Client {
     void LoginBack(const TcpConnectionPtr &conn, const json &js);
     void DeleteAccount(const json &js);
     void DeleteAccountBack(const TcpConnectionPtr &conn, const json &js);
+    void RetrievePassword(const json &js);
+    void RetrievePasswordBack(const TcpConnectionPtr &conn, const json &js);
 
     // 刷新
     void Flush();
