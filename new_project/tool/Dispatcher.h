@@ -10,6 +10,7 @@
 #include <memory>
 #include <mutex>
 #include <nlohmann/json.hpp>
+#include <string>
 #include <unordered_map>
 
 using json = nlohmann::json;
@@ -39,7 +40,7 @@ class Dispatcher {
             auto it = handers_.find(type);
             LOG_DEBUG << type;
             if (it == handers_.end()) {
-                LOG_ERROR << "Unrecognized command format";
+                LOG_ERROR << "Unrecognized command format: " << type;
                 return;
             }
             cb = it->second;
@@ -51,6 +52,10 @@ class Dispatcher {
             return;
         }
         auto jsPtr = std::make_shared<json>(js);
+        if (type == "SendMessage") {
+            (cb)(conn, *jsPtr);
+            return;
+        }
 
         threadpool_.SubmitTask([cb = std::move(cb), type, conn, jsPtr]() {
             LOG_DEBUG << "threadpool push task";

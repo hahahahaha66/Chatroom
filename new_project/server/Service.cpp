@@ -359,7 +359,7 @@ Service::Service(EventLoop *loop)
           opts.port = 6379;
           return sw::redis::Redis(opts);
       }()),
-      loop_(loop), threadpool_(16) {
+      loop_(loop), threadpool_(32) {
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     InitIdsFromMySQL();
     threadpool_.Start();
@@ -398,6 +398,7 @@ void Service::UserRegister(const TcpConnectionPtr &conn, const json &js) {
     if (!end) {
         LOG_ERROR << "Missing required fields in user registration";
         json j = {
+            {"result", "net"},
             {"end", false},
         };
         conn->send(code_.encode(j, "RegisterBack"));
@@ -407,6 +408,7 @@ void Service::UserRegister(const TcpConnectionPtr &conn, const json &js) {
     if (username.empty() || password.empty() || email.empty()) {
         LOG_ERROR << "Empty fields in user registration";
         json j = {
+            {"result", "type"},
             {"end", false},
         };
         conn->send(code_.encode(j, "RegisterBack"));
@@ -437,16 +439,21 @@ void Service::UserRegister(const TcpConnectionPtr &conn, const json &js) {
                     LOG_ERROR << "Register Failed";
                 }
 
-                json j = {{"end", success}};
+                json j = { {"result", "database"},
+                           {"end", success}
+                        };
                 conn->send(code_.encode(j, "RegisterBack"));
             });
     } else {
         LOG_ERROR << "Error verifycode";
         json j = {
+            {"result", "code"},
             {"end", false},
         };
         conn->send(code_.encode(j, "RegisterBack"));
-        return;
+    }
+    if (it != tempverificode_.end()) {
+        tempverificode_.erase(email);
     }
 }
 
@@ -461,7 +468,7 @@ void Service::UserLogin(const TcpConnectionPtr &conn, const json &js) {
         json j = {{"end", false},
                   {"id", -1},
                   {"name", ""},
-                  {"error", "Email and password are required"}};
+                  {"result", "type"}};
         conn->send(code_.encode(j, "LoginBack"));
         return;
     }
@@ -500,8 +507,7 @@ void Service::UserLogin(const TcpConnectionPtr &conn, const json &js) {
                                 json j = {{"end", false},
                                           {"id", -1},
                                           {"name", ""},
-                                          {"error",
-                                           "Email and password are required"}};
+                                          {"result","login"}};
                                 conn->send(code_.encode(j, "LoginBack"));
                                 return;
                             }
@@ -517,10 +523,8 @@ void Service::UserLogin(const TcpConnectionPtr &conn, const json &js) {
                         onlineuser_[userid].SetOnline(userid);
                         onlineuser_[userid].SetConn(conn);
 
-                        std::queue<std::string> newpendingmessages;
-                        sendqueue_.emplace(
-                            conn, std::make_shared<ConnectionContext>(
-                                      std::move(newpendingmessages), false));
+                        std::queue<std::string> newmessagesendlist;
+                       messagesendlist_.emplace(conn, SendContext{std::move(newmessagesendlist), false});
                         json success_response = {
                             {"end", true}, {"id", userid}, {"name", username}};
                         conn->send(code_.encode(success_response, "LoginBack"));
@@ -538,6 +542,7 @@ void Service::UserLogin(const TcpConnectionPtr &conn, const json &js) {
                         {"end", false},
                         {"id", -1},
                         {"name", ""},
+                        {"result", "wrong"}
                     };
                     conn->send(code_.encode(failure_response, "LoginBack"));
                 }
@@ -552,7 +557,7 @@ void Service::UserLogin(const TcpConnectionPtr &conn, const json &js) {
                 json error_response = {{"end", false},
                                        {"id", -1},
                                        {"name", ""},
-                                       {"error", "Database error"}};
+                                       {"result", "database"}};
                 conn->send(code_.encode(error_response, "LoginBack"));
                 done(false);
             }
@@ -647,7 +652,7 @@ void Service::RemoveUserConnect(const TcpConnectionPtr &conn) {
     for (auto it : onlineuser_) {
         if (it.second.GetConn() == conn) {
             onlineuser_.erase(it.first);
-            sendqueue_.erase(conn);
+            messagesendlist_.erase(conn);
             break;
         }
     }
@@ -954,7 +959,9 @@ void Service::MessageSend(const TcpConnectionPtr &conn, const json &js) {
             MYSQL_RES *res = mysqlconn->ExcuteQuery(query);
             if (!res) {
                 LOG_ERROR << "ListGroupUser query failed ";
-                json j = {{"timestamp", timestamp}, {"end", false}};
+                json j = { {"end", false},
+                            {"reason", "database"}
+                        };
                 conn->send(code_.encode(j, "SendMessageBack"));
                 return;
             }
@@ -1006,7 +1013,9 @@ void Service::MessageSend(const TcpConnectionPtr &conn, const json &js) {
             MYSQL_RES *res = mysqlconn->ExcuteQuery(query);
             if (!res) {
                 LOG_ERROR << "Listfriendapply query failed ";
-                json j = {{"timestamp", timestamp}, {"end", false}};
+                json j = {{"end", false},
+                         {"result", "database"}
+            };
                 conn->send(code_.encode(j, "SendMessageBack"));
                 return;
             }
@@ -1019,7 +1028,9 @@ void Service::MessageSend(const TcpConnectionPtr &conn, const json &js) {
             MysqlRow row = result.GetRow();
             block = row.GetBool("block");
             if (block) {
-                json j = {{"timestamp", timestamp}, {"end", false}};
+                json j = {  {"end", false},
+                            {"result", "friend"}
+                        };
                 conn->send(code_.encode(j, "SendMessageBack"));
                 return;
             }
@@ -1073,26 +1084,30 @@ void Service::MessageSend(const TcpConnectionPtr &conn, const json &js) {
 
         for (auto &pair : messagestosend) {
             TcpConnectionPtr reconn = pair.first;
-            auto &ctx = sendqueue_[reconn];
             std::string msg = code_.encode(pair.second, "RecvMessage");
-
             EventLoop *loop = reconn->getLoop();
-            if (loop) {
-                loop->runInLoop([reconn, msg = std::move(msg), ctx]() mutable {
-                    ctx->pendingmessages.push(std::move(msg));
-
-                    if (!ctx->sending) {
-                        ctx->sending = true;
-                        std::string front = ctx->pendingmessages.front();
-                        reconn->send(front);
-                    }
-                });
-            }
+            auto &ctx = messagesendlist_[reconn];
+            auto ctxptr = std::make_shared<SendContext>(ctx);
+            loop->runInLoop([reconn, msg = std::move(msg), ctxptr]() mutable {
+                ctxptr->pendingMessages.push(std::move(msg));
+                if (!ctxptr->pendingMessages.empty()) {
+                    std::string front = ctxptr->pendingMessages.front();
+                    reconn->send(front);
+                    ctxptr->sending = true;
+                }
+            });
+            // threadpool_.SubmitTask([reconn, msg = std::move(msg), loop] {
+            //         loop->runInLoop([reconn, msg = std::move(msg)]() mutable {
+            //             reconn->send(msg);
+            //         });
+            // });
         }
 
     } catch (const std::exception &e) {
         LOG_ERROR << "Database error during message send: " << e.what();
-        json j = {{"timestamp", timestamp}, {"end", false}};
+        json j = {   {"end", false},
+                    {"result", "database"}
+                };
         conn->send(code_.encode(j, "SendMessageBack"));
         return;
     }

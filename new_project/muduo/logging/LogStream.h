@@ -49,6 +49,7 @@ class LogStream : noncopyable {
     LogStream &operator<<(const char *str);
     LogStream &operator<<(const unsigned char *str);
     LogStream &operator<<(const std::string &str);
+    LogStream& operator<<(std::string_view sv);
     LogStream &operator<<(const Buffer &buf);
 
     LogStream &operator<<(const GeneralTemplate &g);

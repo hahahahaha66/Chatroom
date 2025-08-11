@@ -138,6 +138,12 @@ LogStream& LogStream::operator<<(const std::string& str)
     return *this;
 }
 
+LogStream& LogStream::operator<<(std::string_view sv) {
+    *this << std::string(sv);  
+    return *this;
+}
+
+
 LogStream& LogStream::operator<<(const Buffer& buf)
 {
     *this << buf.toString();

@@ -89,10 +89,8 @@ void Client::stop() {
 
 void Client::send(const std::string &msg) {
     client_.getLoop()->runInLoop([this, msg]() {
-        if (client_.connection() && client_.connection()->connected()) {
             client_.connection()->send(msg);
-        }
-    });
+        });
 }
 
 inline void Client::waitInPutReady() {
@@ -118,14 +116,12 @@ void RegisterHandlerSafe(Dispatcher &dispatcher, const std::string &type,
 
 Client::Client(EventLoop &loop, uint16_t port, std::string ip, std::string name)
     : client_(&loop, InetAddress(port, ip), name), ip_(ip),
-      mainserverport_(port), loop_(&loop), dispatcher_(16) {
+      mainserverport_(port), loop_(&loop), dispatcher_(32) {
     client_.setConnectionCallback(
         std::bind(&Client::ConnectionCallBack, this, _1));
     client_.setMessageCallback(std::bind(&Client::OnMessage, this, _1, _2, _3));
     client_.setWriteCompleteCallback(
         std::bind(&Client::MessageCompleteCallback, this, _1));
-
-    // threadpool_.Start();
 
     RegisterHandlerSafe(dispatcher_, "RegisterBack", *this,
                         &Client::RegisterBack);
@@ -224,7 +220,9 @@ void Client::OnMessage(const TcpConnectionPtr &conn, Buffer *buffer,
             break;
         }
 
-        auto [type, js] = msgopt.value();
+        const auto &parsed = *msgopt;
+        const auto &type = std::get<0>(parsed);
+        const auto &js = std::get<1>(parsed);   
 
         // LOG_INFO << type;
 
@@ -249,7 +247,19 @@ void Client::RegisterBack(const TcpConnectionPtr &conn, const json &js) {
     if (end) {
         std::cout << "注册成功" << std::endl;
     } else {
-        std::cout << "注册失败" << std::endl;
+        std::string result;
+        AssignIfPresent(js, "result", result);
+        if (result == "net") {
+            std::cout << "网络传输失败,注册失败" << std::endl;
+        } else if (result == "type") {
+            std::cout << "名字,邮箱,或密码格式不正确,注册失败" << std::endl;
+        } else if (result == "database") {
+            std::cout << "数据库插入失败,注册失败" << std::endl;
+        } else if (result == "code") {
+            std::cout << "验证码不正确,注册失败" << std::endl;
+        } else {
+            std::cout << "注册失败" << std::endl;
+        }
     }
     notifyInputReady();
 }
@@ -271,7 +281,19 @@ void Client::LoginBack(const TcpConnectionPtr &conn, const json &js) {
         Flush();
         loop_->runEvery(2.0, std::bind(&Client::Flush, this));
     } else {
-        std::cout << "登陆失败" << std::endl;
+        std::string result;
+        AssignIfPresent(js, "result", result);
+        if (result == "type") {
+            std::cout << "邮箱或密码格式不正确,登陆失败" << std::endl;
+        } else if (result == "login") {
+            std::cout << "用户已登陆,登陆失败" << std::endl;
+        } else if (result == "wrong") {
+            std::cout << "邮箱或密码不正确,登陆失败" << std::endl;
+        } else if (result == "database") {
+            std::cout << "数据库操作失败,登陆失败" << std::endl;
+        } else {
+            std::cout << "登陆失败" << std::endl;
+        }
     }
     notifyInputReady();
 }
@@ -399,7 +421,15 @@ void Client::SendMessageBack(const TcpConnectionPtr &conn, const json &js) {
     if (end) {
         // std::cout << "Send successful" << std::endl;
     } else {
-        std::cout << "发送失败" << std::endl;
+        std::string result;
+        AssignIfPresent(js, "result", result);
+        if (result == "friend") {
+            std::cout << "你已经被好友屏蔽, 发送失败" << std::endl;
+        } else if (result == "database") {
+            std::cout << "数据库操作失败, 发送失败" << std::endl;
+        } else {
+            std::cout << "发送失败" << std::endl;
+        }
     }
 }
 
@@ -445,6 +475,7 @@ void Client::GetChatHistory(const json &js) {
 void Client::GetChatHistoryBack(const TcpConnectionPtr &conn, const json &js) {
     bool end = false;
     AssignIfPresent(js, "end", end);
+    std::cout << "-----------" << std::endl;
 
     if (end) {
         bool news = true;
@@ -1791,15 +1822,15 @@ void Client::InputLoop() {
             }
 
             if (friendlist_.find(friendid) == friendlist_.end()) {
+                ClearScreen();
                 std::cout << "未知好友id" << std::endl;
                 currentState_ = "MessageCenter";
-                ClearScreen();
                 continue;
             } else {
+                ClearScreen();
                 if (friendlist_[friendid].block_ == true) {
                     std::cout << "好友已被屏蔽" << std::endl;
                     currentState_ = "MessageCenter";
-                    ClearScreen();
                     continue;
                 }
             }

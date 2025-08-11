@@ -25,12 +25,9 @@
 
 using json = nlohmann::json;
 
-class ConnectionContext {
-  public:
-    ConnectionContext(std::queue<std::string> &&queue, bool sending)
-        : pendingmessages(queue), sending(sending) {};
-    std::queue<std::string> pendingmessages;
-    bool sending = false;
+struct SendContext {
+    std::queue<std::string> pendingMessages;
+    bool sending = false;  
 };
 
 struct Message {
@@ -62,10 +59,7 @@ class Service {
     void DeleteAccount(const TcpConnectionPtr &conn, const json &js);
     void RemoveUserConnect(const TcpConnectionPtr &conn);
     std::unordered_map<int, User> &GetOnlineUserList() { return onlineuser_; }
-    std::unordered_map<TcpConnectionPtr, std::shared_ptr<ConnectionContext>> &
-    GetSendQueue() {
-        return sendqueue_;
-    }
+    std::unordered_map<TcpConnectionPtr, SendContext> &GetMessageSendList() { return messagesendlist_; }
     void TimeoutDetection();
 
     // flush
@@ -128,9 +122,8 @@ class Service {
     sw::redis::Redis redis_;
 
     std::mutex mutex_;
-    std::unordered_map<TcpConnectionPtr, std::shared_ptr<ConnectionContext>>
-        sendqueue_;
     std::unordered_map<int, User> onlineuser_;
     std::vector<std::string> messagecachelist_;
+    std::unordered_map<TcpConnectionPtr, SendContext> messagesendlist_;
     std::unordered_map<std::string, int> tempverificode_;
 };

@@ -230,7 +230,6 @@ class Client {
     std::string name_;
     std::string password_;
 
-    // ThreadPool threadpool_;
     std::unordered_map<int, Friend> friendlist_;
     std::unordered_multimap<int, FriendApply> friendapplylist_;
     std::unordered_multimap<int, FriendApply> friendsendapplylist_;

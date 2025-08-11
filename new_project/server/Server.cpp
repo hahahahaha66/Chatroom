@@ -10,7 +10,7 @@ Server::Server(EventLoop *loop, const InetAddress &listenAddr,
     MysqlConnectionPool::Instance().Init("localhost", 3306, "hahaha", "123456",
                                          "chatroom", 48);
 
-    server_.setThreadNum(16);
+    server_.setThreadNum(32);
 
     server_.setConnectionCallback(std::bind(&Server::OnConnection, this, _1));
     server_.setMessageCallback(std::bind(&Server::OnMessage, this, _1, _2, _3));
@@ -101,17 +101,19 @@ void Server::start() {
 void Server::ThreadInitCallback(EventLoop *loop) {}
 
 void Server::MessageCompleteCallback(const TcpConnectionPtr &conn) {
-    if (service_.GetSendQueue().find(conn) != service_.GetSendQueue().end()) {
-        auto &ctx = service_.GetSendQueue()[conn];
-        if (ctx->sending) {
+    auto &list = service_.GetMessageSendList();
+    if (list.find(conn) != list.end()) {
+        auto &ctx = list[conn];
+            auto ctxptr = std::make_shared<SendContext>(ctx);
+        if (ctx.sending) {
             EventLoop *loop = conn->getLoop();
-            loop->runInLoop([this, conn, &ctx]() {
-                ctx->pendingmessages.pop();
-                if (!ctx->pendingmessages.empty()) {
-                    std::string front = ctx->pendingmessages.front();
+            loop->runInLoop([this, conn, ctxptr]() {
+                ctxptr->pendingMessages.pop();
+                if (!ctxptr->pendingMessages.empty()) {
+                    std::string front = ctxptr->pendingMessages.front();
                     conn->send(front);
                 } else {
-                    ctx->sending = false;
+                    ctxptr->sending = false;
                 }
             });
         }
