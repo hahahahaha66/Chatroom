@@ -24,6 +24,7 @@
 #include <type_traits>
 #include <unistd.h>
 #include <unordered_map>
+#include <utf8cpp/utf8.h>
 
 using std::placeholders::_1;
 using std::placeholders::_2;
@@ -199,6 +200,7 @@ class Client {
     void PrintfRed(char a);
     void ClearScreen();
     std::string GetHiddenInput(const std::string &prompt);
+    void RemoveInvalUTF8(std::string &s);
 
     void start();
     void stop();

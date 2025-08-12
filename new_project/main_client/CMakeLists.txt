@@ -20,8 +20,7 @@ include_directories(
     /usr/include/mysql               # MySQL 头文件路径
     /usr/local/include              # sw::redis++ 头文件路径
 )
- =========
-add_executable(c
+
 # 添加 muduo 链接库路径
 link_directories(${PROJECT_SOURCE_DIR}/../muduo/build/lib)
 
@@ -29,7 +28,9 @@ link_directories(${PROJECT_SOURCE_DIR}/../muduo/build/lib)
 file(GLOB_RECURSE CLIENT_COMMON_SOURCES
     ${PROJECT_SOURCE_DIR}/../tool/*.cpp
 )
-======= 客户端lient
+
+# ========= 客户端 =========
+add_executable(client
     ${PROJECT_SOURCE_DIR}/main_client.cpp
     ${PROJECT_SOURCE_DIR}/../client/Client.cpp
     ${PROJECT_SOURCE_DIR}/../ftp/FileClient.cpp
@@ -42,4 +43,3 @@ target_link_libraries(client
     profiler
     jemalloc
 )
-# ==

@@ -75,6 +75,14 @@ std::string Client::GetHiddenInput(const std::string &prompt = "输入密码: ")
     return password;
 }
 
+void Client::RemoveInvalUTF8(std::string &s) {
+    while (!s.empty()) {
+        if (utf8::is_valid(s.begin(), s.end()))
+            return;
+        s.pop_back();
+    }
+}
+
 void Client::PrintfRed(char a) { std::cout << "\033[1;31m" << a << "\033[0m"; }
 
 void Client::ClearScreen() { std::cout << "\033[2J\033[H"; }
@@ -1941,6 +1949,8 @@ void Client::InputLoop() {
                             break;
                         }
 
+                        RemoveInvalUTF8(message);
+
                         json js = {
                             {"senderid", userid_}, {"receiverid", friendid},
                             {"content", message},  {"type", "Private"},
@@ -1949,7 +1959,7 @@ void Client::InputLoop() {
 
                         // waitingback_ = true;
                         SendMessage(js);
-                        ;
+                        
 
                         // waitInPutReady();
                     }
@@ -2153,6 +2163,8 @@ void Client::InputLoop() {
                             std::cout << "你已被禁言,无法发送消息" << std::endl;
                             continue;
                         }
+
+                        RemoveInvalUTF8(message);
 
                         json js = {
                             {"senderid", userid_}, {"receiverid", groupid},
