@@ -1959,7 +1959,6 @@ void Client::InputLoop() {
 
                         // waitingback_ = true;
                         SendMessage(js);
-                        
 
                         // waitInPutReady();
                     }

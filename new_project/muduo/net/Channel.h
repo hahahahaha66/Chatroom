@@ -7,7 +7,6 @@
 
 #include <functional>
 #include <memory>
-#include <sys/epoll.h>
 
 class EventLoop;
 class Timestamp;

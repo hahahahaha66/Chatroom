@@ -5,7 +5,6 @@
 #include "../../base/noncopyable.h"
 #include "../Buffer.h"
 #include "Callback.h"
-#include "InetAddress.h"
 #include "Socket.h"
 
 #include <asm-generic/socket.h>

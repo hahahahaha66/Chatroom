@@ -3,7 +3,6 @@
 
 #include "../../base/noncopyable.h"
 #include "../Channel.h"
-#include "InetAddress.h"
 #include "Socket.h"
 
 class EventLoop;
